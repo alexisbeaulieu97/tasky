@@ -1,17 +1,18 @@
 [project]
 name = "tasky-storage"
 version = "0.1.0"
-description = "Add your description here"
+description = "Storage adapters for Tasky persistence layer"
 readme = "README.md"
-authors = [
-    { name = "Alexis Beaulieu", email = "alexisbeaulieu97@gmail.com" }
-]
+authors = [{ name = "Alexis Beaulieu", email = "alexisbeaulieu97@gmail.com" }]
 requires-python = ">=3.13"
-dependencies = ["tasky-shared"]
+dependencies = [
+    "pydantic>=2.0.0",
+    "tasky-tasks",
+]
 
 [build-system]
 requires = ["uv_build>=0.9.7,<0.10.0"]
 build-backend = "uv_build"
 
 [tool.uv.sources]
-tasky-shared = { workspace = true }
+tasky-tasks = { workspace = true }

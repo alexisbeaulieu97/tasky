@@ -2,20 +2,18 @@
 Task manager with LLMs in mind.
 
 ## Architecture Overview
-- **Domain core** lives in `tasky-core` where `TaskUseCases`, `TaskFactory`, and `TaskTree` orchestrate validation, traversal, and repository interactions. `TaskService` simply wires these policies together so adapters can swap implementations without changing callers (see `docs/core-architecture.md`).
-- **Settings & registry** concerns live in `tasky-settings`, which now exposes a `ProjectSettingsService`, `TaskRepositoryFactory`, and `ConfigRepository` helper. They encapsulate filesystem layout, repository wiring, and registry updates while keeping side effects behind testable seams (details in `docs/settings-architecture.md`).
-- `TaskySettings` configures the global registry backend (`registry_backend=json|sqlite`); when SQLite is selected, the service migrates the legacy JSON registry into `projects.db` automatically and keeps subsequent CLI commands concurrent-safe.
-- **CLI composition** is handled by Typer sub-apps plus a tiny dependency container (`tasky_cli.deps`). Commands receive a ready-made `CLIContext` via the `command_action` decorator (no need to poke `typer.Context.obj`) and delegate rendering to `tasky_cli.ui.*` (documented in `docs/cli-structure.md`).
+- `packages/tasky-tasks` hosts the task domain: immutable `TaskModel` definitions, validation rules, and orchestration services such as `TaskService`. It also publishes repository protocols (`tasky_tasks.ports`) that describe how persistence layers must behave.
+- `packages/tasky-projects` coordinates workspace-level concepts like registries and project metadata. It composes multiple task services while remaining free of infrastructure concerns.
+- `packages/tasky-storage` implements the repository protocols using concrete backends (JSON files today, additional adapters later). Each backend is responsible for translating between domain models and its storage representation.
+- `packages/tasky-hooks` defines lifecycle events and default dispatchers so hosts can react to changes (task created, project pruned, etc.) without coupling directly to domain internals.
+- `packages/tasky-settings` acts as the composition root. It reads configuration, selects the desired storage backend, wires the domain services, and exposes ready-to-use bundles for hosts.
+- `packages/tasky-cli` provides the Typer-based command line interface. Commands accept the services assembled by `tasky-settings`, marshal user input, and render results.
+- `src/tasky` is a thin entry point that forwards to `tasky-cli`, making it easy to ship additional front-ends without duplicating bootstrap code.
 
 ## Developer Workflow
 - Install dependencies with `uv sync`, lint via `uv run ruff check`, and run the full suite with `uv run pytest`.
-- When writing new features, prefer injecting dependencies (e.g., `TaskUseCases`, `ProjectSettingsService`) so logic stays testable. For reference implementations across packages, review `docs/project-structure.md` and `docs/settings-architecture.md`.
-- Add tests next to the code they exercise (package-level `tests/` folders) and use the dependency container overrides (`tasky_cli.deps.configure_dependencies/reset_dependencies`) for CLI-focused tests.
-- Task imports support strategies via `tasky task import --strategy append|replace|merge`; extend `tasky_core.importers` to add more behaviors.
-- Task maintenance commands (`tasky task complete`, `tasky task reopen`, `tasky task update --name/--details`) toggle completion state or edit content in place, firing the corresponding hook events so automations stay informed.
-- `tasky task export [--file path] [--completed|--pending]` snapshots tasks using the same JSON schema consumed by `tasky task import`, making round-trips straightforward. Use `--force` to overwrite an existing export file.
-- Project metadata stays declarative: run `tasky project config` to review or set `.tasky/config.json` fields (e.g., switch `tasks_file` to SQLite). The service migrates tasks automatically and guards against destructive changes unless `--force` is supplied.
-- Project progress is cached in the registry so `tasky project list` stays fast; pass `--refresh-progress` when you need to recompute counts after out-of-band edits.
-- CLI commands receive a shared `CLIContext` via `typer.Context.obj`, giving access to the Rich console plus Task/Project services; prefer `get_cli_context(ctx)` over importing factories directly.
-- Storage adapters: `JsonDocumentStore` powers the file-based workflow, while the new `SQLiteTaskRepository` gives larger workspaces a normalized relational backend (no more JSON blobs inside SQLite).
-- Domain models expose behavior: `Task` aggregates include helper methods (`add_subtask`, `remove_subtask`, `mark_complete`, etc.) so invariants (timestamps, completion state) stay near the data and tests can exercise them directly.
+- When writing new features, inject domain services or repositories instead of instantiating them inline so logic stays testable.
+- Add tests next to the code they exercise (`packages/<pkg>/tests/`) and use storage fakes or hooks test doubles to isolate scenarios.
+- `tasky task import` supports multiple strategies (`append`, `replace`, `merge`); extend the storage adapters or domain services to introduce new behaviors.
+- Task maintenance commands (`tasky task complete`, `tasky task reopen`, `tasky task update`) delegate to `TaskService` so invariants stay centralized and hooks fire consistently.
+- Project configuration flows through `tasky project config`; settings choose the proper repository implementation, migrate data when necessary, and keep CLI users insulated from infrastructure details.
