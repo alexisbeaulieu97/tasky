@@ -1,0 +1,17 @@
+[project]
+name = "tasky-storage"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "Alexis Beaulieu", email = "alexisbeaulieu97@gmail.com" }
+]
+requires-python = ">=3.13"
+dependencies = ["tasky-shared"]
+
+[build-system]
+requires = ["uv_build>=0.9.7,<0.10.0"]
+build-backend = "uv_build"
+
+[tool.uv.sources]
+tasky-shared = { workspace = true }
