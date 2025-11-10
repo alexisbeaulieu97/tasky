@@ -347,14 +347,10 @@ version = "0.1.0"
 source = { editable = "packages/tasky-tasks" }
 dependencies = [
     { name = "pydantic" },
-    { name = "tasky-settings" },
 ]
 
 [package.metadata]
-requires-dist = [
-    { name = "pydantic", specifier = ">=2.12.3" },
-    { name = "tasky-settings", editable = "packages/tasky-settings" },
-]
+requires-dist = [{ name = "pydantic", specifier = ">=2.12.3" }]
 
 [[package]]
 name = "typer"
