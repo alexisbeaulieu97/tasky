@@ -1,6 +1,7 @@
 # Repository Guidelines
 
 ## Project Structure & Module Organization
+- This workspace follows Domain-Driven Design / Clean Architecture: domains publish their models and ports, infrastructure implements those ports, settings compose the graph, and presentation layers consume the composed services.
 - `src/tasky`: CLI entry point and minimal glue for user interactions. It simply forwards to `tasky-cli` so the workspace can install multiple front-ends without duplicating boot code.
 - `packages/tasky-cli`: presentation layer built on Typer. Commands marshal user intent, call into the task/project services exported by the feature packages, and format results. No persistence or configuration logic belongs here.
 - `packages/tasky-tasks`: task domain models plus orchestration services (`TaskModel`, `TaskService`, validators). It owns task-centric business rules and publishes the repository protocols that storage adapters implement.
