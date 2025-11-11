@@ -5,9 +5,7 @@ description = "Add your description here"
 readme = "README.md"
 authors = [{ name = "Alexis Beaulieu", email = "alexisbeaulieu97@gmail.com" }]
 requires-python = ">=3.13"
-dependencies = [
-    "tasky-cli",
-]
+dependencies = ["tasky-cli"]
 
 [project.scripts]
 tasky = "tasky:main"
@@ -23,6 +21,7 @@ members = ["packages/*"]
 tasky-cli = { workspace = true }
 
 [dependency-groups]
-dev = [
-    "ruff>=0.14.4",
-]
+dev = ["pytest>=9.0.0", "ruff>=0.14.4"]
+
+[tool.pytest.ini_options]
+addopts = "--import-mode=importlib"
