@@ -1,5 +1,7 @@
 """Service layer for task management operations."""
 
+from __future__ import annotations
+
 from typing import TYPE_CHECKING
 
 from tasky_tasks.models import TaskModel
@@ -32,6 +34,7 @@ class TaskService:
 
     def update_task(self, task: TaskModel) -> None:
         """Update an existing task."""
+        task.mark_updated()
         self.repository.save_task(task)
 
     def delete_task(self, task_id: UUID) -> bool:
