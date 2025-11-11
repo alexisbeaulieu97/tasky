@@ -1,7 +1,11 @@
-from typing import Protocol
-from uuid import UUID
+"""Repository port definitions for task persistence operations."""
 
-from tasky_tasks.models import TaskModel
+from typing import TYPE_CHECKING, Protocol
+
+if TYPE_CHECKING:
+    from uuid import UUID
+
+    from tasky_tasks.models import TaskModel
 
 
 class TaskRepository(Protocol):

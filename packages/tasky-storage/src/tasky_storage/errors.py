@@ -1,16 +1,20 @@
+"""Exceptions for Tasky storage module."""
+
+from pydantic import ValidationError
+
+
 class StorageError(Exception):
     """Base exception for storage-related errors."""
-
-    pass
 
 
 class StorageConfigurationError(StorageError):
     """Raised when storage configuration is invalid."""
 
-    pass
-
 
 class StorageDataError(StorageError):
-    """Raised when data cannot be serialized/deserialized."""
+    """Raised when stored data is invalid."""
 
-    pass
+    def __init__(self, exc: ValidationError | str) -> None:
+        """Initialize StorageDataError with a ValidationError or message string."""
+        msg = f"Stored task data is invalid: {exc}" if isinstance(exc, ValidationError) else exc
+        super().__init__(msg)

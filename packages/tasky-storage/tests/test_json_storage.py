@@ -1,89 +1,96 @@
+"""Tests for the JsonStorage class in tasky-storage package."""
+
+from __future__ import annotations
+
 import json
-import tempfile
 from pathlib import Path
+from typing import Any
 
 import pytest
-
 from tasky_storage import JsonStorage, StorageDataError
 
 
+@pytest.fixture
+def temp_dir(tmp_path: Path) -> Path:
+    """Provide a temporary directory for tests."""
+    return tmp_path
+
+
+@pytest.fixture
+def storage_path(temp_dir: Path) -> Path:
+    """Provide a storage path in the temp directory."""
+    return temp_dir / "test.json"
+
+
+@pytest.fixture
+def store(storage_path: Path) -> JsonStorage:
+    """Provide a JsonStorage instance."""
+    return JsonStorage(path=storage_path)
+
+
 class TestJsonStorage:
-    def test_initialize_creates_file_with_template(self):
+    """Tests for the JsonStorage class."""
+
+    @staticmethod
+    def _read_json_file(path: Path) -> dict[str, Any]:
+        """Read and parse JSON file."""
+        with path.open() as f:
+            return json.load(f)
+
+    def test_initialize_creates_file_with_template(
+        self,
+        storage_path: Path,
+        store: JsonStorage,
+    ) -> None:
         """Test that initialize creates a file with the provided template."""
-        with tempfile.TemporaryDirectory() as temp_dir:
-            storage_path = Path(temp_dir) / "test.json"
-            store = JsonStorage(path=storage_path)
+        template: dict[str, Any] = {"tasks": [], "version": "1.0"}
+        store.initialize(template)
 
-            template = {"tasks": [], "version": "1.0"}
-            store.initialize(template)
+        assert storage_path.exists()
+        assert self._read_json_file(storage_path) == template
 
-            assert storage_path.exists()
-            with open(storage_path, "r") as f:
-                data = json.load(f)
-            assert data == template
-
-    def test_initialize_does_not_overwrite_existing_file(self):
+    def test_initialize_does_not_overwrite_existing_file(
+        self,
+        storage_path: Path,
+        store: JsonStorage,
+    ) -> None:
         """Test that initialize doesn't overwrite an existing file."""
-        with tempfile.TemporaryDirectory() as temp_dir:
-            storage_path = Path(temp_dir) / "test.json"
-            existing_data = {"existing": "data"}
+        existing_data = {"existing": "data"}
+        storage_path.write_text(json.dumps(existing_data))
 
-            # Create existing file
-            storage_path.write_text(json.dumps(existing_data))
+        store.initialize({"new": "template"})
 
-            store = JsonStorage(path=storage_path)
-            # Try to initialize with different template
-            store.initialize({"new": "template"})
+        assert self._read_json_file(storage_path) == existing_data
 
-            # File should still contain original data
-            with open(storage_path, "r") as f:
-                data = json.load(f)
-            assert data == existing_data
-
-    def test_load_reads_existing_file(self):
+    def test_load_reads_existing_file(self, storage_path: Path, store: JsonStorage) -> None:
         """Test that load correctly reads an existing file."""
-        with tempfile.TemporaryDirectory() as temp_dir:
-            storage_path = Path(temp_dir) / "test.json"
-            test_data = {"tasks": [{"id": "1", "title": "Test task"}]}
+        test_data = {"tasks": [{"id": "1", "title": "Test task"}]}
+        storage_path.write_text(json.dumps(test_data))
 
-            storage_path.write_text(json.dumps(test_data))
+        loaded_data = store.load()
 
-            store = JsonStorage(path=storage_path)
-            loaded_data = store.load()
+        assert loaded_data == test_data
 
-            assert loaded_data == test_data
-
-    def test_save_writes_data_to_file(self):
+    def test_save_writes_data_to_file(self, storage_path: Path, store: JsonStorage) -> None:
         """Test that save correctly writes data to file."""
-        with tempfile.TemporaryDirectory() as temp_dir:
-            storage_path = Path(temp_dir) / "test.json"
-            store = JsonStorage(path=storage_path)
+        test_data = {"updated": "content"}
 
-            test_data = {"updated": "content"}
-            store.save(test_data)
+        store.save(test_data)
 
-            assert storage_path.exists()
-            with open(storage_path, "r") as f:
-                data = json.load(f)
-            assert data == test_data
+        assert storage_path.exists()
+        assert self._read_json_file(storage_path) == test_data
 
-    def test_load_nonexistent_file_raises_error(self):
+    def test_load_nonexistent_file_raises_error(self, temp_dir: Path) -> None:
         """Test that loading a nonexistent file raises StorageDataError."""
-        with tempfile.TemporaryDirectory() as temp_dir:
-            storage_path = Path(temp_dir) / "nonexistent.json"
-            store = JsonStorage(path=storage_path)
+        storage_path = temp_dir / "nonexistent.json"
+        store = JsonStorage(path=storage_path)
 
-            with pytest.raises(StorageDataError):
-                store.load()
+        with pytest.raises(StorageDataError):
+            store.load()
 
-    def test_save_invalid_data_raises_error(self):
+    def test_save_invalid_data_raises_error(self, store: JsonStorage) -> None:
         """Test that saving non-serializable data raises StorageDataError."""
-        with tempfile.TemporaryDirectory() as temp_dir:
-            storage_path = Path(temp_dir) / "test.json"
-            store = JsonStorage(path=storage_path)
+        invalid_data = {"bad": {1, 2, 3}}  # sets are not JSON serializable
 
-            # Try to save data with non-serializable object
-            invalid_data = {"bad": set([1, 2, 3])}  # sets are not JSON serializable
-
-            with pytest.raises(StorageDataError):
-                store.save(invalid_data)
+        with pytest.raises(StorageDataError):
+            store.save(invalid_data)

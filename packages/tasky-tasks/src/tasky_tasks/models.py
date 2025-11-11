@@ -1,3 +1,5 @@
+"""Models for the Tasky Tasks package."""
+
 from datetime import datetime
 from enum import Enum
 from uuid import UUID, uuid4
@@ -6,12 +8,16 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 class TaskStatus(Enum):
+    """Enumeration of possible task statuses."""
+
     PENDING = "pending"
     COMPLETED = "completed"
     CANCELLED = "cancelled"
 
 
 class TaskModel(BaseModel):
+    """A model representing a task in the task management system."""
+
     model_config = ConfigDict(
         validate_assignment=True,
         extra="forbid",

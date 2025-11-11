@@ -1,3 +1,5 @@
+"""Commands related to project management in Tasky CLI."""
+
 from pathlib import Path
 
 import typer

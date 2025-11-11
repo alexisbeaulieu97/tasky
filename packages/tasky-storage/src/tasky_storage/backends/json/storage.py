@@ -1,3 +1,7 @@
+"""Filesystem-backed JSON storage helper for tasky."""
+
+from __future__ import annotations
+
 import json
 from datetime import datetime
 from enum import Enum
@@ -13,14 +17,15 @@ from tasky_storage.errors import StorageDataError
 class TaskyJSONEncoder(json.JSONEncoder):
     """JSON encoder that handles datetime, UUID, and enum objects."""
 
-    def default(self, obj: Any) -> Any:
-        if isinstance(obj, datetime):
-            return obj.isoformat()
-        if isinstance(obj, UUID):
-            return str(obj)
-        if isinstance(obj, Enum):
-            return obj.value
-        return super().default(obj)
+    def default(self, o: Any) -> Any:  # noqa: ANN401
+        """Encode datetime, UUID, and enum objects to JSON-serializable strings."""
+        if isinstance(o, datetime):
+            return o.isoformat()
+        if isinstance(o, UUID):
+            return str(o)
+        if isinstance(o, Enum):
+            return o.value
+        return super().default(o)
 
 
 class JsonStorage(BaseModel):
@@ -38,7 +43,8 @@ class JsonStorage(BaseModel):
                     encoding="utf-8",
                 )
             except (OSError, ValueError, TypeError) as exc:
-                raise StorageDataError(f"Failed to initialize storage: {exc}") from exc
+                msg = f"Failed to initialize storage: {exc}"
+                raise StorageDataError(msg) from exc
 
     def load(self) -> dict[str, Any]:
         """Load and return the persisted JSON document."""
@@ -46,7 +52,8 @@ class JsonStorage(BaseModel):
             content = self.path.read_text(encoding="utf-8")
             return json.loads(content)
         except (FileNotFoundError, OSError, ValueError, TypeError) as exc:
-            raise StorageDataError(f"Failed to load storage: {exc}") from exc
+            msg = f"Failed to load storage: {exc}"
+            raise StorageDataError(msg) from exc
 
     def save(self, data: dict[str, Any]) -> None:
         """Serialize and persist the provided document."""
@@ -57,4 +64,5 @@ class JsonStorage(BaseModel):
                 encoding="utf-8",
             )
         except (OSError, ValueError, TypeError) as exc:
-            raise StorageDataError(f"Failed to save storage: {exc}") from exc
+            msg = f"Failed to save storage: {exc}"
+            raise StorageDataError(msg) from exc

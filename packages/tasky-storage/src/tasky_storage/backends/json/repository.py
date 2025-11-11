@@ -1,9 +1,15 @@
-from pathlib import Path
+"""JSON-based task repository implementation for the Tasky application.
+
+This module defines the JsonTaskRepository class, which implements the TaskRepository
+protocol using JSON file storage. It handles persistence, retrieval, and management of
+TaskModel instances through a JsonStorage backend and TaskDocument structure.
+"""
+
+from __future__ import annotations
+
 from typing import TYPE_CHECKING, Any
-from uuid import UUID
 
 from pydantic import BaseModel, ValidationError
-from tasky_tasks.models import TaskModel
 
 from tasky_storage.backends.json.document import TaskDocument
 from tasky_storage.backends.json.mappers import (
@@ -12,6 +18,12 @@ from tasky_storage.backends.json.mappers import (
 )
 from tasky_storage.backends.json.storage import JsonStorage
 from tasky_storage.errors import StorageDataError
+
+if TYPE_CHECKING:
+    from pathlib import Path
+    from uuid import UUID
+
+    from tasky_tasks.models import TaskModel
 
 
 class JsonTaskRepository(BaseModel):
@@ -76,7 +88,7 @@ class JsonTaskRepository(BaseModel):
         return str(task_id) in document.tasks
 
     @classmethod
-    def from_path(cls, path: Path) -> "JsonTaskRepository":
+    def from_path(cls, path: Path) -> JsonTaskRepository:
         """Create a repository from a file path."""
         storage = JsonStorage(path=path)
         return cls(storage=storage)
@@ -94,27 +106,16 @@ class JsonTaskRepository(BaseModel):
         try:
             return TaskDocument.model_validate(data)
         except ValidationError as exc:
-            raise StorageDataError(f"Stored task data is invalid: {exc}") from exc
+            raise StorageDataError(exc) from exc
 
     @staticmethod
     def _snapshot_to_task(snapshot: dict[str, Any]) -> TaskModel:
         try:
             return snapshot_to_task_model(snapshot)
         except ValidationError as exc:
-            raise StorageDataError(f"Stored task data is invalid: {exc}") from exc
+            raise StorageDataError(exc) from exc
 
     @staticmethod
     def _originated_from_missing_file(error: StorageDataError) -> bool:
         cause = error.__cause__ or error.__context__
         return isinstance(cause, FileNotFoundError)
-
-
-if TYPE_CHECKING:
-    from typing import assert_type
-
-    from tasky_tasks.ports import TaskRepository
-
-    assert_type(
-        JsonTaskRepository(storage=JsonStorage(path=Path("placeholder.json"))),
-        TaskRepository,
-    )

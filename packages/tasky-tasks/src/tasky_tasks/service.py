@@ -1,10 +1,18 @@
-from uuid import UUID
+"""Service layer for task management operations."""
+
+from typing import TYPE_CHECKING
 
 from tasky_tasks.models import TaskModel
-from tasky_tasks.ports import TaskRepository
+
+if TYPE_CHECKING:
+    from uuid import UUID
+
+    from tasky_tasks.ports import TaskRepository
 
 
 class TaskService:
+    """Service for managing tasks."""
+
     def __init__(self, repository: TaskRepository) -> None:
         self.repository = repository
 

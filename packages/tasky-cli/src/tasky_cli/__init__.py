@@ -1,3 +1,5 @@
+"""Tasky CLI package entry point."""
+
 from __future__ import annotations
 
 import typer
@@ -11,6 +13,7 @@ app.add_typer(task_app, name="task")
 
 
 def main() -> None:
+    """Run the Tasky CLI application."""
     app()
 
 
