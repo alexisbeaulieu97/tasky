@@ -1,15 +1,26 @@
-"""Service layer for task management operations."""
+"""Service layer for task management operations.
+
+The service boundary translates storage-level failures into domain exceptions so
+callers receive consistent error semantics.
+"""
 
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from tasky_tasks.exceptions import TaskNotFoundError, TaskValidationError
 from tasky_tasks.models import TaskModel
 
 if TYPE_CHECKING:
     from uuid import UUID
 
     from tasky_tasks.ports import TaskRepository
+
+# Import StorageDataError or use a fallback if storage package is unavailable
+try:  # pragma: no cover - optional dependency at runtime
+    from tasky_storage.errors import StorageDataError
+except ModuleNotFoundError:  # pragma: no cover - fallback when storage is absent
+    StorageDataError = type("StorageDataError", (Exception,), {})  # type: ignore[misc,assignment]
 
 
 class TaskService:
@@ -24,9 +35,29 @@ class TaskService:
         self.repository.save_task(task)
         return task
 
-    def get_task(self, task_id: UUID) -> TaskModel | None:
-        """Get a task by ID."""
-        return self.repository.get_task(task_id)
+    def get_task(self, task_id: UUID) -> TaskModel:
+        """Get a task by ID.
+
+        Raises
+        ------
+        TaskNotFoundError
+            Raised when the requested task does not exist.
+        TaskValidationError
+            Raised when stored task data is invalid.
+        StorageError
+            Propagated when lower layers encounter infrastructure failures.
+
+        """
+        try:
+            task = self.repository.get_task(task_id)
+        except StorageDataError as exc:
+            message = f"Stored data for task '{task_id}' is invalid."
+            raise TaskValidationError(message) from exc
+
+        if task is None:
+            raise TaskNotFoundError(task_id)
+
+        return task
 
     def get_all_tasks(self) -> list[TaskModel]:
         """Get all tasks."""
@@ -38,8 +69,33 @@ class TaskService:
         self.repository.save_task(task)
 
     def delete_task(self, task_id: UUID) -> bool:
-        """Delete a task by ID."""
-        return self.repository.delete_task(task_id)
+        """Delete a task by ID.
+
+        Raises
+        ------
+        TaskNotFoundError
+            Raised when the task to delete does not exist.
+        TaskValidationError
+            Raised when stored task data is invalid.
+        StorageError
+            Propagated when lower layers encounter infrastructure failures.
+
+        Returns
+        -------
+        bool
+            ``True`` when the task was removed successfully.
+
+        """
+        try:
+            removed = self.repository.delete_task(task_id)
+        except StorageDataError as exc:
+            message = f"Stored data for task '{task_id}' is invalid."
+            raise TaskValidationError(message) from exc
+
+        if not removed:
+            raise TaskNotFoundError(task_id)
+
+        return True
 
     def task_exists(self, task_id: UUID) -> bool:
         """Check if a task exists."""

@@ -1,22 +1,12 @@
-# Specification: Task Domain Exceptions
+# task-domain-exceptions Specification
 
-**Capability**: `task-domain-exceptions`  
-**Status**: Draft  
-**Created**: 2025-11-11
-
-## Overview
+## Purpose
 
 Defines a structured exception hierarchy for the task domain that enables precise error handling, rich error context, and clear separation between domain violations and infrastructure failures.
 
----
-
-## ADDED Requirements
-
+## Requirements
 ### Requirement: Base Domain Exception
 
-**ID**: `task-domain-exceptions-base`  
-**Priority**: High  
-**Type**: Functional
 
 The task domain SHALL provide a base exception class that:
 1. Serves as the parent for all task-related domain exceptions
@@ -31,13 +21,9 @@ The task domain SHALL provide a base exception class that:
 **Then** catching `TaskDomainError` SHALL catch all domain-specific exceptions  
 **And** the exception type can be inspected for specific handling
 
----
 
 ### Requirement: Task Not Found Exception
 
-**ID**: `task-domain-exceptions-not-found`  
-**Priority**: High  
-**Type**: Functional
 
 The task domain SHALL provide a `TaskNotFoundError` exception that:
 1. Inherits from `TaskDomainError`
@@ -60,13 +46,9 @@ The task domain SHALL provide a `TaskNotFoundError` exception that:
 **Then** a `TaskNotFoundError` SHALL be raised  
 **And** the exception SHALL include the task_id `xyz`
 
----
 
 ### Requirement: Task Validation Exception
 
-**ID**: `task-domain-exceptions-validation`  
-**Priority**: High  
-**Type**: Functional
 
 The task domain SHALL provide a `TaskValidationError` exception that:
 1. Inherits from `TaskDomainError`
@@ -82,13 +64,9 @@ The task domain SHALL provide a `TaskValidationError` exception that:
 **And** the exception message SHALL describe the validation failure  
 **And** the exception MAY include the field name that failed
 
----
 
 ### Requirement: Invalid State Transition Exception
 
-**ID**: `task-domain-exceptions-state-transition`  
-**Priority**: Medium  
-**Type**: Functional
 
 The task domain SHALL provide an `InvalidStateTransitionError` exception that:
 1. Inherits from `TaskDomainError`
@@ -107,19 +85,11 @@ The task domain SHALL provide an `InvalidStateTransitionError` exception that:
 **And** the exception SHALL include `task_id`, `from_status = completed`, `to_status = cancelled`  
 **And** the exception message SHALL indicate the invalid transition
 
----
 
 ### Requirement: Exception Context Preservation
 
-**ID**: `task-domain-exceptions-context`  
-**Priority**: High  
-**Type**: Functional
 
-All domain exceptions SHALL:
-1. Preserve context data as exception attributes (not just in message)
-2. Support both positional and keyword argument construction
-3. Generate default messages automatically from context
-4. Allow custom messages to be provided
+All domain exceptions SHALL preserve context data as exception attributes (not just in the message), SHALL support both positional and keyword argument construction, SHALL generate default messages automatically from context, and SHALL allow custom messages to be provided.
 
 #### Scenario: Exception attributes accessible
 
@@ -135,19 +105,11 @@ All domain exceptions SHALL:
 **Then** the custom message SHALL be preserved  
 **And** the exception SHALL still be an instance of `TaskValidationError`
 
----
 
 ### Requirement: Exception Module Organization
 
-**ID**: `task-domain-exceptions-organization`  
-**Priority**: Medium  
-**Type**: Non-Functional
 
-The exception hierarchy SHALL:
-1. Be defined in `packages/tasky-tasks/src/tasky_tasks/exceptions.py`
-2. Be exported from `tasky_tasks.__init__` for external use
-3. Include docstrings explaining when each exception is raised
-4. Follow Python exception naming conventions (suffix with `Error`)
+The exception hierarchy SHALL be defined in `packages/tasky-tasks/src/tasky_tasks/exceptions.py`, SHALL be exported from `tasky_tasks.__init__` for external use, SHALL include docstrings explaining when each exception is raised, and SHALL follow Python exception naming conventions (suffix with `Error`).
 
 #### Scenario: Importing exceptions
 
@@ -156,19 +118,11 @@ The exception hierarchy SHALL:
 **Then** all exception classes SHALL be importable from the package root  
 **And** IDEs SHALL provide autocomplete for exception names
 
----
 
 ### Requirement: Exception Serialization
 
-**ID**: `task-domain-exceptions-serialization`  
-**Priority**: Low  
-**Type**: Non-Functional
 
-Domain exceptions SHALL:
-1. Support string representation via `__str__` with human-readable messages
-2. Support `repr()` showing exception type and context attributes
-3. Be compatible with Python's traceback system
-4. Preserve context through exception chaining
+Domain exceptions SHALL support string representation via `__str__` with human-readable messages, SHALL support `repr()` showing exception type and context attributes, SHALL be compatible with Python's traceback system, and SHALL preserve context through exception chaining.
 
 #### Scenario: Exception string representation
 
@@ -184,65 +138,3 @@ Domain exceptions SHALL:
 **Then** `repr(exception)` SHALL show the exception type and key context  
 **And** developers can identify the error source quickly
 
----
-
-## Design Notes
-
-### Exception Hierarchy Rationale
-
-The flat hierarchy (all exceptions inherit directly from `TaskDomainError`) is intentional:
-- **Simplicity**: Easy to understand and extend
-- **Flexibility**: No premature categorization
-- **Explicit handling**: Forces explicit handling of each case
-
-Future groupings (e.g., `TaskOperationalError`, `TaskBusinessRuleError`) can be added if patterns emerge, but YAGNI applies initially.
-
-### Context Over Messages
-
-Exceptions store context as attributes rather than embedding it only in messages because:
-1. **Structured logging**: Can log `task_id` as a searchable field
-2. **Error tracking**: Can aggregate errors by task_id or transition
-3. **Testing**: Can assert on specific attribute values
-4. **Localization**: Can format messages differently per locale (future)
-
-### Compatibility with Storage Exceptions
-
-Domain exceptions are distinct from `StorageError` hierarchy:
-- `StorageError`: Infrastructure concerns (file I/O, serialization)
-- `TaskDomainError`: Business rule violations
-
-Service layer may catch `StorageError` and re-raise as domain exception when appropriate (e.g., `StorageDataError` → `TaskValidationError` if corrupt data).
-
----
-
-## Testing Requirements
-
-### Unit Tests
-
-1. ✅ Each exception class can be instantiated with required context
-2. ✅ Exception messages are generated correctly
-3. ✅ Context attributes are accessible after construction
-4. ✅ Exceptions inherit from correct base classes
-5. ✅ String representations are human-readable
-
-### Integration Tests
-
-1. ✅ Exceptions can be caught by base class handler
-2. ✅ Exception chaining preserves original context
-3. ✅ Exceptions work correctly with Python's traceback system
-
----
-
-## Non-Functional Requirements
-
-- **Performance**: Exception construction overhead SHALL be negligible (<1ms)
-- **Memory**: Exception instances SHALL not hold references to large objects
-- **Documentation**: Each exception class SHALL have docstring with usage examples
-
----
-
-## Future Considerations
-
-- **Internationalization**: Exception messages may need i18n support
-- **Error codes**: May add numeric error codes for API responses
-- **Structured errors**: May extend exceptions with structured error details for rich clients

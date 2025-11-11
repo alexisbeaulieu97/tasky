@@ -7,7 +7,7 @@
 
 ### Phase 1: Exception Foundation (Domain Layer)
 
-- [ ] **1.1**: Create `packages/tasky-tasks/src/tasky_tasks/exceptions.py`
+- [x] **1.1**: Create `packages/tasky-tasks/src/tasky_tasks/exceptions.py`
   - Define `TaskDomainError` base class with docstring
   - Define `TaskNotFoundError` with `task_id` attribute
   - Define `TaskValidationError` with `message` attribute
@@ -17,14 +17,14 @@
   - Implement `__repr__` methods for debugging
   - Add comprehensive docstrings for each exception class
 
-- [ ] **1.2**: Update `packages/tasky-tasks/src/tasky_tasks/__init__.py`
+- [x] **1.2**: Update `packages/tasky-tasks/src/tasky_tasks/__init__.py`
   - Export `TaskDomainError`
   - Export `TaskNotFoundError`
   - Export `TaskValidationError`
   - Export `InvalidStateTransitionError`
   - Add exports to `__all__` list
 
-- [ ] **1.3**: Create `packages/tasky-tasks/tests/test_exceptions.py`
+- [x] **1.3**: Create `packages/tasky-tasks/tests/test_exceptions.py`
   - Test `TaskDomainError` base class instantiation
   - Test `TaskNotFoundError` with task_id context
   - Test `TaskValidationError` with message
@@ -36,28 +36,28 @@
 
 ### Phase 2: Service Layer Integration
 
-- [ ] **2.1**: Update `packages/tasky-tasks/src/tasky_tasks/service.py`
+- [x] **2.1**: Update `packages/tasky-tasks/src/tasky_tasks/service.py`
   - Import exception classes from `tasky_tasks.exceptions`
   - Update `get_task()` to raise `TaskNotFoundError` when task not found
   - Update `delete_task()` to raise `TaskNotFoundError` when task not found
   - Add docstrings documenting raised exceptions
   - Add type hints for return types (remove `| None` where exceptions handle failures)
 
-- [ ] **2.2**: Create `packages/tasky-tasks/tests/test_service_exceptions.py`
+- [x] **2.2**: Create `packages/tasky-tasks/tests/test_service_exceptions.py`
   - Test `get_task()` raises `TaskNotFoundError` for non-existent task
   - Test `delete_task()` raises `TaskNotFoundError` for non-existent task
   - Test exception includes correct task_id context
   - Test successful operations don't raise exceptions
   - Test exception messages are descriptive
 
-- [ ] **2.3**: Update existing service tests
+- [x] **2.3**: Update existing service tests
   - Review `packages/tasky-tasks/tests/test_service.py` (if exists)
   - Update tests expecting `None` returns to expect exceptions
   - Add exception assertions where appropriate
 
 ### Phase 3: CLI Error Handling
 
-- [ ] **3.1**: Update `packages/tasky-cli/src/tasky_cli/commands/tasks.py`
+- [x] **3.1**: Update `packages/tasky-cli/src/tasky_cli/commands/tasks.py`
   - Import exception classes from `tasky_tasks`
   - Add try-except blocks to all task commands
   - Handle `TaskNotFoundError` with user-friendly message
@@ -67,20 +67,20 @@
   - Raise `typer.Exit(1)` for domain errors
   - Raise `typer.Exit(3)` for storage errors
 
-- [ ] **3.2**: Implement error message formatting
+- [x] **3.2**: Implement error message formatting
   - Create error message templates for each exception type
   - Extract context (task_id, status) from exceptions
   - Format messages as "Error: <description>"
   - Keep messages concise and actionable
   - Add suggestions where appropriate
 
-- [ ] **3.3**: Add verbose mode support (optional)
+- [x] **3.3**: Add verbose mode support (optional)
   - Check if verbose flag exists from existing implementation
   - If verbose, display full traceback
   - If not verbose, display only user message
   - Ensure verbose mode works with all error types
 
-- [ ] **3.4**: Create `packages/tasky-cli/tests/test_error_handling.py`
+- [x] **3.4**: Create `packages/tasky-cli/tests/test_error_handling.py`
   - Test each command handles `TaskNotFoundError` correctly
   - Test error messages are formatted properly
   - Test exit codes are correct (1 for domain, 3 for storage)
@@ -89,14 +89,14 @@
 
 ### Phase 4: Integration Testing
 
-- [ ] **4.1**: Create integration test scenarios
+- [x] **4.1**: Create integration test scenarios
   - Test end-to-end error flow: repository → service → CLI
   - Test task not found scenario with real repository
   - Test validation error scenario
   - Test multiple commands handle errors consistently
   - Verify no Python exceptions visible in CLI output
 
-- [ ] **4.2**: Update existing CLI tests
+- [x] **4.2**: Update existing CLI tests
   - Review existing tests in `packages/tasky-cli/tests/`
   - Update tests that may be affected by exception changes
   - Add assertions for error cases
@@ -104,19 +104,19 @@
 
 ### Phase 5: Documentation and Validation
 
-- [ ] **5.1**: Update code documentation
+- [x] **5.1**: Update code documentation
   - Add docstring examples showing exception usage
   - Document error propagation strategy in module docstrings
   - Update README files if needed
   - Add type hints consistently
 
-- [ ] **5.2**: Run validation
+- [x] **5.2**: Run validation
   - Execute `uv run pytest` to ensure all tests pass
   - Execute `uv run ruff check --fix` to ensure linting passes
   - Execute `openspec validate add-domain-exception-hierarchy --strict`
   - Fix any validation issues
 
-- [ ] **5.3**: Manual testing
+- [x] **5.3**: Manual testing
   - Test each CLI command with invalid inputs
   - Verify error messages are clear and helpful
   - Check exit codes using `echo $?` after commands

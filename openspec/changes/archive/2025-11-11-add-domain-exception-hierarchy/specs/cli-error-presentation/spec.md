@@ -18,11 +18,7 @@ Defines how the Tasky CLI presents errors to users, maps exceptions to user-frie
 **Priority**: High  
 **Type**: Functional
 
-The CLI SHALL:
-1. Catch domain exceptions and present clear, actionable messages
-2. Hide technical details (stack traces, exception types) in normal operation
-3. Use language appropriate for end users, not developers
-4. Provide context about what operation failed and why
+The CLI SHALL catch domain exceptions and present clear, actionable messages. It SHALL hide technical details (stack traces, exception types) in normal operation, SHALL use language appropriate for end users (not developers), and SHALL provide context about what operation failed and why.
 
 #### Scenario: Task not found message
 
@@ -56,11 +52,7 @@ The CLI SHALL:
 **Priority**: High  
 **Type**: Functional
 
-The CLI SHALL:
-1. Exit with code 0 for successful operations
-2. Exit with code 1 for domain errors (business rule violations)
-3. Exit with code 2 for CLI usage errors (invalid arguments)
-4. Exit with code 3 for infrastructure errors (storage failures)
+The CLI SHALL exit with code 0 for successful operations, SHALL exit with code 1 for domain errors (business rule violations), SHALL exit with code 2 for CLI usage errors (invalid arguments), and SHALL exit with code 3 for infrastructure errors (storage failures).
 
 #### Scenario: Success exit code
 
@@ -89,11 +81,7 @@ The CLI SHALL:
 **Priority**: Medium  
 **Type**: Architectural
 
-The CLI SHALL:
-1. Implement error handling consistently across all commands
-2. Avoid duplicated error handling code
-3. Use decorators or context managers for common error patterns
-4. Handle unexpected errors gracefully with generic message
+The CLI SHALL implement error handling consistently across all commands, SHALL avoid duplicated error handling code, SHALL use decorators or context managers for common error patterns, and SHALL handle unexpected errors gracefully with a generic message.
 
 #### Scenario: Consistent error handling
 
@@ -118,11 +106,7 @@ The CLI SHALL:
 **Priority**: Low  
 **Type**: Functional
 
-The CLI SHALL:
-1. Support a `--verbose` or `-v` flag for detailed error output
-2. Display full stack traces when verbose mode is enabled
-3. Include exception types and context in verbose output
-4. Default to user-friendly messages without verbose flag
+The CLI SHALL support a `--verbose` or `-v` flag for detailed error output, SHALL display full stack traces when verbose mode is enabled, SHALL include exception types and context in verbose output, and SHALL default to user-friendly messages without the verbose flag.
 
 #### Scenario: Normal error output
 
@@ -147,11 +131,7 @@ The CLI SHALL:
 **Priority**: Medium  
 **Type**: Non-Functional
 
-Error messages SHALL:
-1. Start with "Error: " prefix for clarity
-2. Use consistent formatting across all commands
-3. Highlight key information (task IDs, statuses) if terminal supports it
-4. Keep messages concise (≤2 lines when possible)
+Error messages SHALL start with an "Error: " prefix for clarity, SHALL use consistent formatting across all commands, SHALL highlight key information (task IDs, statuses) if the terminal supports it, and SHALL keep messages concise (≤2 lines when possible).
 
 #### Scenario: Error message structure
 
@@ -177,11 +157,7 @@ Error messages SHALL:
 **Priority**: Medium  
 **Type**: Functional
 
-Error messages SHALL:
-1. Suggest next steps when possible
-2. Reference valid options for invalid inputs
-3. Provide command examples for common mistakes
-4. Link to help or documentation when appropriate
+Error messages SHALL suggest next steps when possible, SHALL reference valid options for invalid inputs, SHALL provide command examples for common mistakes, and SHALL link to help or documentation when appropriate.
 
 #### Scenario: Invalid task ID format
 
@@ -204,11 +180,7 @@ Error messages SHALL:
 **Priority**: Low  
 **Type**: Functional
 
-When handling exceptions, the CLI SHALL:
-1. Extract context from exception attributes (task_id, status, etc.)
-2. Use context to personalize error messages
-3. Preserve context for logging (future)
-4. Not rely solely on exception message strings
+When handling exceptions, the CLI SHALL extract context from exception attributes (task_id, status, etc.), SHALL use context to personalize error messages, SHALL preserve context for logging (future), and SHALL not rely solely on exception message strings.
 
 #### Scenario: Using exception context
 
@@ -217,122 +189,3 @@ When handling exceptions, the CLI SHALL:
 **Then** the CLI SHALL extract `task_id` from exception attributes  
 **And** include it in the formatted message: "Task 'abc-123' not found"
 
----
-
-## MODIFIED Requirements
-
-None (no existing CLI error handling to modify)
-
----
-
-## Design Notes
-
-### Error Handling Strategy
-
-**Three-Layer Approach**:
-
-1. **Command Level**: Specific handlers for command-specific scenarios
-2. **App Level**: Generic handlers for common exceptions
-3. **Global Level**: Catch-all for unexpected errors
-
-```python
-@task_app.command()
-def delete_command(task_id: str):
-    try:
-        # Command logic
-        pass
-    except TaskNotFoundError as e:
-        # Specific handler
-        typer.echo(f"Error: Task '{e.task_id}' not found", err=True)
-        raise typer.Exit(1)
-    except Exception as e:
-        # Fallback handler
-        handle_unexpected_error(e)
-```
-
-### Exit Code Conventions
-
-| Code | Meaning | Examples |
-|------|---------|----------|
-| 0 | Success | All operations completed |
-| 1 | Domain error | Not found, validation, state transition |
-| 2 | Usage error | Invalid arguments, missing required options |
-| 3 | Infrastructure | Storage failures, file I/O errors |
-
-Rationale: Follows Unix conventions where 0=success, 1=general error, 2=usage error.
-
-### Message Composition Guidelines
-
-1. **Clarity**: User understands what went wrong
-2. **Context**: Include relevant IDs or values
-3. **Action**: Suggest what to do next
-4. **Brevity**: Keep messages short
-
-**Template**:
-```
-Error: <What failed>
-Suggestion: <How to fix>
-```
-
-**Examples**:
-- ❌ "Task not found" (no context)
-- ✅ "Error: Task 'abc-123' not found"
-
-- ❌ "InvalidStateTransitionError" (technical)
-- ✅ "Error: Cannot mark completed task as cancelled"
-
-### Verbose Mode Considerations
-
-Verbose mode is for developers/debugging, not normal users:
-- Show full tracebacks
-- Include exception types
-- Display context attributes
-- Reveal internal state
-
-Normal mode is for users:
-- Hide technical details
-- Use plain language
-- Focus on solutions
-- Keep output clean
-
----
-
-## Testing Requirements
-
-### Unit Tests
-
-1. ✅ Error messages formatted correctly for each exception type
-2. ✅ Exit codes match expected values
-3. ✅ Context extracted from exceptions properly
-4. ✅ Verbose mode toggles detailed output
-
-### Integration Tests
-
-1. ✅ End-to-end error handling from service to CLI output
-2. ✅ Error messages appear on stderr, not stdout
-3. ✅ Commands exit with appropriate codes
-4. ✅ User sees actionable messages for common errors
-
-### Acceptance Tests
-
-1. ✅ Non-technical users understand error messages
-2. ✅ Error guidance helps users resolve issues
-3. ✅ No Python exceptions visible in normal operation
-
----
-
-## Non-Functional Requirements
-
-- **Usability**: Error messages SHALL be understandable by non-developers
-- **Consistency**: Similar errors SHALL produce similar messages
-- **Accessibility**: Error messages SHALL work in non-color terminals
-- **Localization**: Messages SHALL use consistent terminology for future i18n
-
----
-
-## Future Considerations
-
-- **Error logging**: Log errors to file for debugging (separate logging change)
-- **Error reporting**: Optionally report crashes to telemetry service
-- **Rich formatting**: Use Rich library for better terminal output
-- **Interactive help**: Suggest commands interactively after errors
