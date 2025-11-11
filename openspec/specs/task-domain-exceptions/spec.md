@@ -1,22 +1,12 @@
-# Specification: Task Domain Exceptions
+# task-domain-exceptions Specification
 
-**Capability**: `task-domain-exceptions`  
-**Status**: Draft  
-**Created**: 2025-11-11
-
-## Overview
+## Purpose
 
 Defines a structured exception hierarchy for the task domain that enables precise error handling, rich error context, and clear separation between domain violations and infrastructure failures.
 
----
-
-## ADDED Requirements
-
+## Requirements
 ### Requirement: Base Domain Exception
 
-**ID**: `task-domain-exceptions-base`  
-**Priority**: High  
-**Type**: Functional
 
 The task domain SHALL provide a base exception class that:
 1. Serves as the parent for all task-related domain exceptions
@@ -31,13 +21,9 @@ The task domain SHALL provide a base exception class that:
 **Then** catching `TaskDomainError` SHALL catch all domain-specific exceptions  
 **And** the exception type can be inspected for specific handling
 
----
 
 ### Requirement: Task Not Found Exception
 
-**ID**: `task-domain-exceptions-not-found`  
-**Priority**: High  
-**Type**: Functional
 
 The task domain SHALL provide a `TaskNotFoundError` exception that:
 1. Inherits from `TaskDomainError`
@@ -60,13 +46,9 @@ The task domain SHALL provide a `TaskNotFoundError` exception that:
 **Then** a `TaskNotFoundError` SHALL be raised  
 **And** the exception SHALL include the task_id `xyz`
 
----
 
 ### Requirement: Task Validation Exception
 
-**ID**: `task-domain-exceptions-validation`  
-**Priority**: High  
-**Type**: Functional
 
 The task domain SHALL provide a `TaskValidationError` exception that:
 1. Inherits from `TaskDomainError`
@@ -82,13 +64,9 @@ The task domain SHALL provide a `TaskValidationError` exception that:
 **And** the exception message SHALL describe the validation failure  
 **And** the exception MAY include the field name that failed
 
----
 
 ### Requirement: Invalid State Transition Exception
 
-**ID**: `task-domain-exceptions-state-transition`  
-**Priority**: Medium  
-**Type**: Functional
 
 The task domain SHALL provide an `InvalidStateTransitionError` exception that:
 1. Inherits from `TaskDomainError`
@@ -107,13 +85,9 @@ The task domain SHALL provide an `InvalidStateTransitionError` exception that:
 **And** the exception SHALL include `task_id`, `from_status = completed`, `to_status = cancelled`  
 **And** the exception message SHALL indicate the invalid transition
 
----
 
 ### Requirement: Exception Context Preservation
 
-**ID**: `task-domain-exceptions-context`  
-**Priority**: High  
-**Type**: Functional
 
 All domain exceptions SHALL preserve context data as exception attributes (not just in the message), SHALL support both positional and keyword argument construction, SHALL generate default messages automatically from context, and SHALL allow custom messages to be provided.
 
@@ -131,13 +105,9 @@ All domain exceptions SHALL preserve context data as exception attributes (not j
 **Then** the custom message SHALL be preserved  
 **And** the exception SHALL still be an instance of `TaskValidationError`
 
----
 
 ### Requirement: Exception Module Organization
 
-**ID**: `task-domain-exceptions-organization`  
-**Priority**: Medium  
-**Type**: Non-Functional
 
 The exception hierarchy SHALL be defined in `packages/tasky-tasks/src/tasky_tasks/exceptions.py`, SHALL be exported from `tasky_tasks.__init__` for external use, SHALL include docstrings explaining when each exception is raised, and SHALL follow Python exception naming conventions (suffix with `Error`).
 
@@ -148,13 +118,9 @@ The exception hierarchy SHALL be defined in `packages/tasky-tasks/src/tasky_task
 **Then** all exception classes SHALL be importable from the package root  
 **And** IDEs SHALL provide autocomplete for exception names
 
----
 
 ### Requirement: Exception Serialization
 
-**ID**: `task-domain-exceptions-serialization`  
-**Priority**: Low  
-**Type**: Non-Functional
 
 Domain exceptions SHALL support string representation via `__str__` with human-readable messages, SHALL support `repr()` showing exception type and context attributes, SHALL be compatible with Python's traceback system, and SHALL preserve context through exception chaining.
 

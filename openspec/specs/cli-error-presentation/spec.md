@@ -1,22 +1,12 @@
-# Specification: CLI Error Presentation
+# cli-error-presentation Specification
 
-**Capability**: `cli-error-presentation`  
-**Status**: Draft  
-**Created**: 2025-11-11
-
-## Overview
+## Purpose
 
 Defines how the Tasky CLI presents errors to users, maps exceptions to user-friendly messages, and provides appropriate exit codes for different failure scenarios.
 
----
-
-## ADDED Requirements
-
+## Requirements
 ### Requirement: User-Friendly Error Messages
 
-**ID**: `cli-error-presentation-messages`  
-**Priority**: High  
-**Type**: Functional
 
 The CLI SHALL catch domain exceptions and present clear, actionable messages. It SHALL hide technical details (stack traces, exception types) in normal operation, SHALL use language appropriate for end users (not developers), and SHALL provide context about what operation failed and why.
 
@@ -44,13 +34,9 @@ The CLI SHALL catch domain exceptions and present clear, actionable messages. It
 **And** SHALL suggest valid transitions  
 **And** SHALL exit with code 1
 
----
 
 ### Requirement: Appropriate Exit Codes
 
-**ID**: `cli-error-presentation-exit-codes`  
-**Priority**: High  
-**Type**: Functional
 
 The CLI SHALL exit with code 0 for successful operations, SHALL exit with code 1 for domain errors (business rule violations), SHALL exit with code 2 for CLI usage errors (invalid arguments), and SHALL exit with code 3 for infrastructure errors (storage failures).
 
@@ -73,13 +59,9 @@ The CLI SHALL exit with code 0 for successful operations, SHALL exit with code 1
 **Then** the CLI SHALL exit with code 3  
 **And** MAY suggest checking file permissions or paths
 
----
 
 ### Requirement: Error Handler Centralization
 
-**ID**: `cli-error-presentation-centralization`  
-**Priority**: Medium  
-**Type**: Architectural
 
 The CLI SHALL implement error handling consistently across all commands, SHALL avoid duplicated error handling code, SHALL use decorators or context managers for common error patterns, and SHALL handle unexpected errors gracefully with a generic message.
 
@@ -98,13 +80,9 @@ The CLI SHALL implement error handling consistently across all commands, SHALL a
 **And** SHALL suggest filing a bug report  
 **And** SHALL exit with code 1
 
----
 
 ### Requirement: Verbose Error Mode
 
-**ID**: `cli-error-presentation-verbose`  
-**Priority**: Low  
-**Type**: Functional
 
 The CLI SHALL support a `--verbose` or `-v` flag for detailed error output, SHALL display full stack traces when verbose mode is enabled, SHALL include exception types and context in verbose output, and SHALL default to user-friendly messages without the verbose flag.
 
@@ -123,13 +101,9 @@ The CLI SHALL support a `--verbose` or `-v` flag for detailed error output, SHAL
 **And** exception type and context SHALL be shown  
 **And** developers can debug the issue
 
----
 
 ### Requirement: Error Message Formatting
 
-**ID**: `cli-error-presentation-formatting`  
-**Priority**: Medium  
-**Type**: Non-Functional
 
 Error messages SHALL start with an "Error: " prefix for clarity, SHALL use consistent formatting across all commands, SHALL highlight key information (task IDs, statuses) if the terminal supports it, and SHALL keep messages concise (≤2 lines when possible).
 
@@ -149,13 +123,9 @@ Error messages SHALL start with an "Error: " prefix for clarity, SHALL use consi
 **And** key values (IDs, statuses) MAY be highlighted  
 **And** messages remain readable if colors are disabled
 
----
 
 ### Requirement: Actionable Error Guidance
 
-**ID**: `cli-error-presentation-guidance`  
-**Priority**: Medium  
-**Type**: Functional
 
 Error messages SHALL suggest next steps when possible, SHALL reference valid options for invalid inputs, SHALL provide command examples for common mistakes, and SHALL link to help or documentation when appropriate.
 
@@ -172,13 +142,9 @@ Error messages SHALL suggest next steps when possible, SHALL reference valid opt
 **When** a `ProjectNotFoundError` is raised  
 **Then** the error SHALL suggest: "Run 'tasky project init' first"
 
----
 
 ### Requirement: Error Context Preservation
 
-**ID**: `cli-error-presentation-context`  
-**Priority**: Low  
-**Type**: Functional
 
 When handling exceptions, the CLI SHALL extract context from exception attributes (task_id, status, etc.), SHALL use context to personalize error messages, SHALL preserve context for logging (future), and SHALL not rely solely on exception message strings.
 
