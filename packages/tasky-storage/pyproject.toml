@@ -7,6 +7,7 @@ authors = [{ name = "Alexis Beaulieu", email = "alexisbeaulieu97@gmail.com" }]
 requires-python = ">=3.13"
 dependencies = [
     "pydantic>=2.0.0",
+    "tasky-logging",
     "tasky-tasks",
 ]
 
@@ -16,3 +17,4 @@ build-backend = "uv_build"
 
 [tool.uv.sources]
 tasky-tasks = { workspace = true }
+tasky-logging = { workspace = true }

@@ -1,0 +1,12 @@
+[project]
+name = "tasky-logging"
+version = "0.1.0"
+description = "Pluggable logging infrastructure for Tasky"
+readme = "README.md"
+authors = [{ name = "Alexis Beaulieu", email = "alexisbeaulieu97@gmail.com" }]
+requires-python = ">=3.13"
+dependencies = []
+
+[build-system]
+requires = ["uv_build>=0.9.8,<0.10.0"]
+build-backend = "uv_build"
