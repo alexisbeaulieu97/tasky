@@ -9,8 +9,8 @@ from functools import wraps
 from pathlib import Path
 from typing import NoReturn, TypeVar, cast
 
+import click
 import typer
-from click import get_current_context
 from tasky_storage.backends.json.repository import JsonTaskRepository
 from tasky_storage.errors import StorageError
 from tasky_tasks import (
@@ -47,8 +47,10 @@ def with_task_error_handling(func: F) -> F:  # noqa: UP047
 
     @wraps(func)
     def wrapper(*args: object, **kwargs: object) -> object:
-        ctx = get_current_context(silent=True)
-        verbose = _is_verbose(ctx)
+        ctx = click.get_current_context(silent=True)
+        # Convert Click context to a generic dict-like object for _is_verbose
+        typer_ctx = _convert_context(ctx)
+        verbose = _is_verbose(typer_ctx)
 
         try:
             return func(*args, **kwargs)
@@ -90,12 +92,22 @@ def _create_task_service(storage_path: Path) -> TaskService:
     return TaskService(repository)
 
 
+def _convert_context(ctx: click.Context | None) -> typer.Context | None:
+    """Convert a Click context to a Typer context."""
+    if ctx is None:
+        return None
+    # Typer.Context is a subclass of click.Context, so we can cast safely
+    return ctx  # type: ignore[return-value]
+
+
 def _is_verbose(ctx: typer.Context | None) -> bool:
     current = ctx
     while current is not None:
-        obj = current.obj
-        if isinstance(obj, dict) and _VERBOSE_KEY in obj:
-            return bool(obj[_VERBOSE_KEY])
+        obj: object = current.obj
+        if isinstance(obj, dict):
+            value = obj.get(_VERBOSE_KEY, False)
+            # Dictionary comes from typer Context setup, value is bool
+            return cast("bool", value)
         current = current.parent
     return False
 

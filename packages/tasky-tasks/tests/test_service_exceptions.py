@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from types import SimpleNamespace
+from typing import TYPE_CHECKING
 from uuid import uuid4
 
 import pytest
@@ -10,57 +10,72 @@ from tasky_tasks.exceptions import TaskNotFoundError, TaskValidationError
 from tasky_tasks.models import TaskModel
 from tasky_tasks.service import TaskService
 
+if TYPE_CHECKING:
+    from uuid import UUID
+
 try:
     from tasky_storage.errors import StorageDataError
 except ModuleNotFoundError:  # pragma: no cover
-
-    class StorageDataError(Exception):
-        """Fallback storage data error when storage package is unavailable."""
+    StorageDataError = type("StorageDataError", (Exception,), {})  # type: ignore[misc,assignment]
 
 
-def _not_found_repository() -> SimpleNamespace:
-    return SimpleNamespace(
-        initialize=lambda: None,
-        save_task=lambda _task: None,
-        get_task=lambda _task_id: None,
-        get_all_tasks=list,
-        delete_task=lambda _task_id: False,
-        task_exists=lambda _task_id: False,
-    )
+class _FakeRepository:
+    """Minimal fake repository for testing."""
 
+    def __init__(
+        self,
+        *,
+        return_none: bool = False,
+        raise_data_error: bool = False,
+        task: TaskModel | None = None,
+    ) -> None:
+        self._return_none = return_none
+        self._raise_data_error = raise_data_error
+        self._task = task
 
-def _data_error_repository() -> SimpleNamespace:
-    def _raise_data_error(*_args: object, **_kwargs: object) -> None:
-        message = "corrupt task payload"
-        raise StorageDataError(message)
+    def initialize(self) -> None:
+        """No-op initialization."""
 
-    return SimpleNamespace(
-        initialize=lambda: None,
-        save_task=lambda _task: None,
-        get_task=lambda _task_id: _raise_data_error(),
-        get_all_tasks=list,
-        delete_task=lambda _task_id: _raise_data_error(),
-        task_exists=lambda _task_id: False,
-    )
+    def save_task(self, task: TaskModel) -> None:
+        """No-op save."""
 
+    def get_task(self, task_id: UUID) -> TaskModel | None:
+        """Return task or None based on configuration."""
+        if self._raise_data_error:
+            message = "corrupt task payload"
+            raise StorageDataError(message)  # type: ignore[misc]
+        if self._return_none:
+            return None
+        if self._task and self._task.task_id == task_id:
+            return self._task
+        return None
 
-def _in_memory_repository() -> SimpleNamespace:
-    task = TaskModel(name="Sample", details="Details")
+    def get_all_tasks(self) -> list[TaskModel]:
+        """Return empty list or single task."""
+        if self._task:
+            return [self._task]
+        return []
 
-    return SimpleNamespace(
-        task=task,
-        initialize=lambda: None,
-        save_task=lambda _updated_task: None,
-        get_task=lambda _task_id: task if task.task_id == _task_id else None,
-        get_all_tasks=lambda: [task],
-        delete_task=lambda _task_id: task.task_id == _task_id,
-        task_exists=lambda _task_id: task.task_id == _task_id,
-    )
+    def delete_task(self, task_id: UUID) -> bool:
+        """Return success status based on configuration."""
+        if self._raise_data_error:
+            message = "corrupt task payload"
+            raise StorageDataError(message)  # type: ignore[misc]
+        if self._task:
+            return self._task.task_id == task_id
+        return False
+
+    def task_exists(self, task_id: UUID) -> bool:
+        """Check if task exists."""
+        if self._task:
+            return self._task.task_id == task_id
+        return False
 
 
 def test_get_task_raises_task_not_found() -> None:
     """Service should raise TaskNotFoundError when repository returns None."""
-    service = TaskService(_not_found_repository())
+    repository = _FakeRepository(return_none=True)
+    service = TaskService(repository)
     task_id = uuid4()
 
     with pytest.raises(TaskNotFoundError) as exc_info:
@@ -71,7 +86,8 @@ def test_get_task_raises_task_not_found() -> None:
 
 def test_delete_task_raises_task_not_found_when_not_removed() -> None:
     """Service should raise TaskNotFoundError when delete fails."""
-    service = TaskService(_not_found_repository())
+    repository = _FakeRepository(return_none=True)
+    service = TaskService(repository)
     task_id = uuid4()
 
     with pytest.raises(TaskNotFoundError) as exc_info:
@@ -82,7 +98,8 @@ def test_delete_task_raises_task_not_found_when_not_removed() -> None:
 
 def test_storage_data_error_translates_to_validation_error_on_get() -> None:
     """Storage data issues should surface as TaskValidationError."""
-    service = TaskService(_data_error_repository())
+    repository = _FakeRepository(raise_data_error=True)
+    service = TaskService(repository)
 
     with pytest.raises(TaskValidationError) as exc_info:
         service.get_task(uuid4())
@@ -92,7 +109,8 @@ def test_storage_data_error_translates_to_validation_error_on_get() -> None:
 
 def test_storage_data_error_translates_to_validation_error_on_delete() -> None:
     """Storage data issues should surface as TaskValidationError for delete."""
-    service = TaskService(_data_error_repository())
+    repository = _FakeRepository(raise_data_error=True)
+    service = TaskService(repository)
 
     with pytest.raises(TaskValidationError):
         service.delete_task(uuid4())
@@ -100,11 +118,11 @@ def test_storage_data_error_translates_to_validation_error_on_delete() -> None:
 
 def test_successful_operations_do_not_raise() -> None:
     """Service should return values for successful operations."""
-    repository = _in_memory_repository()
+    task = TaskModel(name="Sample", details="Details")
+    repository = _FakeRepository(task=task)
     service = TaskService(repository)
 
-    task = service.get_task(repository.task.task_id)
-    assert task is repository.task
+    retrieved = service.get_task(task.task_id)
+    assert retrieved is task
 
-    assert service.delete_task(repository.task.task_id) is True
-
+    assert service.delete_task(task.task_id) is True

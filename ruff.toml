@@ -13,7 +13,7 @@ docstring-code-format = true
 
 [lint]
 select = ["ALL"]
-ignore = ["D107", "TC002", "TC003"]
+ignore = ["D203", "D107", "D213", "TC002", "TC003"]
 
 fixable = ["ALL"]
 unfixable = []

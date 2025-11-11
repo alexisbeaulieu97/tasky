@@ -16,12 +16,11 @@ if TYPE_CHECKING:
 
     from tasky_tasks.ports import TaskRepository
 
+# Import StorageDataError or use a fallback if storage package is unavailable
 try:  # pragma: no cover - optional dependency at runtime
     from tasky_storage.errors import StorageDataError
 except ModuleNotFoundError:  # pragma: no cover - fallback when storage is absent
-
-    class StorageDataError(Exception):
-        """Fallback storage data error used when storage package is unavailable."""
+    StorageDataError = type("StorageDataError", (Exception,), {})  # type: ignore[misc,assignment]
 
 
 class TaskService:
