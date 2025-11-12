@@ -68,7 +68,7 @@
   - Parse and validate task_id UUID
   - Call `task_service.cancel_task(uuid)`
   - Display success message with task name
-  - Handle `TaskNotFoundError` and `InvalidStateTransionError`
+  - Handle `TaskNotFoundError` and `InvalidStateTransitionError`
   - Register command with `@task_app.command(name="cancel")`
 
 - [x] **Add reopen command to CLI**
