@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Protocol
 if TYPE_CHECKING:
     from uuid import UUID
 
-    from tasky_tasks.models import TaskModel
+    from tasky_tasks.models import TaskModel, TaskStatus
 
 
 class TaskRepository(Protocol):
@@ -25,6 +25,22 @@ class TaskRepository(Protocol):
 
     def get_all_tasks(self) -> list[TaskModel]:
         """Retrieve all tasks."""
+        ...
+
+    def get_tasks_by_status(self, status: TaskStatus) -> list[TaskModel]:
+        """Retrieve tasks filtered by status.
+
+        Parameters
+        ----------
+        status:
+            The task status to filter by.
+
+        Returns
+        -------
+        list[TaskModel]:
+            List of tasks matching the specified status.
+
+        """
         ...
 
     def delete_task(self, task_id: UUID) -> bool:

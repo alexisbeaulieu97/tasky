@@ -98,8 +98,15 @@ def _parse_task_id_and_get_service(task_id: str) -> tuple[TaskService, UUID]:
 
 @task_app.command(name="list")
 @with_task_error_handling
-def list_command() -> None:
-    """List all tasks."""
+def list_command(  # noqa: C901
+    status: str | None = typer.Option(
+        None,
+        "--status",
+        "-s",
+        help="Filter tasks by status (pending, completed, cancelled).",
+    ),
+) -> None:
+    """List all tasks or filter by status."""
     try:
         service = _get_service()
     except ProjectNotFoundError:
@@ -110,10 +117,28 @@ def list_command() -> None:
         typer.echo(f"Error: {exc}", err=True)
         return
 
-    tasks = service.get_all_tasks()
+    # Validate and filter by status if provided
+    task_status: TaskStatus | None = None
+
+    if status is not None:
+        valid_statuses = {s.value for s in TaskStatus}
+        if status.lower() not in valid_statuses:
+            valid_list = ", ".join(sorted(valid_statuses))
+            typer.echo(
+                f"Invalid status: '{status}'. Valid options: {valid_list}",
+                err=True,
+            )
+            raise typer.Exit(1)
+        task_status = TaskStatus(status.lower())
+        tasks = service.get_tasks_by_status(task_status)
+    else:
+        tasks = service.get_all_tasks()
 
     if not tasks:
-        typer.echo("No tasks recorded yet.")
+        if task_status is not None:
+            typer.echo(f"No {task_status.value} tasks found.")
+        else:
+            typer.echo("No tasks recorded yet.")
         return
 
     for task in tasks:

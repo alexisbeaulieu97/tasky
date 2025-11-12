@@ -134,3 +134,114 @@ class TestJsonTaskRepository:
         retrieved = repo.get_task(task.task_id)
         assert retrieved is not None
         assert retrieved.task_id == task.task_id
+
+    def test_get_tasks_by_status_pending(self, repo: JsonTaskRepository) -> None:
+        """Test filtering tasks by pending status."""
+        task1 = TaskModel(name="Pending 1", details="Details", status=TaskStatus.PENDING)
+        task2 = TaskModel(name="Pending 2", details="Details", status=TaskStatus.PENDING)
+        task3 = TaskModel(
+            name="Completed",
+            details="Details",
+            status=TaskStatus.COMPLETED,
+        )
+        repo.save_task(task1)
+        repo.save_task(task2)
+        repo.save_task(task3)
+
+        pending_tasks = repo.get_tasks_by_status(TaskStatus.PENDING)
+
+        assert len(pending_tasks) == 2
+        assert all(task.status == TaskStatus.PENDING for task in pending_tasks)
+        task_ids = {t.task_id for t in pending_tasks}
+        assert task1.task_id in task_ids
+        assert task2.task_id in task_ids
+        assert task3.task_id not in task_ids
+
+    def test_get_tasks_by_status_completed(self, repo: JsonTaskRepository) -> None:
+        """Test filtering tasks by completed status."""
+        task1 = TaskModel(name="Pending", details="Details", status=TaskStatus.PENDING)
+        task2 = TaskModel(
+            name="Completed 1",
+            details="Details",
+            status=TaskStatus.COMPLETED,
+        )
+        task3 = TaskModel(
+            name="Completed 2",
+            details="Details",
+            status=TaskStatus.COMPLETED,
+        )
+        repo.save_task(task1)
+        repo.save_task(task2)
+        repo.save_task(task3)
+
+        completed_tasks = repo.get_tasks_by_status(TaskStatus.COMPLETED)
+
+        assert len(completed_tasks) == 2
+        assert all(task.status == TaskStatus.COMPLETED for task in completed_tasks)
+
+    def test_get_tasks_by_status_cancelled(self, repo: JsonTaskRepository) -> None:
+        """Test filtering tasks by cancelled status."""
+        task1 = TaskModel(name="Pending", details="Details", status=TaskStatus.PENDING)
+        task2 = TaskModel(
+            name="Cancelled",
+            details="Details",
+            status=TaskStatus.CANCELLED,
+        )
+        repo.save_task(task1)
+        repo.save_task(task2)
+
+        cancelled_tasks = repo.get_tasks_by_status(TaskStatus.CANCELLED)
+
+        assert len(cancelled_tasks) == 1
+        assert cancelled_tasks[0].status == TaskStatus.CANCELLED
+        assert cancelled_tasks[0].task_id == task2.task_id
+
+    def test_get_tasks_by_status_empty_results(
+        self,
+        repo: JsonTaskRepository,
+    ) -> None:
+        """Test filtering when no tasks match the status."""
+        task = TaskModel(name="Pending", details="Details", status=TaskStatus.PENDING)
+        repo.save_task(task)
+
+        completed_tasks = repo.get_tasks_by_status(TaskStatus.COMPLETED)
+        cancelled_tasks = repo.get_tasks_by_status(TaskStatus.CANCELLED)
+
+        assert completed_tasks == []
+        assert cancelled_tasks == []
+
+    def test_get_tasks_by_status_empty_repository(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        """Test filtering returns empty list for uninitialized repository."""
+        storage_path = tmp_path / "nonexistent.json"
+        repo = JsonTaskRepository.from_path(storage_path)
+
+        pending_tasks = repo.get_tasks_by_status(TaskStatus.PENDING)
+        completed_tasks = repo.get_tasks_by_status(TaskStatus.COMPLETED)
+
+        assert pending_tasks == []
+        assert completed_tasks == []
+
+    def test_get_tasks_by_status_preserves_task_data(
+        self,
+        repo: JsonTaskRepository,
+    ) -> None:
+        """Test that filtering preserves complete task data."""
+        task = TaskModel(
+            task_id=uuid4(),
+            name="Test Task",
+            details="Test details",
+            status=TaskStatus.COMPLETED,
+        )
+        repo.save_task(task)
+
+        filtered_tasks = repo.get_tasks_by_status(TaskStatus.COMPLETED)
+
+        assert len(filtered_tasks) == 1
+        retrieved = filtered_tasks[0]
+        assert retrieved.task_id == task.task_id
+        assert retrieved.name == task.name
+        assert retrieved.details == task.details
+        assert retrieved.status == task.status
