@@ -8,7 +8,10 @@ requires-python = ">=3.13"
 dependencies = [
     "rich>=13.8.0",
     "tasky-logging",
+    "tasky-projects",
     "tasky-settings",
+    "tasky-storage",
+    "tomli_w>=1.0.0",
     "typer>=0.20.0",
 ]
 
@@ -17,5 +20,7 @@ requires = ["uv_build>=0.9.7,<0.10.0"]
 build-backend = "uv_build"
 
 [tool.uv.sources]
-tasky-settings = { workspace = true }
 tasky-logging = { workspace = true }
+tasky-projects = { workspace = true }
+tasky-settings = { workspace = true }
+tasky-storage = { workspace = true }

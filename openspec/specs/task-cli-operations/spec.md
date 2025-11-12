@@ -1,13 +1,8 @@
-# Capability: Task CLI Operations
+# task-cli-operations Specification
 
-**Status**: Draft  
-**Capability ID**: `task-cli-operations`  
-**Package**: `tasky-cli`
-
----
-
-## MODIFIED Requirements
-
+## Purpose
+TBD - created by archiving change add-configurable-storage-backends. Update Purpose after archive.
+## Requirements
 ### Requirement: Task commands use service factory
 
 All task CLI commands SHALL use `create_task_service()` instead of directly instantiating repositories.
@@ -103,93 +98,3 @@ And the error message lists available backends
 
 ---
 
-## Implementation Notes
-
-### Modified Command Structure
-
-```python
-# packages/tasky-cli/src/tasky_cli/commands/tasks.py
-import typer
-from tasky_settings import ProjectNotFoundError, create_task_service
-
-task_app = typer.Typer(no_args_is_help=True)
-
-
-def get_service():
-    """Helper to get TaskService with error handling."""
-    try:
-        return create_task_service()
-    except ProjectNotFoundError as e:
-        typer.echo(f"Error: {e}", err=True)
-        typer.echo("Run 'tasky project init' first", err=True)
-        raise typer.Exit(1)
-    except KeyError as e:
-        typer.echo(f"Error: {e}", err=True)
-        raise typer.Exit(1)
-
-
-@task_app.command(name="list")
-def list_command() -> None:
-    """List all tasks."""
-    service = get_service()
-    tasks = service.get_all_tasks()
-    
-    if not tasks:
-        typer.echo("No tasks found")
-        return
-    
-    for task in tasks:
-        typer.echo(f"{task.name} - {task.details}")
-
-
-@task_app.command(name="create")
-def create_command(
-    name: str = typer.Argument(..., help="Task name"),
-    details: str = typer.Argument(..., help="Task details"),
-) -> None:
-    """Create a new task."""
-    service = get_service()
-    task = service.create_task(name=name, details=details)
-    typer.echo(f"Task created: {task.name}")
-```
-
-### Removed Code
-
-Remove all direct imports and usage of:
-- `JsonTaskRepository`
-- `JsonStorage`
-- Hardcoded paths like `Path(".tasky/tasks.json")`
-
-### Dependencies
-
-```toml
-[project]
-name = "tasky-cli"
-requires-python = ">=3.13"
-dependencies = [
-    "typer>=0.20.0",
-    "tasky-settings",   # For create_task_service
-    # Remove direct dependency on tasky-storage
-]
-```
-
----
-
-## Test Coverage
-
-- [ ] List tasks uses create_task_service()
-- [ ] Create task uses create_task_service()
-- [ ] List without project shows helpful error
-- [ ] Create without project shows helpful error
-- [ ] Commands work with JSON backend
-- [ ] Commands work with SQLite backend (when available)
-- [ ] Invalid backend in config shows error
-- [ ] Unregistered backend shows available options
-
----
-
-## Related Capabilities
-
-- Depends on: `service-factory`, `project-configuration`
-- Modifies: All existing task command implementations
-- Related to: `backend-self-registration` (ensures backends available)

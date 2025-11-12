@@ -6,7 +6,7 @@
 
 ---
 
-## MODIFIED Requirements
+## ADDED Requirements
 
 ### Requirement: Project initialization with backend selection
 

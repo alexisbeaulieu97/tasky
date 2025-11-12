@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+# Import storage to register backends
+import tasky_storage  # noqa: F401 # type: ignore[import-untyped]
 import typer
-from tasky_logging import configure_logging
+from tasky_logging import configure_logging  # type: ignore[import-untyped]
 from tasky_settings import get_settings
 
 from .commands import project_app, task_app

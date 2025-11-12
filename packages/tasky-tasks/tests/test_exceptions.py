@@ -85,4 +85,3 @@ def test_exception_hierarchy_relationships() -> None:
         InvalidStateTransitionError(uuid4(), "pending", "completed"),
     ):
         assert isinstance(exc, TaskDomainError)
-

@@ -6,7 +6,7 @@
 
 ---
 
-## MODIFIED Requirements
+## ADDED Requirements
 
 ### Requirement: JSON backend self-registration
 

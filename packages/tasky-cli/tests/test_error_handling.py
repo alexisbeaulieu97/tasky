@@ -47,10 +47,10 @@ def test_task_not_found_error_is_presented_cleanly(monkeypatch: pytest.MonkeyPat
     with runner.isolated_filesystem():
         _prepare_workspace()
 
-        def _factory(_path: Path) -> _TaskServiceStub:
+        def _factory() -> _TaskServiceStub:
             return _TaskServiceStub(TaskNotFoundError("abc"))
 
-        monkeypatch.setattr(tasks_module, "_create_task_service", _factory)
+        monkeypatch.setattr(tasks_module, "_get_service", _factory)
 
         result = runner.invoke(app, ["task", "list"])
 
@@ -65,10 +65,10 @@ def test_storage_error_results_in_exit_code_three(monkeypatch: pytest.MonkeyPatc
     with runner.isolated_filesystem():
         _prepare_workspace()
 
-        def _factory(_path: Path) -> _TaskServiceStub:
+        def _factory() -> _TaskServiceStub:
             return _TaskServiceStub(StorageConfigurationError("boom"))
 
-        monkeypatch.setattr(tasks_module, "_create_task_service", _factory)
+        monkeypatch.setattr(tasks_module, "_get_service", _factory)
 
         result = runner.invoke(app, ["task", "list"])
 
@@ -79,8 +79,11 @@ def test_storage_error_results_in_exit_code_three(monkeypatch: pytest.MonkeyPatc
 def test_invalid_storage_data_triggers_error_without_patch() -> None:
     """Invalid storage documents should surface as storage failures."""
     with runner.isolated_filesystem():
+        # First initialize project
+        runner.invoke(app, ["project", "init"])
+
+        # Then corrupt the tasks file
         storage_root = Path(".tasky")
-        storage_root.mkdir(exist_ok=True)
         invalid_document: dict[str, object] = {
             "version": "1.0",
             "tasks": {
@@ -104,10 +107,10 @@ def test_verbose_mode_outputs_stack_trace(monkeypatch: pytest.MonkeyPatch) -> No
     with runner.isolated_filesystem():
         _prepare_workspace()
 
-        def _factory(_path: Path) -> _TaskServiceStub:
+        def _factory() -> _TaskServiceStub:
             return _TaskServiceStub(TaskNotFoundError("xyz"))
 
-        monkeypatch.setattr(tasks_module, "_create_task_service", _factory)
+        monkeypatch.setattr(tasks_module, "_get_service", _factory)
 
         result = runner.invoke(app, ["task", "--verbose", "list"])
 

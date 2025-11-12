@@ -32,6 +32,19 @@ class TaskDefaultsSettings(BaseModel):
     status: str = "pending"
 
 
+class StorageSettings(BaseModel):
+    """Storage backend configuration.
+
+    Attributes:
+        backend: Storage backend name (e.g., "json", "sqlite", "postgres")
+        path: Relative path from .tasky/ directory to storage file/database
+
+    """
+
+    backend: str = "json"
+    path: str = "tasks.json"
+
+
 class AppSettings(BaseSettings):
     """Application-wide settings with hierarchical configuration.
 
@@ -45,6 +58,7 @@ class AppSettings(BaseSettings):
     Attributes:
         logging: Logging configuration
         task_defaults: Default task creation settings
+        storage: Storage backend configuration
 
     """
 
@@ -56,3 +70,4 @@ class AppSettings(BaseSettings):
 
     logging: LoggingSettings = Field(default_factory=LoggingSettings)
     task_defaults: TaskDefaultsSettings = Field(default_factory=TaskDefaultsSettings)
+    storage: StorageSettings = Field(default_factory=StorageSettings)
