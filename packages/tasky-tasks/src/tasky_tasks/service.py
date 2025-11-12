@@ -8,6 +8,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from tasky_logging import get_logger
+
 from tasky_tasks.exceptions import TaskNotFoundError, TaskValidationError
 from tasky_tasks.models import TaskModel
 
@@ -23,6 +25,9 @@ except ModuleNotFoundError:  # pragma: no cover - fallback when storage is absen
     StorageDataError = type("StorageDataError", (Exception,), {})  # type: ignore[misc,assignment]
 
 
+logger = get_logger("tasks.service")
+
+
 class TaskService:
     """Service for managing tasks."""
 
@@ -33,6 +38,7 @@ class TaskService:
         """Create a new task."""
         task = TaskModel(name=name, details=details)
         self.repository.save_task(task)
+        logger.info("Task created: id=%s, name=%s", task.task_id, task.name)
         return task
 
     def get_task(self, task_id: UUID) -> TaskModel:
@@ -48,6 +54,7 @@ class TaskService:
             Propagated when lower layers encounter infrastructure failures.
 
         """
+        logger.debug("Getting task: id=%s", task_id)
         try:
             task = self.repository.get_task(task_id)
         except StorageDataError as exc:
@@ -61,12 +68,15 @@ class TaskService:
 
     def get_all_tasks(self) -> list[TaskModel]:
         """Get all tasks."""
-        return self.repository.get_all_tasks()
+        tasks = self.repository.get_all_tasks()
+        logger.debug("Retrieved all tasks: count=%d", len(tasks))
+        return tasks
 
     def update_task(self, task: TaskModel) -> None:
         """Update an existing task."""
         task.mark_updated()
         self.repository.save_task(task)
+        logger.info("Task updated: id=%s", task.task_id)
 
     def delete_task(self, task_id: UUID) -> bool:
         """Delete a task by ID.
@@ -95,8 +105,10 @@ class TaskService:
         if not removed:
             raise TaskNotFoundError(task_id)
 
+        logger.info("Deleted task: id=%s", task_id)
         return True
 
     def task_exists(self, task_id: UUID) -> bool:
         """Check if a task exists."""
+        logger.debug("Checking task existence: id=%s", task_id)
         return self.repository.task_exists(task_id)

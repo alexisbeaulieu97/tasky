@@ -105,9 +105,8 @@ def _is_verbose(ctx: typer.Context | None) -> bool:
     while current is not None:
         obj: object = current.obj
         if isinstance(obj, dict):
-            value = obj.get(_VERBOSE_KEY, False)
-            # Dictionary comes from typer Context setup, value is bool
-            return cast("bool", value)
+            value: bool = bool(obj.get(_VERBOSE_KEY, False))
+            return value
         current = current.parent
     return False
 

@@ -5,7 +5,12 @@ description = "Add your description here"
 readme = "README.md"
 authors = [{ name = "Alexis Beaulieu", email = "alexisbeaulieu97@gmail.com" }]
 requires-python = ">=3.13"
-dependencies = ["typer>=0.20.0", "rich>=13.8.0", "tasky-settings"]
+dependencies = [
+    "rich>=13.8.0",
+    "tasky-logging",
+    "tasky-settings",
+    "typer>=0.20.0",
+]
 
 [build-system]
 requires = ["uv_build>=0.9.7,<0.10.0"]
@@ -13,3 +18,4 @@ build-backend = "uv_build"
 
 [tool.uv.sources]
 tasky-settings = { workspace = true }
+tasky-logging = { workspace = true }

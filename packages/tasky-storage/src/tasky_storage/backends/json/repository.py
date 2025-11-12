@@ -10,6 +10,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel, ValidationError
+from tasky_logging import get_logger
 
 from tasky_storage.backends.json.document import TaskDocument
 from tasky_storage.backends.json.mappers import (
@@ -26,6 +27,9 @@ if TYPE_CHECKING:
     from tasky_tasks.models import TaskModel
 
 
+logger = get_logger("storage.json.repository")
+
+
 class JsonTaskRepository(BaseModel):
     """JSON-based task repository implementation."""
 
@@ -38,6 +42,7 @@ class JsonTaskRepository(BaseModel):
 
     def save_task(self, task: TaskModel) -> None:
         """Persist a task snapshot to storage."""
+        logger.debug("Saving task: id=%s", task.task_id)
         document = self._load_document_optional()
         if document is None:
             self.initialize()
@@ -49,6 +54,7 @@ class JsonTaskRepository(BaseModel):
 
     def get_task(self, task_id: UUID) -> TaskModel | None:
         """Retrieve a task by ID."""
+        logger.debug("Getting task: id=%s", task_id)
         document = self._load_document_optional()
         if document is None:
             return None
@@ -61,14 +67,18 @@ class JsonTaskRepository(BaseModel):
 
     def get_all_tasks(self) -> list[TaskModel]:
         """Retrieve all tasks."""
+        logger.debug("Getting all tasks")
         document = self._load_document_optional()
         if document is None:
             return []
 
-        return [self._snapshot_to_task(snapshot) for snapshot in document.list_tasks()]
+        tasks = [self._snapshot_to_task(snapshot) for snapshot in document.list_tasks()]
+        logger.debug("Retrieved all tasks: count=%d", len(tasks))
+        return tasks
 
     def delete_task(self, task_id: UUID) -> bool:
         """Delete a task by ID."""
+        logger.debug("Deleting task: id=%s", task_id)
         document = self._load_document_optional()
         if document is None:
             return False
@@ -76,6 +86,7 @@ class JsonTaskRepository(BaseModel):
         removed = document.remove_task(str(task_id))
         if removed:
             self.storage.save(document.model_dump())
+            logger.debug("Task deleted: id=%s", task_id)
 
         return removed
 
@@ -99,6 +110,7 @@ class JsonTaskRepository(BaseModel):
         except StorageDataError as exc:
             if self._originated_from_missing_file(exc):
                 return None
+            logger.warning("Failed to load task document: %s", exc)
             raise
 
     def _load_document(self) -> TaskDocument:
