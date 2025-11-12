@@ -6,7 +6,7 @@
 
 ---
 
-## MODIFIED Requirements
+## ADDED Requirements
 
 ### Requirement: Logging configuration must accept settings object
 
