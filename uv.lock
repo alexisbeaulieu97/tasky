@@ -325,14 +325,10 @@ version = "0.1.0"
 source = { editable = "packages/tasky-settings" }
 dependencies = [
     { name = "pydantic-settings" },
-    { name = "tasky-storage" },
 ]
 
 [package.metadata]
-requires-dist = [
-    { name = "pydantic-settings", specifier = ">=2.11.0" },
-    { name = "tasky-storage", editable = "packages/tasky-storage" },
-]
+requires-dist = [{ name = "pydantic-settings", specifier = ">=2.11.0" }]
 
 [[package]]
 name = "tasky-storage"

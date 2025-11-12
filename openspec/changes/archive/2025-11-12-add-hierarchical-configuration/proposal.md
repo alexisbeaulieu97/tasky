@@ -26,6 +26,16 @@ Currently:
 
 This change introduces a proper configuration architecture using pydantic-settings with custom file sources.
 
+## What Changes
+
+- Add hierarchical configuration system using pydantic-settings with custom file sources
+- Create configuration models for logging, task defaults, and overall app settings
+- Implement three-level configuration hierarchy: `~/.tasky/config.toml` → `.tasky/config.toml` → CLI flags
+- Add support for environment variable overrides (e.g., `TASKY_LOGGING__VERBOSITY=2`)
+- Update logging package to accept settings objects instead of direct configuration
+- Update CLI to load and use settings for configuring subsystems
+- Add comprehensive tests for settings models, custom sources, and precedence rules
+
 ## Goals
 
 1. **Three-Level Hierarchy**: `~/.tasky/config.toml` → `.tasky/config.toml` → CLI flags (last wins)
