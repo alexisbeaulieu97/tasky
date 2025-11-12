@@ -218,7 +218,8 @@ class TestTaskFilteringCLI:
     ) -> None:
         """Test filtering with whitespace-padded status is rejected (intentional behavior)."""
         # Whitespace is NOT stripped from status input by design.
-        # This is intentional: users must provide exact status values (pending, completed, cancelled).
+        # This is intentional: users must provide exact status values
+        # (pending, completed, cancelled).
         # Rejecting " pending " helps catch typos and accidental whitespace in user input.
         result = runner.invoke(task_app, ["list", "--status", " pending "])
 
