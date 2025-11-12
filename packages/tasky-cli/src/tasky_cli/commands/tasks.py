@@ -6,13 +6,12 @@ import sys
 import traceback
 from collections.abc import Callable
 from functools import wraps
-from pathlib import Path
 from typing import NoReturn, TypeVar, cast
 from uuid import UUID
 
 import click
 import typer
-from tasky_storage.backends.json.repository import JsonTaskRepository
+from tasky_settings import ProjectNotFoundError, create_task_service
 from tasky_storage.errors import StorageError
 from tasky_tasks import (
     InvalidStateTransitionError,
@@ -68,7 +67,7 @@ def _parse_task_id_and_get_service(task_id: str) -> tuple[TaskService, UUID]:
     """Parse task ID and initialize task service.
 
     This helper handles common setup for task commands:
-    - Storage path validation
+    - Project validation
     - UUID parsing with error handling
     - Task service initialization
 
@@ -79,14 +78,14 @@ def _parse_task_id_and_get_service(task_id: str) -> tuple[TaskService, UUID]:
         Tuple of (TaskService instance, parsed UUID).
 
     Raises:
-        typer.Exit: On validation errors (storage missing or invalid UUID).
+        typer.Exit: On validation errors (no project or invalid UUID).
 
     """
-    storage_path = _storage_path()
-
-    if not storage_path.exists():
-        typer.echo("No tasks found. Initialize a project first.", err=True)
-        raise typer.Exit(1)
+    try:
+        service = _get_service()
+    except (ProjectNotFoundError, KeyError) as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(1) from exc
 
     try:
         uuid = UUID(task_id)
@@ -94,7 +93,6 @@ def _parse_task_id_and_get_service(task_id: str) -> tuple[TaskService, UUID]:
         typer.echo(f"Invalid task ID format: {task_id}", err=True)
         raise typer.Exit(1) from exc
 
-    service = _create_task_service(storage_path)
     return service, uuid
 
 
@@ -102,13 +100,16 @@ def _parse_task_id_and_get_service(task_id: str) -> tuple[TaskService, UUID]:
 @with_task_error_handling
 def list_command() -> None:
     """List all tasks."""
-    storage_path = _storage_path()
-
-    if not storage_path.exists():
-        typer.echo(f"No tasks found in {storage_path}")
+    try:
+        service = _get_service()
+    except ProjectNotFoundError:
+        typer.echo("No project found in current directory.")
+        typer.echo("Run 'tasky project init' to create a project.")
+        return
+    except KeyError as exc:
+        typer.echo(f"Error: {exc}", err=True)
         return
 
-    service = _create_task_service(storage_path)
     tasks = service.get_all_tasks()
 
     if not tasks:
@@ -119,13 +120,18 @@ def list_command() -> None:
         typer.echo(f"{task.name} - {task.details}")
 
 
-def _storage_path() -> Path:
-    return Path(".tasky/tasks.json")
+def _get_service() -> TaskService:
+    """Get or create a task service for the current project.
 
+    Returns:
+        Configured TaskService instance
 
-def _create_task_service(storage_path: Path) -> TaskService:
-    repository = JsonTaskRepository.from_path(storage_path)
-    return TaskService(repository)
+    Raises:
+        ProjectNotFoundError: If no project found
+        KeyError: If configured backend is not registered
+
+    """
+    return create_task_service()
 
 
 def _convert_context(ctx: click.Context | None) -> typer.Context | None:
@@ -170,12 +176,10 @@ def _suggest_transition(
     # Map of (from_status, to_status) -> suggestion
     reopen_suggestion = f"Use 'tasky task reopen {task_id}' to make it pending first."
     completed_suggestion = (
-        f"Task is already completed. "
-        f"Use 'tasky task reopen {task_id}' if you want to make changes."
+        f"Task is already completed. Use 'tasky task reopen {task_id}' if you want to make changes."
     )
     cancelled_suggestion = (
-        f"Task is already cancelled. "
-        f"Use 'tasky task reopen {task_id}' if you want to make changes."
+        f"Task is already cancelled. Use 'tasky task reopen {task_id}' if you want to make changes."
     )
     suggestions = {
         (TaskStatus.CANCELLED, TaskStatus.COMPLETED): reopen_suggestion,

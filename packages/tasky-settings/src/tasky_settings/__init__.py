@@ -6,14 +6,28 @@ from typing import Any
 from pydantic.fields import FieldInfo
 from pydantic_settings import BaseSettings, PydanticBaseSettingsSource
 
-from tasky_settings.models import AppSettings, LoggingSettings, TaskDefaultsSettings
+from tasky_settings.backend_registry import BackendFactory, BackendRegistry, registry
+from tasky_settings.factory import ProjectNotFoundError, create_task_service, find_project_root
+from tasky_settings.models import (
+    AppSettings,
+    LoggingSettings,
+    StorageSettings,
+    TaskDefaultsSettings,
+)
 from tasky_settings.sources import GlobalConfigSource, ProjectConfigSource
 
 __all__ = [
     "AppSettings",
+    "BackendFactory",
+    "BackendRegistry",
     "LoggingSettings",
+    "ProjectNotFoundError",
+    "StorageSettings",
     "TaskDefaultsSettings",
+    "create_task_service",
+    "find_project_root",
     "get_settings",
+    "registry",
 ]
 
 

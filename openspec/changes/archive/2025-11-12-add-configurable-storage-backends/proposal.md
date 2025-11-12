@@ -10,21 +10,82 @@ Eliminate hardcoded backend dependencies in the CLI layer by extending the hiera
 
 ## Why
 
-Currently, the CLI commands directly instantiate `JsonTaskRepository` with hardcoded paths, creating tight coupling between presentation and infrastructure layers. The `add-hierarchical-configuration` change established `AppSettings` and TOML-based configuration—this change extends that foundation to storage:
+Currently, CLI commands directly instantiate `JsonTaskRepository` with hardcoded paths, creating tight coupling between presentation and infrastructure. The `add-hierarchical-configuration` change established `AppSettings` and TOML configuration—this change extends that foundation to storage backend selection.
 
-1. **Backend flexibility**: Users cannot choose SQLite for larger projects or Postgres for production
-2. **Hardcoded instantiation**: CLI commands manually create repositories instead of using configuration
-3. **No dependency injection**: Services passed through context but commands don't use them
-4. **Extensibility**: Adding new backends requires modifying CLI code
-5. **Testing**: Difficult to swap backends for integration testing
+**Problems this solves:**
+- Users cannot choose SQLite or Postgres backends
+- CLI commands manually instantiate repositories instead of using configuration
+- Adding new backends requires modifying CLI code
+- Testing requires swapping backend implementations
 
-The proposed extension provides:
-- `StorageSettings` model in `AppSettings` for backend selection and configuration
-- `BackendRegistry` to map backend names to factory functions
-- `create_task_service()` factory that reads config and wires the appropriate backend
-- CLI refactoring to use dependency injection instead of manual instantiation
+**Proposed solution:**
+- Extend `AppSettings` with `StorageSettings` for backend selection
+- Create `BackendRegistry` for plugin-style backend registration
+- Add `create_task_service()` factory that reads config and instantiates backends
+- Refactor CLI to use dependency injection
 
-This enables a plugin-like architecture where backends can be added or swapped without touching higher layers.
+This enables plugin-like backend architecture without modifying higher layers.
+
+## What Changes
+
+### New Capabilities Added
+
+1. **`storage-configuration`** - `StorageSettings` Pydantic model in `AppSettings`
+   - Fields: `backend: str = "json"`, `path: str = "tasks.json"`
+   - Loaded from `[storage]` section in `.tasky/config.toml`
+   - Respects hierarchical precedence (CLI overrides → env vars → project config → global config → defaults)
+
+2. **`backend-registry`** - Plugin registry for storage backend factories
+   - `BackendRegistry` class with `register(name, factory)` and `get(name)` methods
+   - `BackendFactory` type alias: `Callable[[Path], TaskRepository]`
+   - Global singleton `registry` instance exported from `tasky-settings`
+   - Self-registration at module load (backends register themselves in their `__init__.py`)
+
+3. **`task-service-factory`** - Configuration-driven service instantiation
+   - `find_project_root(start_path)` - Walks up directory tree to find `.tasky/` directory
+   - `create_task_service(project_root)` - Loads settings, gets backend from registry, instantiates service
+   - `ProjectNotFoundError` - Raised when no `.tasky/` directory found
+   - Automatic path resolution relative to `.tasky/` directory
+
+### Modified Capabilities
+
+1. **`project-management`** commands
+   - `tasky project init` now accepts `--backend` / `-b` option
+   - Validates backend is registered before creating project
+   - Persists backend choice to `.tasky/config.toml` in `[storage]` section
+   - `tasky project info` now displays storage configuration from AppSettings
+
+2. **`task-cli-operations`** commands
+   - Refactored to use `create_task_service()` instead of direct repository instantiation
+   - All task commands now work with configurable backends
+   - Graceful error handling when project not found or backend invalid
+
+### Files Changed
+
+**New Files:**
+- `packages/tasky-settings/src/tasky_settings/backend_registry.py` - BackendRegistry class
+- `packages/tasky-settings/src/tasky_settings/factory.py` - Service factory and project discovery
+- `packages/tasky-settings/tests/test_registry.py` - Registry tests
+- `packages/tasky-settings/tests/test_factory.py` - Factory and project discovery tests
+
+**Modified Files:**
+- `packages/tasky-settings/src/tasky_settings/models.py` - Added `StorageSettings` to `AppSettings`
+- `packages/tasky-settings/src/tasky_settings/__init__.py` - Export new classes and functions
+- `packages/tasky-cli/src/tasky_cli/commands/projects.py` - Refactored to use TOML config with `[storage]` section
+- `packages/tasky-cli/src/tasky_cli/commands/tasks.py` - Refactored to use factory
+- `packages/tasky-cli/pyproject.toml` - Added `tomli_w>=1.0.0` dependency for TOML writing
+- `packages/tasky-storage/src/tasky_storage/__init__.py` - Self-register JSON backend with registry
+
+**Configuration Format:**
+- All config in single `.tasky/config.toml` file (TOML format)
+- New `[storage]` section stores backend selection and path
+- Integrates with existing hierarchical configuration from `add-hierarchical-configuration`
+
+### Backward Compatibility
+
+- ✅ Projects without `.tasky/config.toml` work with defaults (backend="json", path="tasks.json")
+- ✅ Existing `tasks.json` files continue to work (no data migration needed)
+- ✅ Subdirectories can find parent project (project root discovery walks up tree)
 
 ## Goals
 
@@ -47,14 +108,15 @@ This enables a plugin-like architecture where backends can be added or swapped w
 
 1. **`storage-configuration`**: `StorageSettings` model in `AppSettings` for backend selection
 2. **`backend-registry`**: Plugin registry mapping backend names to factory functions
-3. **`task-service-factory`**: `create_task_service()` that reads config and wires backends
+3. **`backend-self-registration`**: JSON backend automatically registers itself on module import
+4. **`task-service-factory`**: `create_task_service()` that reads config and wires backends
+5. **`project-cli-operations`**: `tasky project init/info` commands with backend selection and TOML config
+6. **`task-cli-operations`**: Task commands using factory with dependency injection
 
 ### Modified Capabilities
 
 1. **`hierarchical-settings`** (from `add-hierarchical-configuration`): Extend `AppSettings` with `storage` section
-2. **`project-management`**: `project init` accepts `--backend` option and persists to `.tasky/config.toml`
-3. **`task-cli-operations`**: All task commands use factory with dependency injection instead of manual instantiation
-4. **`cli-global-options`**: Settings from context passed to commands via dependency injection
+2. **`json-storage-backend`** (from `tasky-storage`): Add `from_path()` factory method for backend registration
 
 ## Architecture Changes
 

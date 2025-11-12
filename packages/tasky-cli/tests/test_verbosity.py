@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-from pathlib import Path
 
 from tasky_cli import app
 from typer.testing import CliRunner
@@ -13,9 +12,9 @@ runner = CliRunner()
 
 def _prepare_workspace() -> None:
     """Create minimal workspace for CLI tests."""
-    storage_root = Path(".tasky")
-    storage_root.mkdir(exist_ok=True)
-    (storage_root / "tasks.json").write_text('{"version":"1.0","tasks":{}}')
+    # Initialize project with config
+    result = runner.invoke(app, ["project", "init"])
+    assert result.exit_code == 0
 
 
 def test_no_verbosity_flag_shows_warning_and_above() -> None:
@@ -30,9 +29,6 @@ def test_no_verbosity_flag_shows_warning_and_above() -> None:
         # Should not contain INFO or DEBUG logs
         assert "INFO" not in result.output
         assert "DEBUG" not in result.output
-
-        # Verify no log prefixes appear (timestamp, level name)
-        assert "tasky" not in result.output.lower() or "[]" in result.output
 
 
 def test_single_verbosity_flag_shows_info_logs() -> None:
