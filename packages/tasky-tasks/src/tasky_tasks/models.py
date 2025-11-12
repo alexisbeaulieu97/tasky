@@ -17,6 +17,18 @@ class TaskStatus(Enum):
     CANCELLED = "cancelled"
 
 
+# Task state transition rules: maps each status to the set of valid target statuses
+# State diagram:
+#   PENDING → {COMPLETED, CANCELLED}
+#   COMPLETED → {PENDING}  (reopen)
+#   CANCELLED → {PENDING}  (reopen)
+TASK_TRANSITIONS: dict[TaskStatus, set[TaskStatus]] = {
+    TaskStatus.PENDING: {TaskStatus.COMPLETED, TaskStatus.CANCELLED},
+    TaskStatus.COMPLETED: {TaskStatus.PENDING},
+    TaskStatus.CANCELLED: {TaskStatus.PENDING},
+}
+
+
 class TaskModel(BaseModel):
     """A model representing a task in the task management system.
 
@@ -70,3 +82,69 @@ class TaskModel(BaseModel):
     def mark_updated(self) -> None:
         """Refresh the updated_at timestamp to the current UTC time."""
         self.updated_at = datetime.now(tz=UTC)
+
+    def transition_to(self, target_status: TaskStatus) -> None:
+        """Transition to a new status with validation.
+
+        This method validates that the requested transition is allowed according
+        to TASK_TRANSITIONS rules, updates the status, and refreshes the
+        updated_at timestamp.
+
+        Parameters
+        ----------
+        target_status:
+            The desired target status for this task.
+
+        Raises
+        ------
+        InvalidStateTransitionError:
+            Raised when the transition from the current status to the target
+            status is not allowed.
+
+        """
+        # Import here to avoid circular dependency (exceptions imports TaskStatus)
+        from tasky_tasks.exceptions import InvalidStateTransitionError  # noqa: PLC0415
+
+        allowed_transitions = TASK_TRANSITIONS.get(self.status, set())
+        if target_status not in allowed_transitions:
+            raise InvalidStateTransitionError(
+                task_id=self.task_id,
+                from_status=self.status,
+                to_status=target_status,
+            )
+
+        self.status = target_status
+        self.mark_updated()
+
+    def complete(self) -> None:
+        """Mark this task as completed.
+
+        Raises
+        ------
+        InvalidStateTransitionError:
+            Raised when the task cannot be completed from its current status.
+
+        """
+        self.transition_to(TaskStatus.COMPLETED)
+
+    def cancel(self) -> None:
+        """Mark this task as cancelled.
+
+        Raises
+        ------
+        InvalidStateTransitionError:
+            Raised when the task cannot be cancelled from its current status.
+
+        """
+        self.transition_to(TaskStatus.CANCELLED)
+
+    def reopen(self) -> None:
+        """Reopen this task, returning it to pending status.
+
+        Raises
+        ------
+        InvalidStateTransitionError:
+            Raised when the task cannot be reopened from its current status.
+
+        """
+        self.transition_to(TaskStatus.PENDING)

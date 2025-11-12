@@ -6,9 +6,10 @@ callers receive consistent error semantics.
 
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING
 
-from tasky_logging import get_logger
+from tasky_logging import get_logger  # type: ignore[import-untyped]
 
 from tasky_tasks.exceptions import TaskNotFoundError, TaskValidationError
 from tasky_tasks.models import TaskModel
@@ -25,7 +26,7 @@ except ModuleNotFoundError:  # pragma: no cover - fallback when storage is absen
     StorageDataError = type("StorageDataError", (Exception,), {})  # type: ignore[misc,assignment]
 
 
-logger = get_logger("tasks.service")
+logger: logging.Logger = get_logger("tasks.service")  # type: ignore[no-untyped-call]
 
 
 class TaskService:
@@ -112,3 +113,99 @@ class TaskService:
         """Check if a task exists."""
         logger.debug("Checking task existence: id=%s", task_id)
         return self.repository.task_exists(task_id)
+
+    def complete_task(self, task_id: UUID) -> TaskModel:
+        """Mark a task as completed.
+
+        Fetches the task, transitions it to completed status, and persists
+        the change.
+
+        Parameters
+        ----------
+        task_id:
+            The ID of the task to complete.
+
+        Returns
+        -------
+        TaskModel:
+            The updated task model with completed status.
+
+        Raises
+        ------
+        TaskNotFoundError:
+            Raised when the task does not exist.
+        InvalidStateTransitionError:
+            Raised when the task cannot be completed from its current status.
+        TaskValidationError:
+            Raised when stored task data is invalid.
+
+        """
+        task = self.get_task(task_id)
+        task.complete()
+        self.repository.save_task(task)
+        logger.info("Task completed: id=%s, name=%s", task.task_id, task.name)
+        return task
+
+    def cancel_task(self, task_id: UUID) -> TaskModel:
+        """Mark a task as cancelled.
+
+        Fetches the task, transitions it to cancelled status, and persists
+        the change.
+
+        Parameters
+        ----------
+        task_id:
+            The ID of the task to cancel.
+
+        Returns
+        -------
+        TaskModel:
+            The updated task model with cancelled status.
+
+        Raises
+        ------
+        TaskNotFoundError:
+            Raised when the task does not exist.
+        InvalidStateTransitionError:
+            Raised when the task cannot be cancelled from its current status.
+        TaskValidationError:
+            Raised when stored task data is invalid.
+
+        """
+        task = self.get_task(task_id)
+        task.cancel()
+        self.repository.save_task(task)
+        logger.info("Task cancelled: id=%s, name=%s", task.task_id, task.name)
+        return task
+
+    def reopen_task(self, task_id: UUID) -> TaskModel:
+        """Reopen a completed or cancelled task.
+
+        Fetches the task, transitions it back to pending status, and persists
+        the change.
+
+        Parameters
+        ----------
+        task_id:
+            The ID of the task to reopen.
+
+        Returns
+        -------
+        TaskModel:
+            The updated task model with pending status.
+
+        Raises
+        ------
+        TaskNotFoundError:
+            Raised when the task does not exist.
+        InvalidStateTransitionError:
+            Raised when the task cannot be reopened from its current status.
+        TaskValidationError:
+            Raised when stored task data is invalid.
+
+        """
+        task = self.get_task(task_id)
+        task.reopen()
+        self.repository.save_task(task)
+        logger.info("Task reopened: id=%s, name=%s", task.task_id, task.name)
+        return task
