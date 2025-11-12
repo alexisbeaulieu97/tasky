@@ -8,6 +8,7 @@ from collections.abc import Callable
 from functools import wraps
 from pathlib import Path
 from typing import NoReturn, TypeVar, cast
+from uuid import UUID
 
 import click
 import typer
@@ -19,6 +20,7 @@ from tasky_tasks import (
     TaskNotFoundError,
     TaskValidationError,
 )
+from tasky_tasks.models import TaskStatus
 from tasky_tasks.service import TaskService
 
 task_app = typer.Typer(no_args_is_help=True)
@@ -60,6 +62,40 @@ def with_task_error_handling(func: F) -> F:  # noqa: UP047
             _dispatch_exception(exc, verbose=verbose)
 
     return cast("F", wrapper)
+
+
+def _parse_task_id_and_get_service(task_id: str) -> tuple[TaskService, UUID]:
+    """Parse task ID and initialize task service.
+
+    This helper handles common setup for task commands:
+    - Storage path validation
+    - UUID parsing with error handling
+    - Task service initialization
+
+    Args:
+        task_id: The task ID string from CLI input.
+
+    Returns:
+        Tuple of (TaskService instance, parsed UUID).
+
+    Raises:
+        typer.Exit: On validation errors (storage missing or invalid UUID).
+
+    """
+    storage_path = _storage_path()
+
+    if not storage_path.exists():
+        typer.echo("No tasks found. Initialize a project first.", err=True)
+        raise typer.Exit(1)
+
+    try:
+        uuid = UUID(task_id)
+    except ValueError as exc:
+        typer.echo(f"Invalid task ID format: {task_id}", err=True)
+        raise typer.Exit(1) from exc
+
+    service = _create_task_service(storage_path)
+    return service, uuid
 
 
 @task_app.command(name="list")
@@ -111,6 +147,51 @@ def _is_verbose(ctx: typer.Context | None) -> bool:
     return False
 
 
+def _suggest_transition(
+    from_status: TaskStatus | str,
+    to_status: TaskStatus | str,
+    task_id: str,
+) -> str:
+    """Generate context-aware suggestions for invalid state transitions.
+
+    Args:
+        from_status: The current status that prevents the transition.
+        to_status: The desired target status.
+        task_id: The task ID to include in the suggestion.
+
+    Returns:
+        A helpful suggestion string for the user.
+
+    """
+    # Normalize to TaskStatus enums for consistent comparison
+    from_enum = from_status if isinstance(from_status, TaskStatus) else TaskStatus(from_status)
+    to_enum = to_status if isinstance(to_status, TaskStatus) else TaskStatus(to_status)
+
+    # Map of (from_status, to_status) -> suggestion
+    reopen_suggestion = f"Use 'tasky task reopen {task_id}' to make it pending first."
+    completed_suggestion = (
+        f"Task is already completed. "
+        f"Use 'tasky task reopen {task_id}' if you want to make changes."
+    )
+    cancelled_suggestion = (
+        f"Task is already cancelled. "
+        f"Use 'tasky task reopen {task_id}' if you want to make changes."
+    )
+    suggestions = {
+        (TaskStatus.CANCELLED, TaskStatus.COMPLETED): reopen_suggestion,
+        (TaskStatus.COMPLETED, TaskStatus.CANCELLED): reopen_suggestion,
+        (TaskStatus.COMPLETED, TaskStatus.COMPLETED): completed_suggestion,
+        (TaskStatus.CANCELLED, TaskStatus.CANCELLED): cancelled_suggestion,
+        (TaskStatus.PENDING, TaskStatus.PENDING): "Task is already pending. No action needed.",
+    }
+
+    # Return specific suggestion or generic fallback
+    return suggestions.get(
+        (from_enum, to_enum),
+        f"Use 'tasky task list' to inspect the current status of task '{task_id}'.",
+    )
+
+
 def _render_error(
     message: str,
     *,
@@ -152,9 +233,14 @@ def _handle_task_domain_error(exc: TaskDomainError, *, verbose: bool) -> NoRetur
         message = str(exc) or "Task validation failed."
         _render_error(message, suggestion=suggestion, verbose=verbose, exc=exc)
     elif isinstance(exc, InvalidStateTransitionError):
+        suggestion = _suggest_transition(
+            from_status=exc.from_status,
+            to_status=exc.to_status,
+            task_id=str(exc.task_id),
+        )
         _render_error(
-            f"Cannot transition task '{exc.task_id}' from {exc.from_status} to {exc.to_status}.",
-            suggestion="Use 'tasky task list' to inspect the current status before retrying.",
+            f"Cannot transition from {exc.from_status} to {exc.to_status}.",
+            suggestion=suggestion,
             verbose=verbose,
             exc=exc,
         )
@@ -182,3 +268,46 @@ def _handle_unexpected_error(exc: Exception, *, verbose: bool) -> NoReturn:
         exc=exc,
     )
     raise typer.Exit(1) from exc
+
+
+@task_app.command(name="complete")
+@with_task_error_handling
+def complete_command(task_id: str) -> None:
+    """Mark a task as completed.
+
+    Args:
+        task_id: The UUID of the task to complete.
+
+    """
+    service, uuid = _parse_task_id_and_get_service(task_id)
+    task = service.complete_task(uuid)
+    typer.echo(f"✓ Task completed: {task.name}")
+    typer.echo(f"  Completed at: {task.updated_at.strftime('%Y-%m-%d %H:%M:%S')}")
+
+
+@task_app.command(name="cancel")
+@with_task_error_handling
+def cancel_command(task_id: str) -> None:
+    """Mark a task as cancelled.
+
+    Args:
+        task_id: The UUID of the task to cancel.
+
+    """
+    service, uuid = _parse_task_id_and_get_service(task_id)
+    task = service.cancel_task(uuid)
+    typer.echo(f"✗ Task cancelled: {task.name}")
+
+
+@task_app.command(name="reopen")
+@with_task_error_handling
+def reopen_command(task_id: str) -> None:
+    """Reopen a completed or cancelled task.
+
+    Args:
+        task_id: The UUID of the task to reopen.
+
+    """
+    service, uuid = _parse_task_id_and_get_service(task_id)
+    task = service.reopen_task(uuid)
+    typer.echo(f"↻ Task reopened: {task.name}")
