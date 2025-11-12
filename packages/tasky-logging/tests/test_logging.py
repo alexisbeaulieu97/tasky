@@ -1,9 +1,11 @@
 """Tests for tasky_logging package."""
 
+import json
 import logging
 
 import pytest
 from tasky_logging import Logger, configure_logging, get_logger
+from tasky_settings.models import LoggingSettings
 
 
 class TestGetLogger:
@@ -43,50 +45,51 @@ class TestConfigureLogging:
 
     def test_configure_logging_verbosity_zero_sets_warning(self) -> None:
         """Test that verbosity=0 sets WARNING level."""
-        configure_logging(verbosity=0)
+        settings = LoggingSettings(verbosity=0)
+        configure_logging(settings)
         logger = logging.getLogger("tasky")
         assert logger.level == logging.WARNING
 
     def test_configure_logging_verbosity_one_sets_info(self) -> None:
         """Test that verbosity=1 sets INFO level."""
-        configure_logging(verbosity=1)
+        settings = LoggingSettings(verbosity=1)
+        configure_logging(settings)
         logger = logging.getLogger("tasky")
         assert logger.level == logging.INFO
 
     def test_configure_logging_verbosity_two_sets_debug(self) -> None:
         """Test that verbosity=2 sets DEBUG level."""
-        configure_logging(verbosity=2)
-        logger = logging.getLogger("tasky")
-        assert logger.level == logging.DEBUG
-
-    def test_configure_logging_verbosity_three_sets_debug(self) -> None:
-        """Test that verbosity=3+ also sets DEBUG level."""
-        configure_logging(verbosity=3)
+        settings = LoggingSettings(verbosity=2)
+        configure_logging(settings)
         logger = logging.getLogger("tasky")
         assert logger.level == logging.DEBUG
 
     def test_configure_logging_adds_handler(self) -> None:
         """Test that configure_logging adds a handler."""
-        configure_logging(verbosity=1)
+        settings = LoggingSettings(verbosity=1)
+        configure_logging(settings)
         logger = logging.getLogger("tasky")
         assert len(logger.handlers) == 1
 
     def test_configure_logging_removes_duplicate_handlers(self) -> None:
         """Test that calling configure_logging twice doesn't duplicate handlers."""
-        configure_logging(verbosity=1)
-        configure_logging(verbosity=1)
+        settings = LoggingSettings(verbosity=1)
+        configure_logging(settings)
+        configure_logging(settings)
         logger = logging.getLogger("tasky")
         assert len(logger.handlers) == 1
 
     def test_configure_logging_sets_propagate_false(self) -> None:
         """Test that logger.propagate is set to False."""
-        configure_logging(verbosity=1)
+        settings = LoggingSettings(verbosity=1)
+        configure_logging(settings)
         logger = logging.getLogger("tasky")
         assert logger.propagate is False
 
     def test_configure_logging_supports_standard_format(self) -> None:
         """Test that standard format is applied correctly."""
-        configure_logging(verbosity=1, format_style="standard")
+        settings = LoggingSettings(verbosity=1, format="standard")
+        configure_logging(settings)
         logger = logging.getLogger("tasky")
         handler = logger.handlers[0]
         formatter = handler.formatter
@@ -105,6 +108,54 @@ class TestConfigureLogging:
         assert "test" in formatted  # Logger name
         assert "INFO" in formatted  # Log level
         assert "test message" in formatted  # Message
+
+    def test_configure_logging_supports_minimal_format(self) -> None:
+        """Test that minimal format is applied correctly."""
+        settings = LoggingSettings(verbosity=1, format="minimal")
+        configure_logging(settings)
+        logger = logging.getLogger("tasky")
+        handler = logger.handlers[0]
+        formatter = handler.formatter
+        assert formatter is not None
+        # Verify formatter has minimal format
+        record = logging.LogRecord(
+            name="test",
+            level=logging.INFO,
+            pathname="",
+            lineno=0,
+            msg="test message",
+            args=(),
+            exc_info=None,
+        )
+        formatted = formatter.format(record)
+        assert "INFO" in formatted  # Log level
+        assert "test message" in formatted  # Message
+        # Minimal format should not include timestamp or logger name
+        assert "test" not in formatted or formatted.startswith("INFO")
+
+    def test_configure_logging_supports_json_format(self) -> None:
+        """Test that JSON format is applied correctly."""
+        settings = LoggingSettings(verbosity=1, format="json")
+        configure_logging(settings)
+        logger = logging.getLogger("tasky")
+        handler = logger.handlers[0]
+        formatter = handler.formatter
+        assert formatter is not None
+        # Verify JSON formatter produces valid JSON
+        record = logging.LogRecord(
+            name="test",
+            level=logging.INFO,
+            pathname="",
+            lineno=0,
+            msg="test message",
+            args=(),
+            exc_info=None,
+        )
+        formatted = formatter.format(record)
+        # Should be valid JSON
+        parsed = json.loads(formatted)
+        assert parsed["level"] == "INFO"
+        assert parsed["message"] == "test message"
 
 
 class TestLoggingWithoutConfiguration:

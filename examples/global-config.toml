@@ -1,0 +1,26 @@
+# Example Global Configuration
+# Location: ~/.tasky/config.toml
+#
+# This file provides user-wide default settings that apply to all projects.
+# Project-specific settings in .tasky/config.toml will override these values.
+
+# Logging Configuration
+[logging]
+# Verbosity level: 0=WARNING, 1=INFO, 2=DEBUG
+verbosity = 1
+
+# Log format: "standard", "json", or "minimal"
+# - standard: timestamp + logger name + level + message
+# - minimal: level + message only
+# - json: structured JSON logging
+format = "standard"
+
+# Task Defaults
+# These settings apply when creating new tasks
+[task_defaults]
+# Default priority: 1 (lowest) to 5 (highest)
+priority = 3
+
+# Default status for new tasks
+status = "pending"
+

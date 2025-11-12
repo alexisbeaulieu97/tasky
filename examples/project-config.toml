@@ -1,0 +1,20 @@
+# Example Project Configuration
+# Location: .tasky/config.toml (in project root)
+#
+# This file provides project-specific settings that override global configuration.
+# CLI flags and environment variables can override these values.
+
+# Logging Configuration
+[logging]
+# Enable debug logging for this project
+verbosity = 2
+
+# Use JSON format for structured logs in this project
+format = "json"
+
+# Task Defaults
+# Set higher default priority for this important project
+[task_defaults]
+priority = 5
+status = "pending"
+
