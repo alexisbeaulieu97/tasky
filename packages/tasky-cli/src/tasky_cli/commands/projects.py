@@ -73,7 +73,7 @@ def init_command(
 
     typer.echo(f"✓ Project initialized in {storage_root}")
     typer.echo(f"  Backend: {backend}")
-    typer.echo("  Storage: tasks.json")
+    typer.echo(f"  Storage: {storage['path']}")
 
 
 @project_app.command(name="info")
