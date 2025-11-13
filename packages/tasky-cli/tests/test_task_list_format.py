@@ -280,6 +280,39 @@ class TestTaskListFormatting:
         assert "✗" in result.stdout  # Cancelled
 
 
+class TestTaskListValidation:
+    """Test suite for task list input validation."""
+
+    def test_list_rejects_invalid_status_without_project(
+        self,
+        runner: CliRunner,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Test that invalid status is rejected before requiring a project.
+
+        Per task-filtering-cli spec: validation must occur before calling
+        the task service, so users get helpful error messages even when
+        no project exists.
+        """
+        # Create uninitialized directory
+        uninit_dir = tmp_path / "uninitialized"
+        uninit_dir.mkdir()
+        monkeypatch.chdir(uninit_dir)
+
+        # Try to list with invalid status
+        result = runner.invoke(task_app, ["list", "--status", "nope"])
+
+        # Should get validation error, not project not found error
+        assert result.exit_code == 1
+        # Error messages go to stderr
+        assert "Invalid status: 'nope'" in result.stderr
+        assert "Valid options:" in result.stderr
+        assert "cancelled, completed, pending" in result.stderr
+        # Should NOT see project not found error
+        assert "No project found" not in result.stderr
+
+
 class TestTaskListIntegration:
     """Integration tests for task list with real service."""
 

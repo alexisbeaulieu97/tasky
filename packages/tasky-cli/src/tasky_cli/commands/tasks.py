@@ -138,9 +138,8 @@ def list_command(  # noqa: C901
         Showing 1 task (1 pending, 0 completed, 0 cancelled)
 
     """
-    service = _get_service()
-
-    # Validate and filter by status if provided
+    # Validate status argument first, before creating service
+    # This ensures invalid status values are rejected without requiring a project
     task_status: TaskStatus | None = None
 
     if status is not None:
@@ -153,6 +152,12 @@ def list_command(  # noqa: C901
             )
             raise typer.Exit(1)
         task_status = TaskStatus(status.lower())
+
+    # Only create service after validating input
+    service = _get_service()
+
+    # Fetch tasks based on validated status
+    if task_status is not None:
         tasks = service.get_tasks_by_status(task_status)
     else:
         tasks = service.get_all_tasks()
