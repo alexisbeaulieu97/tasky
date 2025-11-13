@@ -145,6 +145,49 @@ def list_command(  # noqa: C901
         typer.echo(f"{task.name} - {task.details}")
 
 
+@task_app.command(name="create")
+@with_task_error_handling
+def create_command(
+    name: str = typer.Argument(..., help="Task name"),
+    details: str = typer.Argument(..., help="Task details/description"),
+) -> None:
+    """Create a new task.
+
+    Examples:
+        tasky task create "Buy groceries" "Get milk and eggs from the store"
+        tasky task create "Review PR" "Check code quality and tests"
+
+    """
+    # Validate inputs
+    if not name.strip():
+        typer.echo("Error: Task name cannot be empty.")
+        raise typer.Exit(1)
+    if not details.strip():
+        typer.echo("Error: Task details cannot be empty.")
+        raise typer.Exit(1)
+
+    try:
+        service = _get_service()
+    except ProjectNotFoundError:
+        typer.echo("No project found in current directory.")
+        typer.echo("Run 'tasky project init' to create a project.")
+        raise typer.Exit(1) from None
+    except KeyError as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(1) from exc
+
+    # Create the task
+    task = service.create_task(name, details)
+
+    # Display success message and task details
+    typer.echo("Task created successfully!")
+    typer.echo(f"ID: {task.task_id}")
+    typer.echo(f"Name: {task.name}")
+    typer.echo(f"Details: {task.details}")
+    typer.echo(f"Status: {task.status.value.upper()}")
+    typer.echo(f"Created: {task.created_at.strftime('%Y-%m-%d %H:%M:%S')}")
+
+
 def _get_service() -> TaskService:
     """Get or create a task service for the current project.
 

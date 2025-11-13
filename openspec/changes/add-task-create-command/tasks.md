@@ -6,19 +6,19 @@ This document outlines the ordered implementation tasks for adding the `tasky ta
 
 ### Phase 1: CLI Command Implementation
 
-- [ ] **Task 1.1**: Add `create_command()` function to `packages/tasky-cli/src/tasky_cli/commands/tasks.py`
+- [x] **Task 1.1**: Add `create_command()` function to `packages/tasky-cli/src/tasky_cli/commands/tasks.py`
   - Add function signature: `def create_command(name: str, details: str) -> None:`
   - Use `typer.echo()` for output
   - Include docstring explaining the command
   - **Validation**: Function compiles without syntax errors
 
-- [ ] **Task 1.2**: Implement service integration in create command
+- [x] **Task 1.2**: Implement service integration in create command
   - Create task service instance using `create_task_service()`
   - Call `service.create_task(name, details)`
   - Capture returned `TaskModel` instance
   - **Validation**: Service call executes without errors
 
-- [ ] **Task 1.3**: Format and display created task output
+- [x] **Task 1.3**: Format and display created task output
   - Display task ID prominently
   - Display task name
   - Display task details
@@ -27,7 +27,7 @@ This document outlines the ordered implementation tasks for adding the `tasky ta
   - Use consistent formatting with existing commands
   - **Validation**: Output is human-readable and informative
 
-- [ ] **Task 1.4**: Add command registration to CLI
+- [x] **Task 1.4**: Add command registration to CLI
   - Import `create_command` in `packages/tasky-cli/src/tasky_cli/commands/__init__.py`
   - Register command in task subcommand group
   - Verify `tasky task create --help` shows the command
@@ -35,20 +35,20 @@ This document outlines the ordered implementation tasks for adding the `tasky ta
 
 ### Phase 2: Argument Validation and Error Handling
 
-- [ ] **Task 2.1**: Add validation for required arguments
+- [x] **Task 2.1**: Add validation for required arguments
   - NAME parameter is positional and required
   - DETAILS parameter is positional and required
   - Typer automatically validates required positional args
   - **Validation**: Running without arguments shows error
 
-- [ ] **Task 2.2**: Implement error handling for service failures
+- [x] **Task 2.2**: Implement error handling for service failures
   - Catch exceptions from `service.create_task()`
   - Display helpful error messages
   - Exit with non-zero status on error
   - Follow existing error handling patterns
   - **Validation**: Invalid operations show clear error messages
 
-- [ ] **Task 2.3**: Add argument help text and examples
+- [x] **Task 2.3**: Add argument help text and examples
   - Provide clear descriptions for NAME and DETAILS parameters
   - Include usage examples in help text
   - Show example command invocation
@@ -56,21 +56,21 @@ This document outlines the ordered implementation tasks for adding the `tasky ta
 
 ### Phase 3: Testing
 
-- [ ] **Task 3.1**: Write unit tests for create command
+- [x] **Task 3.1**: Write unit tests for create command
   - Create `packages/tasky-cli/tests/test_task_create.py`
   - Test successful task creation
   - Test output formatting
   - Test with different name and details strings
   - **Validation**: Tests pass with `uv run pytest packages/tasky-cli/tests/test_task_create.py -v`
 
-- [ ] **Task 3.2**: Write integration tests with JSON backend
+- [x] **Task 3.2**: Write integration tests with JSON backend
   - Test create command with real task service
   - Verify task is actually persisted
   - Test retrieving created task with `tasky task list`
   - Test timestamp and ID assignment
   - **Validation**: `uv run pytest packages/tasky-cli/tests/ -k "create" -v`
 
-- [ ] **Task 3.3**: Write error case tests
+- [x] **Task 3.3**: Write error case tests
   - Test with missing NAME argument
   - Test with missing DETAILS argument
   - Test with service failures
@@ -79,19 +79,19 @@ This document outlines the ordered implementation tasks for adding the `tasky ta
 
 ### Phase 4: Validation and Polish
 
-- [ ] **Task 4.1**: Run full test suite
+- [x] **Task 4.1**: Run full test suite
   - Run `uv run pytest` across all packages
   - Address any failures or regressions
   - Verify no tests broken by new command
   - **Validation**: All tests pass (200+ tests)
 
-- [ ] **Task 4.2**: Code quality checks
+- [x] **Task 4.2**: Code quality checks
   - Run `uv run ruff check --fix`
   - Run `uv run ruff format`
   - Ensure no linting errors or warnings
   - **Validation**: No linting issues
 
-- [ ] **Task 4.3**: Manual smoke testing
+- [x] **Task 4.3**: Manual smoke testing
   - Initialize fresh project with `uv run tasky project init`
   - Create a task: `uv run tasky task create "Test task" "Test details"`
   - Verify output shows ID, name, status, and timestamp
@@ -101,13 +101,13 @@ This document outlines the ordered implementation tasks for adding the `tasky ta
 
 ### Phase 5: Documentation
 
-- [ ] **Task 5.1**: Update command documentation
+- [x] **Task 5.1**: Update command documentation
   - Add create command example to help text
   - Provide usage scenarios in docstring
   - Document expected output format
   - **Validation**: Help text is clear and complete
 
-- [ ] **Task 5.2**: Add code comments
+- [x] **Task 5.2**: Add code comments
   - Document key implementation decisions
   - Explain error handling approach
   - Note any assumptions or constraints
