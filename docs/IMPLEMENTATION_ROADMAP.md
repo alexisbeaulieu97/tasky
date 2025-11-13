@@ -7,9 +7,28 @@ This roadmap organizes all 10 OpenSpec changes in optimal implementation order, 
 
 ## Overview
 
-**Total Effort**: ~35-40 hours of implementation
-**Phases**: 4 sequential phases
-**Test Gate**: After each phase, run `uv run pytest` to ensure all 213 tests still pass
+**Total Effort**: ~35.5-40.5 hours of implementation
+**Phases**: 5 sequential phases (1, 1.5, 2, 3, 4, 4.4, 5)
+**Test Gate**: After each phase, run `uv run pytest` to ensure all tests still pass
+
+## Change Checklist
+
+Tick off each change as you complete it (mirrors the execution order below).
+
+- [x] 1.1 `add-task-create-command`
+- [x] 1.2 `enhance-task-list-output`
+- [ ] 1.3 `add-task-show-command`
+- [ ] 1.4 `add-task-update-command`
+- [ ] 1.5 `ensure-storage-backend-registration`
+- [ ] 2.1 `add-sqlite-backend`
+- [ ] 3.1 `add-task-filtering`
+- [ ] 3.2 `add-advanced-filtering`
+- [ ] 3.3 `add-task-import-export`
+- [ ] 4.1 `add-coverage-reporting`
+- [ ] 4.2 `standardize-config-format`
+- [ ] 4.3 `implement-project-list`
+- [ ] 4.4 `align-tasky-projects-format`
+- [ ] 5.1 `add-project-registry`
 
 ---
 
@@ -123,6 +142,49 @@ uv run pytest
 
 ---
 
+## Phase 1.5: Backend Registry Initialization (0.5 hours)
+**Goal**: Ensure storage backends are automatically registered; fix hidden dependency
+
+### 1.5 `ensure-storage-backend-registration` ⭐ CRITICAL FIX
+**Why after Phase 1, before Phase 2**:
+- Fixes hidden dependency discovered in code review
+- `create_task_service()` relies on `tasky_storage` import side-effect
+- Must be fixed before Phase 2 (SQLite backend) to prevent KeyError failures
+- Quick fix (~0.5 hours) with high priority
+- Non-breaking change
+
+**What it enables**:
+- `create_task_service()` works without explicit `tasky_storage` import
+- Cleaner host implementations (CLI, API, etc.)
+- Foundation for Phase 2 (SQLite backend) and beyond
+
+**Depends on**: Phase 1 complete (nothing more)
+**Enables**: Phase 2 (SQLite backend works reliably)
+
+**What changes**:
+- Update `tasky_settings/__init__.py` or `factory.py` to ensure backends are registered on first use
+- Add test to verify `create_task_service()` works in isolation
+- Document the backend registration pattern for future maintainers
+
+```bash
+/openspec:apply ensure-storage-backend-registration
+```
+
+---
+
+## Phase 1.5 Verification Checkpoint ✓
+After Phase 1.5, verify:
+- `create_task_service()` works without explicit `tasky_storage` import
+- Backend registry is initialized correctly
+- No breaking changes to existing code
+
+```bash
+uv run pytest
+# Verify all tests pass
+```
+
+---
+
 ## Phase 2: Storage Architecture Validation (7 hours)
 **Goal**: Prove swappable backend architecture works with production-quality storage
 
@@ -132,14 +194,14 @@ uv run pytest
 - Requires significant implementation (32 tasks, 7 hours)
 - Should complete cleanly before adding more CLI features
 - Demonstrates architectural strength
-- Not dependent on Phase 1 CLI features working
+- Phase 1.5 ensures registry is initialized correctly
 
 **What it enables**:
 - Users can choose between JSON and SQLite backends
 - Validates that adding new backends is "just an implementation" of the protocol
 - Foundation for future backends (PostgreSQL, etc.)
 
-**Depends on**: Nothing (uses existing architecture)
+**Depends on**: Phase 1.5 (backend registry initialization)
 **Enables**: All subsequent changes work with either backend
 
 **Implementation concern**:
@@ -167,13 +229,42 @@ uv run pytest --cov=packages --cov-report=term-missing
 
 ---
 
-## Phase 3: Advanced Features (12-14 hours)
+## Phase 3: Advanced Features (14-16 hours)
 **Goal**: Add sophisticated capabilities that unlock new use cases
 
-### 3.1 `add-advanced-filtering`
+### 3.1 `add-task-filtering`
 **Why first in Phase 3**:
-- Enhances `tasky task list` command (familiar surface)
-- Users can now do more with existing commands
+- Foundation for all other filtering capabilities
+- Adds status-only filtering (`--status pending/completed/cancelled`)
+- Introduces repository-level filtering pattern
+- Quick win (~2-3 hours)
+- Required before advanced filtering can be implemented
+
+**What it enables**:
+- Users can filter by status: `tasky task list --status pending`
+- Foundation for advanced filtering (date range + text search)
+- Repository layer: `get_tasks_by_status()` method
+- Service convenience methods: `get_pending_tasks()`, etc.
+
+**Depends on**: Phase 2 complete (works with both JSON and SQLite)
+**Enables**: `add-advanced-filtering` (builds on status filtering)
+
+**Testing note**:
+- Test filtering each status value
+- Test service convenience methods
+- Verify efficiency with 1000+ tasks
+- Test with both JSON and SQLite backends
+
+```bash
+/openspec:apply add-task-filtering
+```
+
+---
+
+### 3.2 `add-advanced-filtering`
+**Why second in Phase 3**:
+- Builds on status filtering from 3.1
+- Adds date range and text search capabilities
 - Foundation for import/export (search before exporting)
 - ~4 hours
 - Medium complexity (TaskFilter model, repository updates)
@@ -183,13 +274,13 @@ uv run pytest --cov=packages --cov-report=term-missing
 - Users can search task content: `--search "bug fix"`
 - Combine filters: `--status pending --created-after 2025-11-01`
 
-**Depends on**: Phase 1 CLI commands (enhances list)
+**Depends on**: `add-task-filtering` (builds on status filtering)
 **Enables**: `add-task-import-export` (can filter before exporting)
 
 **Testing note**:
 - Test date filtering with tasks created at different times
 - Test search across name and details
-- Test combining status + date filters
+- Test combining status + date + search filters
 - Test with both JSON and SQLite backends
 
 ```bash
@@ -198,25 +289,26 @@ uv run pytest --cov=packages --cov-report=term-missing
 
 ---
 
-### 3.2 `add-task-import-export`
-**Why second in Phase 3**:
+### 3.3 `add-task-import-export`
+**Why third in Phase 3**:
 - Users can now backup tasks
 - Foundational for disaster recovery
 - Complex implementation (52+ scenarios, 4 hours for export + import)
-- Depends on Phase 1 basic operations working
 - Advanced filtering enhances use case (can export filtered results)
+- Requires both filtering features to be in place
 
 **What it enables**:
 - Users can backup: `tasky task export backup.json`
 - Users can restore: `tasky task import backup.json --strategy replace`
 - Users can merge: `tasky task import tasks.json --strategy merge`
+- Can filter before exporting (combines with advanced filtering)
 - Templates and sharing
 
-**Depends on**: Phase 1 CLI (needs working task management)
+**Depends on**: `add-advanced-filtering` (filters can be applied before export)
 **Enables**: Cross-project migrations, backup workflows
 
 **Interdependencies**:
-- Export should work with `add-advanced-filtering` results (optional but nice)
+- Export should work with `add-advanced-filtering` results
 - Import should work with both JSON and SQLite backends
 - Dry-run mode should not actually modify anything
 
@@ -228,8 +320,10 @@ uv run pytest --cov=packages --cov-report=term-missing
 
 ## Phase 3 Verification Checkpoint ✓
 After Phase 3, users should be able to:
-- Filter by multiple criteria: `tasky task list --status pending --search "urgent"`
+- Filter by status: `tasky task list --status pending`
+- Filter by multiple criteria: `tasky task list --status pending --search "urgent" --created-after 2025-11-01`
 - Export all tasks: `tasky task export backup.json`
+- Export filtered results: `tasky task export filtered.json --status completed`
 - Restore tasks: `tasky task import backup.json`
 - Use merge strategy to combine task lists
 
@@ -339,10 +433,14 @@ uv run ruff format
 /openspec:apply add-task-show-command
 /openspec:apply add-task-update-command
 
+# Phase 1.5 - Critical Fix (BEFORE Phase 2)
+/openspec:apply ensure-storage-backend-registration
+
 # Phase 2 - Backend Validation
 /openspec:apply add-sqlite-backend
 
 # Phase 3 - Advanced Features (run in order)
+/openspec:apply add-task-filtering
 /openspec:apply add-advanced-filtering
 /openspec:apply add-task-import-export
 
@@ -350,6 +448,10 @@ uv run ruff format
 /openspec:apply add-coverage-reporting
 /openspec:apply standardize-config-format
 /openspec:apply implement-project-list
+/openspec:apply align-tasky-projects-format
+
+# Phase 5 - Global Project Registry
+/openspec:apply add-project-registry
 ```
 
 ---
@@ -357,23 +459,34 @@ uv run ruff format
 ## Dependency Graph
 
 ```
+# Phase 1: Core CLI
 add-task-create-command (START)
     ↓
 enhance-task-list-output
     ├→ add-task-show-command
     │       ↓
     │   add-task-update-command
-    └→ (both feed into)
-        add-advanced-filtering
-            ↓
-        add-task-import-export
+    └→ (both complete Phase 1)
+        ↓
+    ensure-storage-backend-registration (Phase 1.5 - CRITICAL FIX)
+        ↓
+    add-sqlite-backend (Phase 2)
+        ↓
+    add-task-filtering (Phase 3.1 - status filtering)
+        ↓
+    add-advanced-filtering (Phase 3.2 - date + search)
+        ↓
+    add-task-import-export (Phase 3.3)
 
-add-sqlite-backend (independent, ~same time as Phase 1)
-
-add-coverage-reporting (after all features)
-standardize-config-format (any time)
+# Phase 4: Polish (can run after all features)
+add-coverage-reporting (after Phase 3)
+standardize-config-format (any time after Phase 3)
     ↓
-implement-project-list
+implement-project-list (Phase 4.3)
+    ↓
+align-tasky-projects-format (Phase 4.4 - quick 0.5h fix)
+    ↓
+add-project-registry (Phase 5 - 5-6 hours)
 ```
 
 ---
@@ -410,10 +523,13 @@ Only Phase 4's `standardize-config-format` is breaking:
 | Phase | Changes | Tasks | Hours | Complexity |
 |-------|---------|-------|-------|------------|
 | 1 | 4 | 50+ | 8-10 | Medium |
+| 1.5 | 1 | 12 | 0.5 | Low |
 | 2 | 1 | 32 | 7 | High |
-| 3 | 2 | 37 | 12-14 | High |
+| 3 | 3 | 59+ | 14-16 | High |
 | 4 | 3 | 28 | 8-9 | Low-Med |
-| **TOTAL** | **10** | **150+** | **35-40** | **Balanced** |
+| 4.4 | 1 | 13 | 0.5 | Low |
+| 5 | 1 | 48 | 18-20 | High |
+| **TOTAL** | **14** | **242+** | **56-62** | **Balanced** |
 
 ---
 
@@ -441,19 +557,123 @@ Only Phase 4's `standardize-config-format` is breaking:
 
 ---
 
+---
+
+## Phase 4.4: Architectural Alignment (0.5 hours)
+**Goal**: Fix format mismatch identified in code review; prepare for Phase 5
+
+### 4.4 `align-tasky-projects-format`
+**Why after Phase 4.3**:
+- Quick fix with no new features
+- Prepares foundation for Phase 5 registry feature
+- Addresses architectural debt (JSON vs TOML mismatch)
+- ~0.5 hours
+
+**What it enables**:
+- `tasky-projects` package uses TOML format consistently
+- ProjectConfig can read/write `.tasky/config.toml` (currently only reads/writes JSON)
+- Foundation for Phase 5 registry feature
+
+**Depends on**: `standardize-config-format` (Phase 4.2)
+**Enables**: Phase 5 registry implementation
+
+```bash
+/openspec:apply align-tasky-projects-format
+```
+
+---
+
+## Phase 5: Global Project Registry (5-6 hours)
+**Goal**: Enable `tasky` commands to work from anywhere by discovering and managing projects globally
+
+### 5.1 `add-project-registry`
+**Why separate phase**:
+- Builds on Phases 1-4 foundation
+- Non-blocking feature (existing workflow still works)
+- Enables cross-project workflows
+- ~5-6 hours with 3 sub-components
+
+**What it enables**:
+- Users can track multiple projects in `~/.tasky/registry.json`
+- `tasky project list` shows all registered projects
+- Future: `tasky task <cmd> --project <name>` works from anywhere
+- Foundation for project metadata (created_at, last_accessed, etc.)
+
+**Depends on**: Phase 4 complete (especially Phase 4.4 alignment)
+**Enables**: Cross-project commands and advanced project workflows
+
+```bash
+/openspec:apply add-project-registry
+```
+
+---
+
+## Success Criteria
+
+### Phase 1 ✓
+- [ ] Users can create, list, show, and update tasks
+- [ ] All tests pass
+- [ ] CLI workflow is intuitive
+
+### Phase 1.5 ✓
+- [ ] Backend registry is automatically initialized
+- [ ] `create_task_service()` works without explicit `tasky_storage` import
+- [ ] No breaking changes to existing code
+
+### Phase 2 ✓
+- [ ] SQLite backend is production-ready
+- [ ] All CLI features work with both JSON and SQLite
+- [ ] Architecture validation complete
+
+### Phase 3 ✓
+- [ ] Status filtering works correctly
+- [ ] Advanced filtering (date + search) works with combined criteria
+- [ ] Import/export covers all scenarios and merge strategies
+- [ ] Data portability achieved
+
+### Phase 4 ✓
+- [ ] Coverage ≥80%
+- [ ] Configuration standardized on TOML
+- [ ] Project discoverability complete
+- [ ] tasky-projects format aligned with TOML
+
+### Phase 5 ✓
+- [ ] Global project registry implemented
+- [ ] `tasky project list` lists all registered projects
+- [ ] Projects can be discovered from anywhere
+
+---
+
 ## After Implementation: Archival Process
 
 Once each change is merged (after PR):
 ```bash
 openspec archive add-task-create-command --yes
 openspec archive enhance-task-list-output --yes
-# ... continue for all 10 changes
+# ... continue for all changes
 
 # Final validation
 openspec validate --specs
 ```
 
 This moves completed changes to `openspec/changes/archive/YYYY-MM-DD-<name>/` and updates the specs to reflect the new state.
+
+---
+
+## Architectural Vision
+
+**tasky** is designed with clear separation of concerns:
+
+- **tasky-tasks**: Task domain (models, services, business rules)
+- **tasky-projects**: Project domain (registry, discovery, metadata)
+- **tasky-storage**: Storage adapters (JSON, SQLite, etc.)
+- **tasky-settings**: Configuration wiring and dependency injection
+- **tasky-cli**: User-facing commands and presentation
+
+**Phase 5** completes the architecture by:
+1. Implementing the project registry in `tasky-projects`
+2. Enabling project discovery across the filesystem
+3. Supporting workflows that span multiple projects
 
 ---
 

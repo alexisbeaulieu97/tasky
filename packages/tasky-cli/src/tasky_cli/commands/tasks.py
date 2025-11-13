@@ -105,11 +105,41 @@ def list_command(  # noqa: C901
         "-s",
         help="Filter tasks by status (pending, completed, cancelled).",
     ),
+    long: bool = typer.Option(  # noqa: FBT001
+        False,  # noqa: FBT003
+        "--long",
+        "-l",
+        help="Show timestamps (created_at and updated_at) for each task.",
+    ),
 ) -> None:
-    """List all tasks or filter by status."""
-    service = _get_service()
+    """List all tasks with status indicators and IDs.
 
-    # Validate and filter by status if provided
+    Output format:
+        {status} {id} {name} - {details}
+
+    Status indicators:
+        ○ = pending
+        ✓ = completed
+        ✗ = cancelled
+
+    Tasks are sorted by status: pending first, then completed, then cancelled.
+
+    Example:
+        $ tasky task list
+        ○ 550e8400-e29b-41d4-a716-446655440000 Buy groceries - Get milk and eggs
+        ✓ 550e8400-e29b-41d4-a716-446655440001 Review PR - Check code quality
+
+        Showing 2 tasks (1 pending, 1 completed, 0 cancelled)
+
+        $ tasky task list --long
+        ○ 550e8400-e29b-41d4-a716-446655440000 Buy groceries - Get milk and eggs
+          Created: 2025-11-12T10:30:00Z | Modified: 2025-11-12T10:30:00Z
+
+        Showing 1 task (1 pending, 0 completed, 0 cancelled)
+
+    """
+    # Validate status argument first, before creating service
+    # This ensures invalid status values are rejected without requiring a project
     task_status: TaskStatus | None = None
 
     if status is not None:
@@ -122,19 +152,70 @@ def list_command(  # noqa: C901
             )
             raise typer.Exit(1)
         task_status = TaskStatus(status.lower())
+
+    # Only create service after validating input
+    service = _get_service()
+
+    # Fetch tasks based on validated status
+    if task_status is not None:
         tasks = service.get_tasks_by_status(task_status)
     else:
         tasks = service.get_all_tasks()
 
     if not tasks:
+        # Show status-specific message when filtering, generic message otherwise
         if task_status is not None:
             typer.echo(f"No {task_status.value} tasks found.")
         else:
-            typer.echo("No tasks recorded yet.")
+            typer.echo("No tasks to display")
         return
 
-    for task in tasks:
-        typer.echo(f"{task.name} - {task.details}")
+    # Sort tasks by status: pending → completed → cancelled
+    status_order = {TaskStatus.PENDING: 0, TaskStatus.COMPLETED: 1, TaskStatus.CANCELLED: 2}
+    sorted_tasks = sorted(tasks, key=lambda t: status_order[t.status])
+
+    # Count tasks by status
+    pending_count = sum(1 for t in tasks if t.status == TaskStatus.PENDING)
+    completed_count = sum(1 for t in tasks if t.status == TaskStatus.COMPLETED)
+    cancelled_count = sum(1 for t in tasks if t.status == TaskStatus.CANCELLED)
+
+    # Display tasks with status indicators
+    for task in sorted_tasks:
+        # Map status to indicator
+        status_indicator = _get_status_indicator(task.status)
+        typer.echo(f"{status_indicator} {task.task_id} {task.name} - {task.details}")
+
+        # Show timestamps if --long flag is provided
+        if long:
+            created = task.created_at.strftime("%Y-%m-%dT%H:%M:%SZ")
+            updated = task.updated_at.strftime("%Y-%m-%dT%H:%M:%SZ")
+            typer.echo(f"  Created: {created} | Modified: {updated}")
+
+    # Display summary line
+    task_word = "task" if len(tasks) == 1 else "tasks"
+    typer.echo(
+        f"\nShowing {len(tasks)} {task_word} "
+        f"({pending_count} pending, {completed_count} completed, "
+        f"{cancelled_count} cancelled)",
+    )
+
+
+def _get_status_indicator(status: TaskStatus) -> str:
+    """Get the visual indicator for a task status.
+
+    Args:
+        status: The task status.
+
+    Returns:
+        A single-character indicator (○, ✓, or ✗).
+
+    """
+    indicators = {
+        TaskStatus.PENDING: "○",
+        TaskStatus.COMPLETED: "✓",
+        TaskStatus.CANCELLED: "✗",
+    }
+    return indicators[status]
 
 
 @task_app.command(name="create")
@@ -273,13 +354,13 @@ def _route_exception_to_handler(exc: Exception, *, verbose: bool) -> NoReturn:
 
     for exc_type, handler in handler_chain:
         if isinstance(exc, exc_type):
-            handler(exc, verbose)
+            handler(exc, verbose)  # Call with positional args as per Handler type
 
     # Fallback for unexpected errors
-    _handle_unexpected_error(exc, verbose=verbose)
+    _handle_unexpected_error(exc, verbose)
 
 
-def _handle_task_domain_error(exc: TaskDomainError, *, verbose: bool) -> NoReturn:
+def _handle_task_domain_error(exc: TaskDomainError, verbose: bool) -> NoReturn:
     if isinstance(exc, TaskNotFoundError):
         _render_error(
             f"Task '{exc.task_id}' not found.",
@@ -311,7 +392,7 @@ def _handle_task_domain_error(exc: TaskDomainError, *, verbose: bool) -> NoRetur
     raise typer.Exit(1) from exc
 
 
-def _handle_storage_error(exc: StorageError, *, verbose: bool) -> NoReturn:
+def _handle_storage_error(exc: StorageError, verbose: bool) -> NoReturn:
     _render_error(
         "Storage failure encountered. Verify project initialization and file permissions.",
         suggestion="Run 'tasky project init' or check the .tasky directory.",
@@ -321,7 +402,7 @@ def _handle_storage_error(exc: StorageError, *, verbose: bool) -> NoReturn:
     raise typer.Exit(3) from exc
 
 
-def _handle_project_not_found_error(exc: ProjectNotFoundError, *, verbose: bool) -> NoReturn:
+def _handle_project_not_found_error(exc: ProjectNotFoundError, verbose: bool) -> NoReturn:
     _render_error(
         "No project found in current directory.",
         suggestion="Run 'tasky project init' to create a project.",
@@ -331,7 +412,7 @@ def _handle_project_not_found_error(exc: ProjectNotFoundError, *, verbose: bool)
     raise typer.Exit(1) from exc
 
 
-def _handle_backend_not_registered_error(exc: KeyError, *, verbose: bool) -> NoReturn:
+def _handle_backend_not_registered_error(exc: KeyError, verbose: bool) -> NoReturn:
     """Render backend registry errors with actionable guidance."""
     details = exc.args[0] if exc.args else "Configured backend is not registered."
     _render_error(
@@ -343,7 +424,7 @@ def _handle_backend_not_registered_error(exc: KeyError, *, verbose: bool) -> NoR
     raise typer.Exit(1) from exc
 
 
-def _handle_pydantic_validation_error(exc: PydanticValidationError, *, verbose: bool) -> NoReturn:
+def _handle_pydantic_validation_error(exc: PydanticValidationError, verbose: bool) -> NoReturn:
     """Handle Pydantic validation errors with user-friendly messages."""
     # Extract the first error for a clean message
     errors = exc.errors()
@@ -367,7 +448,7 @@ def _handle_pydantic_validation_error(exc: PydanticValidationError, *, verbose: 
     raise typer.Exit(1) from exc
 
 
-def _handle_unexpected_error(exc: Exception, *, verbose: bool) -> NoReturn:
+def _handle_unexpected_error(exc: Exception, verbose: bool) -> NoReturn:
     _render_error(
         "An unexpected error occurred.",
         suggestion="Run with --verbose for details or file a bug report.",
