@@ -1,18 +1,8 @@
-# Spec: Task Filtering CLI
+# task-filtering-cli Specification
 
-**Capability**: `task-filtering-cli`  
-**Status**: Draft  
-**Package**: `tasky-cli`  
-**Layer**: Presentation
-
-## Overview
-
-Extends the `task list` command with a `--status` option to filter displayed tasks by status. Provides user-friendly error handling and clear output formatting.
-
----
-
-## ADDED Requirements
-
+## Purpose
+TBD - created by archiving change add-task-filtering. Update Purpose after archive.
+## Requirements
 ### Requirement: Task List Command Accepts Status Filter Option
 
 The `task list` command MUST accept an optional status parameter to filter displayed tasks.
@@ -99,17 +89,9 @@ The CLI MUST provide clear feedback when filtering returns no tasks.
 **Then** the CLI MUST display a message indicating no tasks exist  
 **And** the CLI MUST exit with status code 0 (success)
 
----
-
-## MODIFIED Requirements
-
 ### Requirement: Task List Command Maintains Consistent Output Format
 
 The `task list` command output format MUST remain consistent whether displaying all tasks or filtered tasks.
-
-**Original Behavior**: List command displays all tasks with basic formatting.
-
-**Modified Behavior**: List command displays either all tasks or filtered tasks while maintaining consistent formatting.
 
 #### Scenario: Filtered output matches existing format
 
@@ -121,74 +103,3 @@ The `task list` command output format MUST remain consistent whether displaying 
 
 ---
 
-## Implementation Notes
-
-- Update: `packages/tasky-cli/src/tasky_cli/commands/tasks.py`
-- Add parameter to `list_command()`:
-  ```python
-  def list_command(
-      status: Optional[str] = typer.Option(
-          None,
-          "--status",
-          "-s",
-          help="Filter tasks by status (pending, completed, cancelled)",
-      ),
-  ) -> None:
-  ```
-- Status validation logic:
-  ```python
-  if status is not None:
-      normalized = status.lower()
-      try:
-          status_enum = TaskStatus[normalized.upper()]
-          tasks = service.get_tasks_by_status(status_enum)
-      except KeyError:
-          typer.echo(f"Error: Invalid status '{status}'", err=True)
-          typer.echo("Valid values: pending, completed, cancelled", err=True)
-          raise typer.Exit(1)
-  else:
-      tasks = service.get_all_tasks()
-  ```
-- Import `TaskStatus` from `tasky_tasks.models`
-- Use existing service instance creation logic
-
----
-
-## Testing Requirements
-
-- End-to-end tests with real task service
-- Test each status filter value
-- Test invalid status handling
-- Test short and long option forms
-- Test case-insensitive status values
-- Test empty result messaging
-- Verify help text includes option
-
-**Test File**: `packages/tasky-cli/tests/test_filtering.py`
-
-**Test Cases**:
-1. `test_list_with_status_filter_shows_matching_tasks`
-2. `test_list_with_invalid_status_shows_error`
-3. `test_list_without_status_shows_all_tasks`
-4. `test_list_with_short_status_option`
-5. `test_list_with_uppercase_status_normalizes`
-6. `test_list_with_no_matching_tasks_shows_message`
-7. `test_list_help_documents_status_option`
-
----
-
-## User Experience Considerations
-
-- Clear error messages guide users toward correct usage
-- Help text provides examples for common scenarios
-- Empty results are distinguished from errors
-- Backward compatibility maintained for existing workflows
-- Performance remains fast even with filtering
-
----
-
-## Related Specifications
-
-- `task-filtering-service`: Service methods consumed by CLI
-- `task-filtering-protocol`: Underlying protocol definition
-- `task-filtering-json-backend`: Backend implementation

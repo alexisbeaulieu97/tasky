@@ -273,13 +273,13 @@ def _route_exception_to_handler(exc: Exception, *, verbose: bool) -> NoReturn:
 
     for exc_type, handler in handler_chain:
         if isinstance(exc, exc_type):
-            handler(exc, verbose)
+            handler(exc, verbose)  # Call with positional args as per Handler type
 
     # Fallback for unexpected errors
-    _handle_unexpected_error(exc, verbose=verbose)
+    _handle_unexpected_error(exc, verbose)
 
 
-def _handle_task_domain_error(exc: TaskDomainError, *, verbose: bool) -> NoReturn:
+def _handle_task_domain_error(exc: TaskDomainError, verbose: bool) -> NoReturn:
     if isinstance(exc, TaskNotFoundError):
         _render_error(
             f"Task '{exc.task_id}' not found.",
@@ -311,7 +311,7 @@ def _handle_task_domain_error(exc: TaskDomainError, *, verbose: bool) -> NoRetur
     raise typer.Exit(1) from exc
 
 
-def _handle_storage_error(exc: StorageError, *, verbose: bool) -> NoReturn:
+def _handle_storage_error(exc: StorageError, verbose: bool) -> NoReturn:
     _render_error(
         "Storage failure encountered. Verify project initialization and file permissions.",
         suggestion="Run 'tasky project init' or check the .tasky directory.",
@@ -321,7 +321,7 @@ def _handle_storage_error(exc: StorageError, *, verbose: bool) -> NoReturn:
     raise typer.Exit(3) from exc
 
 
-def _handle_project_not_found_error(exc: ProjectNotFoundError, *, verbose: bool) -> NoReturn:
+def _handle_project_not_found_error(exc: ProjectNotFoundError, verbose: bool) -> NoReturn:
     _render_error(
         "No project found in current directory.",
         suggestion="Run 'tasky project init' to create a project.",
@@ -331,7 +331,7 @@ def _handle_project_not_found_error(exc: ProjectNotFoundError, *, verbose: bool)
     raise typer.Exit(1) from exc
 
 
-def _handle_backend_not_registered_error(exc: KeyError, *, verbose: bool) -> NoReturn:
+def _handle_backend_not_registered_error(exc: KeyError, verbose: bool) -> NoReturn:
     """Render backend registry errors with actionable guidance."""
     details = exc.args[0] if exc.args else "Configured backend is not registered."
     _render_error(
@@ -343,7 +343,7 @@ def _handle_backend_not_registered_error(exc: KeyError, *, verbose: bool) -> NoR
     raise typer.Exit(1) from exc
 
 
-def _handle_pydantic_validation_error(exc: PydanticValidationError, *, verbose: bool) -> NoReturn:
+def _handle_pydantic_validation_error(exc: PydanticValidationError, verbose: bool) -> NoReturn:
     """Handle Pydantic validation errors with user-friendly messages."""
     # Extract the first error for a clean message
     errors = exc.errors()
@@ -367,7 +367,7 @@ def _handle_pydantic_validation_error(exc: PydanticValidationError, *, verbose: 
     raise typer.Exit(1) from exc
 
 
-def _handle_unexpected_error(exc: Exception, *, verbose: bool) -> NoReturn:
+def _handle_unexpected_error(exc: Exception, verbose: bool) -> NoReturn:
     _render_error(
         "An unexpected error occurred.",
         suggestion="Run with --verbose for details or file a bug report.",
