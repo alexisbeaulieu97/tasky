@@ -112,6 +112,13 @@ class TaskService:
         list[TaskModel]:
             List of tasks with pending status.
 
+        Raises
+        ------
+        TaskValidationError:
+            Raised when stored task data is invalid.
+        StorageError:
+            Propagated when lower layers encounter infrastructure failures.
+
         """
         return self.get_tasks_by_status(TaskStatus.PENDING)
 
@@ -123,6 +130,13 @@ class TaskService:
         list[TaskModel]:
             List of tasks with completed status.
 
+        Raises
+        ------
+        TaskValidationError:
+            Raised when stored task data is invalid.
+        StorageError:
+            Propagated when lower layers encounter infrastructure failures.
+
         """
         return self.get_tasks_by_status(TaskStatus.COMPLETED)
 
@@ -133,6 +147,13 @@ class TaskService:
         -------
         list[TaskModel]:
             List of tasks with cancelled status.
+
+        Raises
+        ------
+        TaskValidationError:
+            Raised when stored task data is invalid.
+        StorageError:
+            Propagated when lower layers encounter infrastructure failures.
 
         """
         return self.get_tasks_by_status(TaskStatus.CANCELLED)
