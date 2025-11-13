@@ -24,7 +24,7 @@ if TYPE_CHECKING:
     from pathlib import Path
     from uuid import UUID
 
-    from tasky_tasks.models import TaskModel
+    from tasky_tasks.models import TaskModel, TaskStatus
 
 
 logger = get_logger("storage.json.repository")
@@ -74,6 +74,33 @@ class JsonTaskRepository(BaseModel):
 
         tasks = [self._snapshot_to_task(snapshot) for snapshot in document.list_tasks()]
         logger.debug("Retrieved all tasks: count=%d", len(tasks))
+        return tasks
+
+    def get_tasks_by_status(self, status: TaskStatus) -> list[TaskModel]:
+        """Retrieve tasks filtered by status.
+
+        Parameters
+        ----------
+        status:
+            The task status to filter by.
+
+        Returns
+        -------
+        list[TaskModel]:
+            List of tasks matching the specified status.
+
+        """
+        logger.debug("Getting tasks by status: status=%s", status.value)
+        document = self._load_document_optional()
+        if document is None:
+            return []
+
+        tasks = [
+            self._snapshot_to_task(snapshot)
+            for snapshot in document.list_tasks()
+            if snapshot.get("status") == status.value
+        ]
+        logger.debug("Retrieved tasks by status: status=%s, count=%d", status.value, len(tasks))
         return tasks
 
     def delete_task(self, task_id: UUID) -> bool:

@@ -7,7 +7,7 @@ from uuid import uuid4
 
 import pytest
 from tasky_tasks.exceptions import TaskNotFoundError, TaskValidationError
-from tasky_tasks.models import TaskModel
+from tasky_tasks.models import TaskModel, TaskStatus
 from tasky_tasks.service import TaskService
 
 if TYPE_CHECKING:
@@ -53,6 +53,12 @@ class _FakeRepository:
     def get_all_tasks(self) -> list[TaskModel]:
         """Return empty list or single task."""
         if self._task:
+            return [self._task]
+        return []
+
+    def get_tasks_by_status(self, status: TaskStatus) -> list[TaskModel]:
+        """Return tasks filtered by status."""
+        if self._task and self._task.status == status:
             return [self._task]
         return []
 

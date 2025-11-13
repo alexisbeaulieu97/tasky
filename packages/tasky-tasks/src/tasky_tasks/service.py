@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING
 from tasky_logging import get_logger  # type: ignore[import-untyped]
 
 from tasky_tasks.exceptions import TaskNotFoundError, TaskValidationError
-from tasky_tasks.models import TaskModel
+from tasky_tasks.models import TaskModel, TaskStatus
 
 if TYPE_CHECKING:
     from uuid import UUID
@@ -72,6 +72,91 @@ class TaskService:
         tasks = self.repository.get_all_tasks()
         logger.debug("Retrieved all tasks: count=%d", len(tasks))
         return tasks
+
+    def get_tasks_by_status(self, status: TaskStatus) -> list[TaskModel]:
+        """Get tasks filtered by status.
+
+        Parameters
+        ----------
+        status:
+            The task status to filter by.
+
+        Returns
+        -------
+        list[TaskModel]:
+            List of tasks matching the specified status.
+
+        Raises
+        ------
+        TaskValidationError:
+            Raised when stored task data is invalid.
+        StorageError:
+            Propagated when lower layers encounter infrastructure failures.
+
+        """
+        logger.debug("Getting tasks by status: status=%s", status.value)
+        try:
+            tasks = self.repository.get_tasks_by_status(status)
+        except StorageDataError as exc:
+            message = "Unable to retrieve tasks due to corrupted data."
+            raise TaskValidationError(message) from exc
+
+        logger.debug("Retrieved tasks by status: status=%s, count=%d", status.value, len(tasks))
+        return tasks
+
+    def get_pending_tasks(self) -> list[TaskModel]:
+        """Get all pending tasks.
+
+        Returns
+        -------
+        list[TaskModel]:
+            List of tasks with pending status.
+
+        Raises
+        ------
+        TaskValidationError:
+            Raised when stored task data is invalid.
+        StorageError:
+            Propagated when lower layers encounter infrastructure failures.
+
+        """
+        return self.get_tasks_by_status(TaskStatus.PENDING)
+
+    def get_completed_tasks(self) -> list[TaskModel]:
+        """Get all completed tasks.
+
+        Returns
+        -------
+        list[TaskModel]:
+            List of tasks with completed status.
+
+        Raises
+        ------
+        TaskValidationError:
+            Raised when stored task data is invalid.
+        StorageError:
+            Propagated when lower layers encounter infrastructure failures.
+
+        """
+        return self.get_tasks_by_status(TaskStatus.COMPLETED)
+
+    def get_cancelled_tasks(self) -> list[TaskModel]:
+        """Get all cancelled tasks.
+
+        Returns
+        -------
+        list[TaskModel]:
+            List of tasks with cancelled status.
+
+        Raises
+        ------
+        TaskValidationError:
+            Raised when stored task data is invalid.
+        StorageError:
+            Propagated when lower layers encounter infrastructure failures.
+
+        """
+        return self.get_tasks_by_status(TaskStatus.CANCELLED)
 
     def update_task(self, task: TaskModel) -> None:
         """Update an existing task."""

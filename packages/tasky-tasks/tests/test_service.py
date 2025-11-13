@@ -38,6 +38,10 @@ class InMemoryTaskRepository:
         """Return all stored tasks."""
         return list(self.tasks.values())
 
+    def get_tasks_by_status(self, status: TaskStatus) -> list[TaskModel]:
+        """Return tasks filtered by status."""
+        return [task for task in self.tasks.values() if task.status == status]
+
     def delete_task(self, task_id: UUID) -> bool:
         """Remove a stored task."""
         return self.tasks.pop(task_id, None) is not None
