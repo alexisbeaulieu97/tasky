@@ -6,7 +6,7 @@ import sys
 import traceback
 from collections.abc import Callable
 from functools import wraps
-from typing import NoReturn, TypeVar, cast
+from typing import NoReturn, Protocol, TypeVar, cast
 from uuid import UUID
 
 import click
@@ -26,7 +26,14 @@ from tasky_tasks.service import TaskService
 task_app = typer.Typer(no_args_is_help=True)
 
 F = TypeVar("F", bound=Callable[..., object])
-Handler = Callable[[Exception, bool], NoReturn]
+
+class Handler(Protocol):
+    """Protocol for exception handler functions."""
+
+    def __call__(self, exc: Exception, *, verbose: bool) -> NoReturn:
+        """Handle an exception with optional verbose output."""
+        ...
+
 _VERBOSE_KEY = "verbose"
 
 
@@ -304,10 +311,9 @@ def update_command(
         details: New task details (optional).
 
     Examples:
+        tasky task update <task-id> --name "New name" --details "New details"
         tasky task update 3af4b92f-c4a1-4b2e-9c3d-7a1b8c2e5f6g --name "Updated name"
         tasky task update 3af4b92f-c4a1-4b2e-9c3d-7a1b8c2e5f6g --details "Updated details"
-        tasky task update 3af4b92f-c4a1-4b2e-9c3d-7a1b8c2e5f6g \
-            --name "New name" --details "New details"
 
     """
     # Validate that at least one field is provided
@@ -316,7 +322,10 @@ def update_command(
             "Error: At least one of --name or --details must be provided.",
             err=True,
         )
-        typer.echo("Suggestion: Specify which field(s) to update.", err=True)
+        typer.echo(
+            'Example: tasky task update <task-id> --name "New name"',
+            err=True,
+        )
         raise typer.Exit(1)
 
     # Parse task ID and get service
@@ -454,13 +463,13 @@ def _route_exception_to_handler(exc: Exception, *, verbose: bool) -> NoReturn:
 
     for exc_type, handler in handler_chain:
         if isinstance(exc, exc_type):
-            handler(exc, verbose)  # Call with positional args as per Handler type
+            handler(exc, verbose=verbose)
 
     # Fallback for unexpected errors
-    _handle_unexpected_error(exc, verbose)
+    _handle_unexpected_error(exc, verbose=verbose)
 
 
-def _handle_task_domain_error(exc: TaskDomainError, verbose: bool) -> NoReturn:
+def _handle_task_domain_error(exc: TaskDomainError, *, verbose: bool) -> NoReturn:
     if isinstance(exc, TaskNotFoundError):
         _render_error(
             f"Task '{exc.task_id}' not found.",
@@ -492,7 +501,7 @@ def _handle_task_domain_error(exc: TaskDomainError, verbose: bool) -> NoReturn:
     raise typer.Exit(1) from exc
 
 
-def _handle_storage_error(exc: StorageError, verbose: bool) -> NoReturn:
+def _handle_storage_error(exc: StorageError, *, verbose: bool) -> NoReturn:
     _render_error(
         "Storage failure encountered. Verify project initialization and file permissions.",
         suggestion="Run 'tasky project init' or check the .tasky directory.",
@@ -502,7 +511,7 @@ def _handle_storage_error(exc: StorageError, verbose: bool) -> NoReturn:
     raise typer.Exit(3) from exc
 
 
-def _handle_project_not_found_error(exc: ProjectNotFoundError, verbose: bool) -> NoReturn:
+def _handle_project_not_found_error(exc: ProjectNotFoundError, *, verbose: bool) -> NoReturn:
     _render_error(
         "No project found in current directory.",
         suggestion="Run 'tasky project init' to create a project.",
@@ -512,7 +521,7 @@ def _handle_project_not_found_error(exc: ProjectNotFoundError, verbose: bool) ->
     raise typer.Exit(1) from exc
 
 
-def _handle_backend_not_registered_error(exc: KeyError, verbose: bool) -> NoReturn:
+def _handle_backend_not_registered_error(exc: KeyError, *, verbose: bool) -> NoReturn:
     """Render backend registry errors with actionable guidance."""
     details = exc.args[0] if exc.args else "Configured backend is not registered."
     _render_error(
@@ -524,7 +533,7 @@ def _handle_backend_not_registered_error(exc: KeyError, verbose: bool) -> NoRetu
     raise typer.Exit(1) from exc
 
 
-def _handle_pydantic_validation_error(exc: PydanticValidationError, verbose: bool) -> NoReturn:
+def _handle_pydantic_validation_error(exc: PydanticValidationError, *, verbose: bool) -> NoReturn:
     """Handle Pydantic validation errors with user-friendly messages."""
     # Extract the first error for a clean message
     errors = exc.errors()
@@ -548,7 +557,7 @@ def _handle_pydantic_validation_error(exc: PydanticValidationError, verbose: boo
     raise typer.Exit(1) from exc
 
 
-def _handle_unexpected_error(exc: Exception, verbose: bool) -> NoReturn:
+def _handle_unexpected_error(exc: Exception, *, verbose: bool) -> NoReturn:
     _render_error(
         "An unexpected error occurred.",
         suggestion="Run with --verbose for details or file a bug report.",

@@ -202,8 +202,8 @@ class TestTaskUpdateCommand:
         original_task = service.get_task(UUID(task_id))
         original_timestamp = original_task.updated_at
 
-        # Wait a tiny bit and update
-        time.sleep(0.01)
+        # Wait to ensure timestamp changes (increased for reliability)
+        time.sleep(0.1)
 
         result = runner.invoke(task_app, ["update", task_id, "--name", "Updated"])
         assert result.exit_code == 0
@@ -226,6 +226,9 @@ class TestTaskUpdateErrorHandling:
 
         assert result.exit_code == 1
         assert "At least one of --name or --details must be provided" in result.stderr
+        # Verify example usage is shown as required by spec
+        assert "Example:" in result.stderr
+        assert "tasky task update" in result.stderr
 
     def test_update_missing_task_id(
         self,
