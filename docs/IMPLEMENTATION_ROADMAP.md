@@ -16,7 +16,7 @@ This roadmap organizes all 10 OpenSpec changes in optimal implementation order, 
 Tick off each change as you complete it (mirrors the execution order below).
 
 - [x] 1.1 `add-task-create-command`
-- [ ] 1.2 `enhance-task-list-output`
+- [x] 1.2 `enhance-task-list-output`
 - [ ] 1.3 `add-task-show-command`
 - [ ] 1.4 `add-task-update-command`
 - [ ] 1.5 `ensure-storage-backend-registration`
