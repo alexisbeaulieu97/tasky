@@ -6,7 +6,7 @@ from datetime import UTC, datetime
 from enum import Enum
 from uuid import UUID, uuid4
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class TaskStatus(Enum):
@@ -66,6 +66,24 @@ class TaskModel(BaseModel):
         default_factory=lambda: datetime.now(tz=UTC),
         description="The date and time the task was updated.",
     )
+
+    @field_validator("name")
+    @classmethod
+    def _validate_name_not_empty(cls, value: str) -> str:
+        """Validate that task name is not empty or whitespace-only."""
+        if not value.strip():
+            msg = "Task name cannot be empty"
+            raise ValueError(msg)
+        return value
+
+    @field_validator("details")
+    @classmethod
+    def _validate_details_not_empty(cls, value: str) -> str:
+        """Validate that task details are not empty or whitespace-only."""
+        if not value.strip():
+            msg = "Task details cannot be empty"
+            raise ValueError(msg)
+        return value
 
     @model_validator(mode="after")
     def _sync_initial_timestamps(self) -> TaskModel:

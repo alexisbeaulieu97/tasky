@@ -11,6 +11,7 @@ from uuid import UUID
 
 import click
 import typer
+from pydantic import ValidationError as PydanticValidationError
 from tasky_settings import ProjectNotFoundError, create_task_service
 from tasky_storage.errors import StorageError
 from tasky_tasks import (
@@ -67,7 +68,7 @@ def _parse_task_id_and_get_service(task_id: str) -> tuple[TaskService, UUID]:
     """Parse task ID and initialize task service.
 
     This helper handles common setup for task commands:
-    - Project validation
+    - Project validation (via error dispatcher)
     - UUID parsing with error handling
     - Task service initialization
 
@@ -78,14 +79,12 @@ def _parse_task_id_and_get_service(task_id: str) -> tuple[TaskService, UUID]:
         Tuple of (TaskService instance, parsed UUID).
 
     Raises:
-        typer.Exit: On validation errors (no project or invalid UUID).
+        ProjectNotFoundError: If no project found (caught by error dispatcher)
+        KeyError: If backend not registered (caught by error dispatcher)
+        typer.Exit: On invalid UUID format
 
     """
-    try:
-        service = _get_service()
-    except (ProjectNotFoundError, KeyError) as exc:
-        typer.echo(str(exc), err=True)
-        raise typer.Exit(1) from exc
+    service = _get_service()
 
     try:
         uuid = UUID(task_id)
@@ -107,15 +106,7 @@ def list_command(  # noqa: C901
     ),
 ) -> None:
     """List all tasks or filter by status."""
-    try:
-        service = _get_service()
-    except ProjectNotFoundError:
-        typer.echo("No project found in current directory.")
-        typer.echo("Run 'tasky project init' to create a project.")
-        return
-    except KeyError as exc:
-        typer.echo(f"Error: {exc}", err=True)
-        return
+    service = _get_service()
 
     # Validate and filter by status if provided
     task_status: TaskStatus | None = None
@@ -158,25 +149,7 @@ def create_command(
         tasky task create "Review PR" "Check code quality and tests"
 
     """
-    # Validate inputs
-    if not name.strip():
-        typer.echo("Error: Task name cannot be empty.")
-        raise typer.Exit(1)
-    if not details.strip():
-        typer.echo("Error: Task details cannot be empty.")
-        raise typer.Exit(1)
-
-    try:
-        service = _get_service()
-    except ProjectNotFoundError:
-        typer.echo("No project found in current directory.")
-        typer.echo("Run 'tasky project init' to create a project.")
-        raise typer.Exit(1) from None
-    except KeyError as exc:
-        typer.echo(f"Error: {exc}", err=True)
-        raise typer.Exit(1) from exc
-
-    # Create the task
+    service = _get_service()
     task = service.create_task(name, details)
 
     # Display success message and task details
@@ -282,12 +255,24 @@ def _render_error(
 def _dispatch_exception(exc: Exception, *, verbose: bool) -> NoReturn:
     if isinstance(exc, typer.Exit):
         raise exc
+
+    # Dispatch to appropriate handler
+    _route_exception_to_handler(exc, verbose=verbose)
+
+
+def _route_exception_to_handler(exc: Exception, *, verbose: bool) -> NoReturn:
+    """Route exception to the appropriate error handler."""
     if isinstance(exc, TaskDomainError):
         _handle_task_domain_error(exc, verbose=verbose)
-    elif isinstance(exc, StorageError):
+    if isinstance(exc, StorageError):
         _handle_storage_error(exc, verbose=verbose)
-    else:
-        _handle_unexpected_error(exc, verbose=verbose)
+    if isinstance(exc, ProjectNotFoundError):
+        _handle_project_not_found_error(exc, verbose=verbose)
+    if isinstance(exc, PydanticValidationError):
+        _handle_pydantic_validation_error(exc, verbose=verbose)
+
+    # Fallback for unexpected errors
+    _handle_unexpected_error(exc, verbose=verbose)
 
 
 def _handle_task_domain_error(exc: TaskDomainError, *, verbose: bool) -> NoReturn:
@@ -330,6 +315,40 @@ def _handle_storage_error(exc: StorageError, *, verbose: bool) -> NoReturn:
         exc=exc,
     )
     raise typer.Exit(3) from exc
+
+
+def _handle_project_not_found_error(exc: ProjectNotFoundError, *, verbose: bool) -> NoReturn:
+    _render_error(
+        "No project found in current directory.",
+        suggestion="Run 'tasky project init' to create a project.",
+        verbose=verbose,
+        exc=exc,
+    )
+    raise typer.Exit(1) from exc
+
+
+def _handle_pydantic_validation_error(exc: PydanticValidationError, *, verbose: bool) -> NoReturn:
+    """Handle Pydantic validation errors with user-friendly messages."""
+    # Extract the first error for a clean message
+    errors = exc.errors()
+    if errors:
+        first_error = errors[0]
+        field = first_error.get("loc", ("unknown",))[-1]
+        message = first_error.get("msg", "Validation failed")
+        _render_error(
+            f"{message.capitalize()} for field '{field}'.",
+            suggestion="Check your input values and try again.",
+            verbose=verbose,
+            exc=exc,
+        )
+    else:
+        _render_error(
+            "Validation failed.",
+            suggestion="Check your input values and try again.",
+            verbose=verbose,
+            exc=exc,
+        )
+    raise typer.Exit(1) from exc
 
 
 def _handle_unexpected_error(exc: Exception, *, verbose: bool) -> NoReturn:

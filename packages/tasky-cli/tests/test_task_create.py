@@ -125,9 +125,17 @@ class TestTaskCreateCommand:
         result2 = runner.invoke(task_app, ["create", "Task B", "Details B"])
 
         # Extract IDs from output
-        id1 = next(line for line in result1.stdout.split("\n") if line.startswith("ID:"))
-        id2 = next(line for line in result2.stdout.split("\n") if line.startswith("ID:"))
+        id1 = next(
+            (line for line in result1.stdout.split("\n") if line.startswith("ID:")),
+            None,
+        )
+        id2 = next(
+            (line for line in result2.stdout.split("\n") if line.startswith("ID:")),
+            None,
+        )
 
+        assert id1 is not None, "Task 1 output missing ID line"
+        assert id2 is not None, "Task 2 output missing ID line"
         assert id1 != id2
 
     def test_create_task_sets_pending_status(
@@ -145,7 +153,8 @@ class TestTaskCreateCommand:
         service = create_task_service()
         tasks = service.get_all_tasks()
         assert len(tasks) == 1
-        assert tasks[0].status.value == "pending"
+        # All newly created tasks should have pending status
+        assert all(task.status.value == "pending" for task in tasks)
 
     def test_create_task_with_empty_name(
         self,
@@ -156,8 +165,8 @@ class TestTaskCreateCommand:
         result = runner.invoke(task_app, ["create", "", "Details"])
 
         assert result.exit_code != 0
-        # CliRunner captures both stdout and stderr in stdout by default
-        assert "name cannot be empty" in result.stdout.lower()
+        # Error messages are written to stderr
+        assert "name cannot be empty" in result.stderr.lower()
 
     def test_create_task_with_empty_details(
         self,
@@ -168,7 +177,7 @@ class TestTaskCreateCommand:
         result = runner.invoke(task_app, ["create", "Task Name", ""])
 
         assert result.exit_code != 0
-        assert "details cannot be empty" in result.stdout.lower()
+        assert "details cannot be empty" in result.stderr.lower()
 
     def test_create_task_with_whitespace_only_name(
         self,
@@ -179,7 +188,7 @@ class TestTaskCreateCommand:
         result = runner.invoke(task_app, ["create", "   ", "Details"])
 
         assert result.exit_code != 0
-        assert "name cannot be empty" in result.stdout.lower()
+        assert "name cannot be empty" in result.stderr.lower()
 
     def test_create_task_output_format(
         self,
@@ -240,7 +249,7 @@ class TestTaskCreateErrors:
         result = runner.invoke(task_app, ["create", "Task", "Details"])
 
         assert result.exit_code != 0
-        assert "No project found" in result.stdout
+        assert "No project found" in result.stderr
 
     def test_create_task_help_displays_correctly(
         self,
@@ -270,7 +279,11 @@ class TestTaskCreateIntegration:
         assert create_result.exit_code == 0
 
         # Extract task ID
-        id_line = next(line for line in create_result.stdout.split("\n") if line.startswith("ID:"))
+        id_line = next(
+            (line for line in create_result.stdout.split("\n") if line.startswith("ID:")),
+            None,
+        )
+        assert id_line is not None, "Create output missing ID line"
         task_id = id_line.split("ID:")[1].strip()
 
         # Complete the task
