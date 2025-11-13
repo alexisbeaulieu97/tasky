@@ -17,7 +17,7 @@ Tick off each change as you complete it (mirrors the execution order below).
 
 - [x] 1.1 `add-task-create-command`
 - [x] 1.2 `enhance-task-list-output`
-- [ ] 1.3 `add-task-show-command`
+- [x] 1.3 `add-task-show-command`
 - [ ] 1.4 `add-task-update-command`
 - [ ] 1.5 `ensure-storage-backend-registration`
 - [ ] 2.1 `add-sqlite-backend`

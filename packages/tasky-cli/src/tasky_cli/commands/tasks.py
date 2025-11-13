@@ -69,8 +69,8 @@ def _parse_task_id_and_get_service(task_id: str) -> tuple[TaskService, UUID]:
     """Parse task ID and initialize task service.
 
     This helper handles common setup for task commands:
+    - UUID parsing with error handling (before service creation)
     - Project validation (via error dispatcher)
-    - UUID parsing with error handling
     - Task service initialization
 
     Args:
@@ -80,18 +80,26 @@ def _parse_task_id_and_get_service(task_id: str) -> tuple[TaskService, UUID]:
         Tuple of (TaskService instance, parsed UUID).
 
     Raises:
+        typer.Exit: On invalid UUID format
         ProjectNotFoundError: If no project found (caught by error dispatcher)
         KeyError: If backend not registered (caught by error dispatcher)
-        typer.Exit: On invalid UUID format
 
     """
-    service = _get_service()
-
+    # Parse UUID first, before creating service or checking for project
+    # This ensures invalid UUIDs are rejected without touching storage
     try:
         uuid = UUID(task_id)
     except ValueError as exc:
-        typer.echo(f"Invalid task ID format: {task_id}", err=True)
+        typer.echo(
+            f"Invalid UUID format: {task_id}\n"
+            f"Expected format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx "
+            f"(e.g., 123e4567-e89b-12d3-a456-426614174000)",
+            err=True,
+        )
         raise typer.Exit(1) from exc
+
+    # Only create service after UUID is validated
+    service = _get_service()
 
     return service, uuid
 
@@ -216,6 +224,41 @@ def _get_status_indicator(status: TaskStatus) -> str:
         TaskStatus.CANCELLED: "✗",
     }
     return indicators[status]
+
+
+@task_app.command(name="show")
+@with_task_error_handling
+def show_command(task_id: str = typer.Argument(..., help="Task ID (UUID format)")) -> None:
+    """Display full details for a specific task.
+
+    Shows all task metadata including ID, name, details, status, and timestamps.
+
+    Args:
+        task_id: The UUID of the task to display.
+
+    Example:
+        $ tasky task show 550e8400-e29b-41d4-a716-446655440000
+
+        Task Details
+        ID: 550e8400-e29b-41d4-a716-446655440000
+        Name: Buy groceries
+        Details: Get milk and eggs from the store
+        Status: PENDING
+        Created: 2025-11-12 14:30:45
+        Updated: 2025-11-12 14:30:45
+
+    """
+    service, uuid = _parse_task_id_and_get_service(task_id)
+    task = service.get_task(uuid)
+
+    # Display task details in human-readable format
+    typer.echo("Task Details")
+    typer.echo(f"ID: {task.task_id}")
+    typer.echo(f"Name: {task.name}")
+    typer.echo(f"Details: {task.details}")
+    typer.echo(f"Status: {task.status.value.upper()}")
+    typer.echo(f"Created: {task.created_at.strftime('%Y-%m-%d %H:%M:%S')}")
+    typer.echo(f"Updated: {task.updated_at.strftime('%Y-%m-%d %H:%M:%S')}")
 
 
 @task_app.command(name="create")
