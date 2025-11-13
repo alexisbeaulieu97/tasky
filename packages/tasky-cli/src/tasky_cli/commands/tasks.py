@@ -237,10 +237,10 @@ def show_command(task_id: str = typer.Argument(..., help="Task ID (UUID format)"
         task_id: The UUID of the task to display.
 
     Example:
-        $ tasky task show 550e8400-e29b-41d4-a716-446655440000
+        $ tasky task show 3af4b92f-c4a1-4b2e-9c3d-7a1b8c2e5f6g
 
         Task Details
-        ID: 550e8400-e29b-41d4-a716-446655440000
+        ID: 3af4b92f-c4a1-4b2e-9c3d-7a1b8c2e5f6g
         Name: Buy groceries
         Details: Get milk and eggs from the store
         Status: PENDING

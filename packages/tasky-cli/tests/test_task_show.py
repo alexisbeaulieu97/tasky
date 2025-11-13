@@ -247,6 +247,18 @@ class TestTaskShowCommandErrors:
         assert result.exit_code == 1
         assert "No project found" in result.stderr
 
+    def test_show_help_includes_mandated_uuid_example(
+        self,
+        runner: CliRunner,
+    ) -> None:
+        """Test that help text includes the UUID example mandated by the spec."""
+        result = runner.invoke(task_app, ["show", "--help"])
+
+        assert result.exit_code == 0
+        # The spec requires the help to show this specific UUID example
+        assert "3af4b92f-c4a1-4b2e-9c3d-7a1b8c2e5f6g" in result.stdout
+        assert "tasky task show 3af4b92f-c4a1-4b2e-9c3d-7a1b8c2e5f6g" in result.stdout
+
 
 class TestTaskShowCommandIntegration:
     """Integration tests for task show command."""
@@ -277,7 +289,7 @@ class TestTaskShowCommandIntegration:
     ) -> None:
         """Test showing multiple tasks one after another."""
         # Create multiple tasks
-        task_ids = []
+        task_ids: list[str] = []
         for i in range(3):
             result = runner.invoke(task_app, ["create", f"Task {i}", f"Details {i}"])
             assert result.exit_code == 0
