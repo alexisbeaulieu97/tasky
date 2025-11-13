@@ -286,6 +286,63 @@ def create_command(
     typer.echo(f"Created: {task.created_at.strftime('%Y-%m-%d %H:%M:%S')}")
 
 
+@task_app.command(name="update")
+@with_task_error_handling
+def update_command(
+    task_id: str = typer.Argument(..., help="Task ID (UUID format)"),
+    name: str | None = typer.Option(None, "--name", help="New task name"),
+    details: str | None = typer.Option(None, "--details", help="New task details"),
+) -> None:
+    r"""Update an existing task's name and/or details.
+
+    At least one of --name or --details must be provided.
+    Only the specified fields will be updated; unspecified fields remain unchanged.
+
+    Args:
+        task_id: The UUID of the task to update.
+        name: New task name (optional).
+        details: New task details (optional).
+
+    Examples:
+        tasky task update 3af4b92f-c4a1-4b2e-9c3d-7a1b8c2e5f6g --name "Updated name"
+        tasky task update 3af4b92f-c4a1-4b2e-9c3d-7a1b8c2e5f6g --details "Updated details"
+        tasky task update 3af4b92f-c4a1-4b2e-9c3d-7a1b8c2e5f6g \
+            --name "New name" --details "New details"
+
+    """
+    # Validate that at least one field is provided
+    if name is None and details is None:
+        typer.echo(
+            "Error: At least one of --name or --details must be provided.",
+            err=True,
+        )
+        typer.echo("Suggestion: Specify which field(s) to update.", err=True)
+        raise typer.Exit(1)
+
+    # Parse task ID and get service
+    service, uuid = _parse_task_id_and_get_service(task_id)
+
+    # Retrieve the current task
+    task = service.get_task(uuid)
+
+    # Update only the specified fields
+    if name is not None:
+        task.name = name
+    if details is not None:
+        task.details = details
+
+    # Persist changes
+    service.update_task(task)
+
+    # Display updated task details
+    typer.echo("Task updated successfully!")
+    typer.echo(f"ID: {task.task_id}")
+    typer.echo(f"Name: {task.name}")
+    typer.echo(f"Details: {task.details}")
+    typer.echo(f"Status: {task.status.value.upper()}")
+    typer.echo(f"Modified: {task.updated_at.strftime('%Y-%m-%d %H:%M:%S')}")
+
+
 def _get_service() -> TaskService:
     """Get or create a task service for the current project.
 

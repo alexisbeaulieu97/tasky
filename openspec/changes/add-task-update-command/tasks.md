@@ -6,19 +6,19 @@ This document outlines the ordered implementation tasks for adding the `tasky ta
 
 ### Phase 1: CLI Command Implementation
 
-- [ ] **Task 1.1**: Add `update_command()` function to `packages/tasky-cli/src/tasky_cli/commands/tasks.py`
+- [x] **Task 1.1**: Add `update_command()` function to `packages/tasky-cli/src/tasky_cli/commands/tasks.py`
   - Add function signature: `def update_command(task_id: str, name: Optional[str] = None, details: Optional[str] = None) -> None:`
   - Use `typer.echo()` for output
   - Include docstring explaining the command
   - **Validation**: Function compiles without syntax errors
 
-- [ ] **Task 1.2**: Implement validation for required field flags
+- [x] **Task 1.2**: Implement validation for required field flags
   - Validate that at least one of `--name` or `--details` is provided
   - Display helpful error message if neither is provided
   - Exit with status code 1 on validation failure
   - **Validation**: Error shown when neither flag is provided
 
-- [ ] **Task 1.3**: Implement service integration in update command
+- [x] **Task 1.3**: Implement service integration in update command
   - Create task service instance using `create_task_service()`
   - Call `service.get_task(task_id)` to retrieve the current task
   - Modify only the specified fields in the retrieved task
@@ -26,7 +26,7 @@ This document outlines the ordered implementation tasks for adding the `tasky ta
   - Capture updated `TaskModel` instance
   - **Validation**: Service calls execute without errors
 
-- [ ] **Task 1.4**: Format and display updated task output
+- [x] **Task 1.4**: Format and display updated task output
   - Display task ID prominently
   - Display task name
   - Display task details
@@ -35,7 +35,7 @@ This document outlines the ordered implementation tasks for adding the `tasky ta
   - Use consistent formatting with existing commands
   - **Validation**: Output is human-readable and informative
 
-- [ ] **Task 1.5**: Add command registration to CLI
+- [x] **Task 1.5**: Add command registration to CLI
   - Import `update_command` in `packages/tasky-cli/src/tasky_cli/commands/__init__.py`
   - Register command in task subcommand group
   - Verify `tasky task update --help` shows the command
@@ -43,17 +43,17 @@ This document outlines the ordered implementation tasks for adding the `tasky ta
 
 ### Phase 2: Argument Validation and Error Handling
 
-- [ ] **Task 2.1**: Add validation for required TASK_ID argument
+- [x] **Task 2.1**: Add validation for required TASK_ID argument
   - TASK_ID parameter is positional and required
   - Typer automatically validates required positional args
   - **Validation**: Running without TASK_ID shows error
 
-- [ ] **Task 2.2**: Add validation for optional flags
+- [x] **Task 2.2**: Add validation for optional flags
   - `--name` and `--details` are optional but at least one is required
   - Clear error message if neither flag is provided
   - **Validation**: Error shown when no flags provided
 
-- [ ] **Task 2.3**: Implement error handling for service failures
+- [x] **Task 2.3**: Implement error handling for service failures
   - Catch exceptions from `service.get_task()` (task not found)
   - Catch exceptions from `service.update_task()` (storage errors)
   - Display helpful error messages
@@ -61,7 +61,7 @@ This document outlines the ordered implementation tasks for adding the `tasky ta
   - Follow existing error handling patterns
   - **Validation**: Invalid operations show clear error messages
 
-- [ ] **Task 2.4**: Add argument help text and examples
+- [x] **Task 2.4**: Add argument help text and examples
   - Provide clear descriptions for TASK_ID parameter
   - Provide clear descriptions for `--name` and `--details` flags
   - Include usage examples in help text
@@ -70,7 +70,7 @@ This document outlines the ordered implementation tasks for adding the `tasky ta
 
 ### Phase 3: Testing
 
-- [ ] **Task 3.1**: Write unit tests for update command
+- [x] **Task 3.1**: Write unit tests for update command
   - Create `packages/tasky-cli/tests/test_task_update.py`
   - Test successful update with name only
   - Test successful update with details only
@@ -78,7 +78,7 @@ This document outlines the ordered implementation tasks for adding the `tasky ta
   - Test with different name and details strings
   - **Validation**: Tests pass with `uv run pytest packages/tasky-cli/tests/test_task_update.py -v`
 
-- [ ] **Task 3.2**: Write error case tests
+- [x] **Task 3.2**: Write error case tests
   - Test error when no TASK_ID provided
   - Test error when neither `--name` nor `--details` provided
   - Test error when task ID does not exist
@@ -86,7 +86,7 @@ This document outlines the ordered implementation tasks for adding the `tasky ta
   - Test error message clarity for each case
   - **Validation**: All error cases handled gracefully
 
-- [ ] **Task 3.3**: Write integration tests with storage backends
+- [x] **Task 3.3**: Write integration tests with storage backends
   - Test update command with JSON backend
   - Test update command with SQLite backend
   - Create task, update it, verify changes persisted
@@ -94,7 +94,7 @@ This document outlines the ordered implementation tasks for adding the `tasky ta
   - Test updating name, details, and both fields
   - **Validation**: `uv run pytest packages/tasky-cli/tests/ -k "update" -v`
 
-- [ ] **Task 3.4**: Verify field isolation in updates
+- [x] **Task 3.4**: Verify field isolation in updates
   - Create task with name and details
   - Update only name and verify details unchanged
   - Update only details and verify name unchanged
@@ -103,19 +103,19 @@ This document outlines the ordered implementation tasks for adding the `tasky ta
 
 ### Phase 4: Validation and Polish
 
-- [ ] **Task 4.1**: Run full test suite
+- [x] **Task 4.1**: Run full test suite
   - Run `uv run pytest` across all packages
   - Address any failures or regressions
   - Verify no tests broken by new command
   - **Validation**: All tests pass
 
-- [ ] **Task 4.2**: Code quality checks
+- [x] **Task 4.2**: Code quality checks
   - Run `uv run ruff check --fix`
   - Run `uv run ruff format`
   - Ensure no linting errors or warnings
   - **Validation**: No linting issues
 
-- [ ] **Task 4.3**: Manual smoke testing
+- [x] **Task 4.3**: Manual smoke testing
   - Initialize fresh project with `uv run tasky project init`
   - Create a task: `uv run tasky task create "Original name" "Original details"`
   - Copy the task ID from output
@@ -131,14 +131,14 @@ This document outlines the ordered implementation tasks for adding the `tasky ta
 
 ### Phase 5: Documentation
 
-- [ ] **Task 5.1**: Update command documentation
+- [x] **Task 5.1**: Update command documentation
   - Add update command example to help text
   - Provide usage scenarios in docstring
   - Document expected output format
   - Show examples of updating different fields
   - **Validation**: Help text is clear and complete
 
-- [ ] **Task 5.2**: Add code comments
+- [x] **Task 5.2**: Add code comments
   - Document key implementation decisions
   - Explain error handling approach
   - Note validation logic for field flags
