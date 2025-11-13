@@ -26,6 +26,7 @@ from tasky_tasks.service import TaskService
 task_app = typer.Typer(no_args_is_help=True)
 
 F = TypeVar("F", bound=Callable[..., object])
+Handler = Callable[[Exception, bool], NoReturn]
 _VERBOSE_KEY = "verbose"
 
 
@@ -262,14 +263,17 @@ def _dispatch_exception(exc: Exception, *, verbose: bool) -> NoReturn:
 
 def _route_exception_to_handler(exc: Exception, *, verbose: bool) -> NoReturn:
     """Route exception to the appropriate error handler."""
-    if isinstance(exc, TaskDomainError):
-        _handle_task_domain_error(exc, verbose=verbose)
-    if isinstance(exc, StorageError):
-        _handle_storage_error(exc, verbose=verbose)
-    if isinstance(exc, ProjectNotFoundError):
-        _handle_project_not_found_error(exc, verbose=verbose)
-    if isinstance(exc, PydanticValidationError):
-        _handle_pydantic_validation_error(exc, verbose=verbose)
+    handler_chain: tuple[tuple[type[Exception], Handler], ...] = (
+        (TaskDomainError, cast("Handler", _handle_task_domain_error)),
+        (StorageError, cast("Handler", _handle_storage_error)),
+        (KeyError, cast("Handler", _handle_backend_not_registered_error)),
+        (ProjectNotFoundError, cast("Handler", _handle_project_not_found_error)),
+        (PydanticValidationError, cast("Handler", _handle_pydantic_validation_error)),
+    )
+
+    for exc_type, handler in handler_chain:
+        if isinstance(exc, exc_type):
+            handler(exc, verbose)
 
     # Fallback for unexpected errors
     _handle_unexpected_error(exc, verbose=verbose)
@@ -321,6 +325,18 @@ def _handle_project_not_found_error(exc: ProjectNotFoundError, *, verbose: bool)
     _render_error(
         "No project found in current directory.",
         suggestion="Run 'tasky project init' to create a project.",
+        verbose=verbose,
+        exc=exc,
+    )
+    raise typer.Exit(1) from exc
+
+
+def _handle_backend_not_registered_error(exc: KeyError, *, verbose: bool) -> NoReturn:
+    """Render backend registry errors with actionable guidance."""
+    details = exc.args[0] if exc.args else "Configured backend is not registered."
+    _render_error(
+        str(details),
+        suggestion="Update .tasky/config.toml or re-run 'tasky project init' with a valid backend.",
         verbose=verbose,
         exc=exc,
     )
