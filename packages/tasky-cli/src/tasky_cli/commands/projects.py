@@ -79,9 +79,12 @@ def init_command(
 @project_app.command(name="info")
 def info_command() -> None:
     """Display project configuration information."""
-    config_file = Path(".tasky") / "config.toml"
+    tasky_dir = Path(".tasky")
+    config_toml = tasky_dir / "config.toml"
+    config_json = tasky_dir / "config.json"
 
-    if not config_file.exists():
+    # Check for either TOML or JSON config
+    if not config_toml.exists() and not config_json.exists():
         typer.echo("Error: No project found in current directory.", err=True)
         typer.echo("Run 'tasky project init' to create a project.", err=True)
         raise typer.Exit(code=1)
@@ -95,7 +98,7 @@ def info_command() -> None:
 
     # Display project information
     typer.echo("Project Information:")
-    typer.echo(f"  Location: {config_file.parent.absolute()}")
+    typer.echo(f"  Location: {tasky_dir.absolute()}")
     typer.echo(f"  Backend: {settings.storage.backend}")
     typer.echo(f"  Storage: {settings.storage.path}")
 

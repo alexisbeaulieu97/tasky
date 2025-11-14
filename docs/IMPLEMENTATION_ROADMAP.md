@@ -24,8 +24,8 @@ Tick off each change as you complete it (mirrors the execution order below).
 - [x] 3.1 `add-task-filtering`
 - [x] 3.2 `add-advanced-filtering`
 - [x] 3.3 `add-task-import-export`
-- [ ] 4.1 `add-coverage-reporting`
-- [ ] 4.2 `standardize-config-format`
+- [x] 4.1 `add-coverage-reporting`
+- [x] 4.2 `standardize-config-format`
 - [ ] 4.3 `implement-project-list`
 - [ ] 4.4 `align-tasky-projects-format`
 - [ ] 5.1 `add-project-registry`

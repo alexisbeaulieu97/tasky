@@ -1,10 +1,12 @@
 """Tests for project configuration models."""
 
 import json
+import tomllib
 from datetime import UTC
 from pathlib import Path
 
 import pytest
+import tomli_w
 from tasky_projects import ProjectConfig, StorageConfig
 
 
@@ -38,14 +40,15 @@ def test_project_config_created_at_uses_utc() -> None:
 
 
 def test_project_config_from_file_valid(tmp_path: Path) -> None:
-    """Test loading valid configuration from file."""
-    config_file = tmp_path / "config.json"
+    """Test loading valid configuration from TOML file."""
+    config_file = tmp_path / "config.toml"
     config_data: dict[str, object] = {
         "version": "1.0",
         "storage": {"backend": "json", "path": "tasks.json"},
         "created_at": "2025-11-12T10:00:00Z",
     }
-    config_file.write_text(json.dumps(config_data))
+    with config_file.open("wb") as f:
+        tomli_w.dump(config_data, f)
 
     config = ProjectConfig.from_file(config_file)
     assert config.version == "1.0"
@@ -55,26 +58,27 @@ def test_project_config_from_file_valid(tmp_path: Path) -> None:
 
 def test_project_config_from_file_missing(tmp_path: Path) -> None:
     """Test from_file raises FileNotFoundError for missing file."""
-    config_file = tmp_path / "nonexistent.json"
+    config_file = tmp_path / "nonexistent.toml"
 
     with pytest.raises(FileNotFoundError, match="Configuration file not found"):
         ProjectConfig.from_file(config_file)
 
 
 def test_project_config_from_file_invalid_json(tmp_path: Path) -> None:
-    """Test from_file handles invalid JSON."""
-    config_file = tmp_path / "config.json"
-    config_file.write_text("{invalid json}")
+    """Test from_file handles invalid TOML."""
+    config_file = tmp_path / "config.toml"
+    config_file.write_text("{invalid toml}")
 
-    with pytest.raises(json.JSONDecodeError):
+    with pytest.raises(tomllib.TOMLDecodeError):
         ProjectConfig.from_file(config_file)
 
 
 def test_project_config_from_file_validation_error(tmp_path: Path) -> None:
     """Test from_file handles validation errors."""
-    config_file = tmp_path / "config.json"
+    config_file = tmp_path / "config.toml"
     config_data: dict[str, object] = {"version": "1.0", "storage": {"backend": 123}}  # Invalid type
-    config_file.write_text(json.dumps(config_data))
+    with config_file.open("wb") as f:
+        tomli_w.dump(config_data, f)
 
     # Pydantic will raise ValidationError for invalid backend type
     with pytest.raises(Exception):  # noqa: B017, PT011
@@ -83,7 +87,7 @@ def test_project_config_from_file_validation_error(tmp_path: Path) -> None:
 
 def test_project_config_to_file_creates_directories(tmp_path: Path) -> None:
     """Test to_file creates parent directories."""
-    config_file = tmp_path / "nested" / "dir" / "config.json"
+    config_file = tmp_path / "nested" / "dir" / "config.toml"
     config = ProjectConfig()
 
     config.to_file(config_file)
@@ -93,8 +97,8 @@ def test_project_config_to_file_creates_directories(tmp_path: Path) -> None:
 
 
 def test_project_config_to_file_saves_data(tmp_path: Path) -> None:
-    """Test to_file saves configuration data."""
-    config_file = tmp_path / "config.json"
+    """Test to_file saves configuration data in TOML format."""
+    config_file = tmp_path / "config.toml"
     config = ProjectConfig(
         version="1.0",
         storage=StorageConfig(backend="sqlite", path="db.sqlite"),
@@ -102,7 +106,8 @@ def test_project_config_to_file_saves_data(tmp_path: Path) -> None:
 
     config.to_file(config_file)
 
-    data = json.loads(config_file.read_text())
+    with config_file.open("rb") as f:
+        data = tomllib.load(f)
     assert data["version"] == "1.0"
     assert data["storage"]["backend"] == "sqlite"
     assert data["storage"]["path"] == "db.sqlite"
@@ -111,7 +116,7 @@ def test_project_config_to_file_saves_data(tmp_path: Path) -> None:
 
 def test_project_config_round_trip(tmp_path: Path) -> None:
     """Test saving and loading produces identical config."""
-    config_file = tmp_path / "config.json"
+    config_file = tmp_path / "config.toml"
     original = ProjectConfig(
         version="1.0",
         storage=StorageConfig(backend="json", path="tasks.json"),
@@ -129,14 +134,100 @@ def test_project_config_round_trip(tmp_path: Path) -> None:
     assert abs((loaded.created_at - original.created_at).total_seconds()) < 1
 
 
-def test_project_config_to_file_pretty_printed(tmp_path: Path) -> None:
-    """Test to_file creates human-readable JSON."""
-    config_file = tmp_path / "config.json"
+def test_project_config_to_file_creates_toml(tmp_path: Path) -> None:
+    """Test to_file creates valid TOML file."""
+    config_file = tmp_path / "config.toml"
     config = ProjectConfig()
 
     config.to_file(config_file)
 
-    content = config_file.read_text()
-    # Check it's pretty-printed (has newlines and indentation)
-    assert "\n" in content
-    assert "  " in content  # Has indentation
+    # Verify it's valid TOML by parsing it
+    with config_file.open("rb") as f:
+        data = tomllib.load(f)
+    assert "version" in data
+    assert "storage" in data
+
+
+# Legacy JSON Migration Tests
+
+
+def test_project_config_from_file_legacy_json(tmp_path: Path) -> None:
+    """Test loading legacy JSON configuration with migration warning."""
+    config_file = tmp_path / "config.json"
+    config_data: dict[str, object] = {
+        "version": "1.0",
+        "storage": {"backend": "json", "path": "tasks.json"},
+        "created_at": "2025-11-12T10:00:00Z",
+    }
+    config_file.write_text(json.dumps(config_data))
+
+    config = ProjectConfig.from_file(config_file)
+    assert config.version == "1.0"
+    assert config.storage.backend == "json"
+    assert config.storage.path == "tasks.json"
+
+
+def test_project_config_auto_detects_toml(tmp_path: Path) -> None:
+    """Test auto-detection prefers TOML over JSON."""
+    # Create both files
+    json_file = tmp_path / "config.json"
+    toml_file = tmp_path / "config.toml"
+
+    json_data = {
+        "version": "1.0",
+        "storage": {"backend": "json", "path": "tasks.json"},
+        "created_at": "2025-11-12T10:00:00Z",
+    }
+    toml_data = {
+        "version": "2.0",
+        "storage": {"backend": "sqlite", "path": "db.sqlite"},
+        "created_at": "2025-11-12T11:00:00Z",
+    }
+
+    json_file.write_text(json.dumps(json_data))
+    with toml_file.open("wb") as f:
+        tomli_w.dump(toml_data, f)
+
+    # When both exist, TOML should be preferred
+    config = ProjectConfig.from_file(tmp_path / "config.toml")
+    assert config.version == "2.0"
+    assert config.storage.backend == "sqlite"
+
+
+def test_project_config_json_to_toml_migration(tmp_path: Path) -> None:
+    """Test migrating from JSON to TOML on write."""
+    json_file = tmp_path / "config.json"
+    toml_file = tmp_path / "config.toml"
+
+    # Create legacy JSON config
+    config_data = {
+        "version": "1.0",
+        "storage": {"backend": "json", "path": "tasks.json"},
+        "created_at": "2025-11-12T10:00:00Z",
+    }
+    json_file.write_text(json.dumps(config_data))
+
+    # Load from JSON
+    config = ProjectConfig.from_file(json_file)
+
+    # Save (should create TOML)
+    config.to_file(toml_file)
+
+    # Verify TOML was created
+    assert toml_file.exists()
+    with toml_file.open("rb") as f:
+        loaded = tomllib.load(f)
+    assert loaded["version"] == "1.0"
+
+
+def test_project_config_to_file_forces_toml_extension(tmp_path: Path) -> None:
+    """Test to_file always creates .toml file even if .json path provided."""
+    json_path = tmp_path / "config.json"
+    config = ProjectConfig()
+
+    config.to_file(json_path)
+
+    # Should create config.toml, not config.json
+    toml_path = tmp_path / "config.toml"
+    assert toml_path.exists()
+    assert not json_path.exists()
