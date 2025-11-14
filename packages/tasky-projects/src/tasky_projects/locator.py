@@ -142,13 +142,14 @@ def find_projects_recursive(root_dir: Path | None = None) -> list[ProjectLocatio
         logger.debug("Skipping directory due to error: %s", err)
 
     for dirpath, dirnames, _filenames in os.walk(root_dir, onerror=handle_error):
+        # Always prune .tasky directories to avoid unnecessary traversal
+        if ".tasky" in dirnames:
+            dirnames.remove(".tasky")
+
         current_path = Path(dirpath)
         project = _check_directory_for_project(current_path)
 
         if project:
             projects.append(project)
-            # Don't descend into .tasky directories
-            if ".tasky" in dirnames:
-                dirnames.remove(".tasky")
 
     return sorted(projects)
