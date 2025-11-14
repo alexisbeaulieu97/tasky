@@ -118,7 +118,7 @@ The system SHALL provide a CLI command `tasky task create NAME DETAILS` that cre
 **Given** a project is initialized
 **When** the user runs `tasky task create "Fix bug #123: Handle null pointer" "Check cache initialization logic"`
 **Then** the task SHALL be created with the name exactly as provided
-**And** special characters (# : & etc) SHALL be preserved
+**And** special characters (# : & etc.) SHALL be preserved
 **And** the created task SHALL be retrievable with `tasky task list`
 
 #### Scenario: Create task with multiword details
@@ -677,7 +677,7 @@ The system SHALL provide a CLI command `tasky task update TASK_ID [--name NAME] 
 **Given** a task with ID `special123`
 **When** the user runs `tasky task update special123 --name "Fix bug #456: Handle null & undefined"`
 **Then** the task name SHALL change to exactly "Fix bug #456: Handle null & undefined"
-**And** special characters (# : & etc) SHALL be preserved
+**And** special characters (# : & etc.) SHALL be preserved
 **And** the updated task SHALL be retrievable with `tasky task list`
 
 #### Scenario: Update with multiword details
@@ -872,4 +872,3 @@ The system SHALL ensure that fields not specified in the update command remain u
 **And** when the task is retrieved again, all non-modified fields SHALL be identical to the original
 
 ---
-
