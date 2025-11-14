@@ -74,7 +74,7 @@ import_list = [name for name in globals() if not name.startswith('_')]
 assert "tasky_storage" not in import_list, "User code should not import tasky_storage"
 
 # Create service - factory handles backend initialization internally
-project_root = Path({isolated_test_project!r})
+project_root = Path({str(isolated_test_project)!r})
 service = create_task_service(project_root=project_root)
 
 # Verify service was created successfully

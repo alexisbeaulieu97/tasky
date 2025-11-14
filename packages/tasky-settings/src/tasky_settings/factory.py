@@ -34,11 +34,11 @@ def _ensure_backends_registered() -> None:
         registry.register("backend-name", factory_function)
 
     """
-    global _backends_initialized  # noqa: PLW0603
+    global _backends_initialized
     with _init_lock:
         if not _backends_initialized:
             # Import triggers backend registration via tasky_storage.__init__.py
-            import tasky_storage  # noqa: F401, PLC0415
+            import tasky_storage
 
             _backends_initialized = True
 
@@ -114,7 +114,7 @@ def create_task_service(project_root: Path | None = None) -> TaskService:
 
     # Avoid circular import by importing locally
     # get_settings is defined in __init__.py
-    from tasky_settings import get_settings as _get_settings  # noqa: PLC0415
+    from tasky_settings import get_settings as _get_settings
 
     # Find project root if not provided
     if project_root is None:

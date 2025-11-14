@@ -32,12 +32,12 @@ __all__ = [
 #
 # .. code-block:: python
 #
-#    try:  # noqa: ERA001
-#        from tasky_settings import registry  # noqa: ERA001
-#        registry.register("backend-name", YourRepository.from_path)  # noqa: ERA001
-#    except ImportError:  # noqa: ERA001
+#    try:
+#        from tasky_settings import registry
+#        registry.register("backend-name", YourRepository.from_path)
+#    except ImportError:
 #        # tasky-settings may not be installed yet (e.g., during development)
-#        pass  # noqa: ERA001
+#        pass
 #
 # ============================================================================
 
