@@ -20,7 +20,7 @@ from tasky_storage.backends.sqlite.schema import create_schema, validate_schema
 from tasky_storage.errors import StorageDataError, StorageError
 
 if TYPE_CHECKING:
-    from tasky_tasks.models import TaskModel, TaskStatus
+    from tasky_tasks.models import TaskFilter, TaskModel, TaskStatus
 
 
 logger = get_logger("storage.sqlite.repository")
@@ -213,6 +213,88 @@ class SqliteTaskRepository:
                 return tasks
         except sqlite3.Error as exc:
             msg = f"Database error filtering tasks by status {status.value}: {exc}"
+            raise StorageError(msg) from exc
+
+    def find_tasks(self, task_filter: TaskFilter) -> list[TaskModel]:
+        """Retrieve tasks matching the specified filter criteria.
+
+        All criteria in the filter are combined using AND logic—tasks must
+        match all specified criteria to be included in the results.
+
+        Parameters
+        ----------
+        task_filter:
+            The filter criteria to apply. None values in filter fields
+            indicate no filtering on that dimension.
+
+        Returns
+        -------
+        list[TaskModel]:
+            List of tasks matching all specified filter criteria.
+
+        Raises
+        ------
+        StorageError:
+            If database operation fails
+
+        """
+        logger.debug("Finding tasks with filter: %s", task_filter)
+
+        # Build SQL query with WHERE clauses for specified criteria
+        where_clauses = []
+        params = []
+
+        # Status filter
+        if task_filter.statuses is not None:
+            if task_filter.statuses:  # Non-empty list
+                placeholders = ",".join("?" * len(task_filter.statuses))
+                where_clauses.append(f"status IN ({placeholders})")
+                params.extend(status.value for status in task_filter.statuses)
+            else:  # Empty list means no status will match
+                # Return empty list immediately
+                return []
+
+        # Date range filters
+        if task_filter.created_after is not None:
+            where_clauses.append("created_at >= ?")
+            params.append(task_filter.created_after.isoformat())
+
+        if task_filter.created_before is not None:
+            where_clauses.append("created_at < ?")
+            params.append(task_filter.created_before.isoformat())
+
+        # Text search filter (case-insensitive)
+        if task_filter.name_contains is not None:
+            # Escape LIKE metacharacters to prevent wildcard interpretation
+            # Users expect literal substring matching, not SQL wildcard behavior
+            escaped_search = (
+                task_filter.name_contains.replace("\\", "\\\\")
+                .replace("%", "\\%")
+                .replace("_", "\\_")
+            )
+            # SQLite LIKE is case-insensitive by default for ASCII characters
+            # Use || for string concatenation in SQLite
+            where_clauses.append("(name LIKE ? ESCAPE '\\' OR details LIKE ? ESCAPE '\\')")
+            search_pattern = f"%{escaped_search}%"
+            params.extend([search_pattern, search_pattern])
+
+        # Build complete query
+        query = "SELECT * FROM tasks"
+        if where_clauses:
+            query += " WHERE " + " AND ".join(where_clauses)
+        query += " ORDER BY created_at DESC"
+
+        try:
+            with get_connection(self.path) as conn:
+                cursor = conn.cursor()
+                cursor.execute(query, params)
+                rows = cursor.fetchall()
+
+                tasks = [self._snapshot_to_task(row_to_snapshot(row)) for row in rows]
+                logger.debug("Found tasks: count=%d", len(tasks))
+                return tasks
+        except sqlite3.Error as exc:
+            msg = f"Database error finding tasks: {exc}"
             raise StorageError(msg) from exc
 
     def delete_task(self, task_id: UUID) -> bool:

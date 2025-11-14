@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Protocol
 if TYPE_CHECKING:
     from uuid import UUID
 
-    from tasky_tasks.models import TaskModel, TaskStatus
+    from tasky_tasks.models import TaskFilter, TaskModel, TaskStatus
 
 
 class TaskRepository(Protocol):
@@ -39,6 +39,26 @@ class TaskRepository(Protocol):
         -------
         list[TaskModel]:
             List of tasks matching the specified status.
+
+        """
+        ...
+
+    def find_tasks(self, task_filter: TaskFilter) -> list[TaskModel]:
+        """Retrieve tasks matching the specified filter criteria.
+
+        All criteria in the filter are combined using AND logic—tasks must
+        match all specified criteria to be included in the results.
+
+        Parameters
+        ----------
+        task_filter:
+            The filter criteria to apply. None values in filter fields
+            indicate no filtering on that dimension.
+
+        Returns
+        -------
+        list[TaskModel]:
+            List of tasks matching all specified filter criteria.
 
         """
         ...

@@ -180,7 +180,7 @@ class TestTaskListFormatting:
         # Filter by completed (should be empty)
         result = runner.invoke(task_app, ["list", "--status", "completed"])
         assert result.exit_code == 0
-        assert "No completed tasks found" in result.stdout
+        assert "No matching tasks found" in result.stdout
         # Should not show summary line when empty
         assert "Showing" not in result.stdout
 

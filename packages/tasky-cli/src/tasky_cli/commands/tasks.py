@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import re
 import sys
 import traceback
 from collections.abc import Callable
+from datetime import UTC, datetime, timedelta
 from functools import wraps
 from typing import NoReturn, Protocol, TypeVar, cast
 from uuid import UUID
@@ -17,6 +19,7 @@ from tasky_storage.errors import StorageError
 from tasky_tasks import (
     InvalidStateTransitionError,
     TaskDomainError,
+    TaskFilter,
     TaskNotFoundError,
     TaskValidationError,
 )
@@ -115,12 +118,27 @@ def _parse_task_id_and_get_service(task_id: str) -> tuple[TaskService, UUID]:
 
 @task_app.command(name="list")
 @with_task_error_handling
-def list_command(  # noqa: C901
+def list_command(  # noqa: C901, PLR0912, PLR0915
     status: str | None = typer.Option(
         None,
         "--status",
         "-s",
         help="Filter tasks by status (pending, completed, cancelled).",
+    ),
+    created_after: str | None = typer.Option(
+        None,
+        "--created-after",
+        help="Filter tasks created on or after this date (ISO 8601: YYYY-MM-DD).",
+    ),
+    created_before: str | None = typer.Option(
+        None,
+        "--created-before",
+        help="Filter tasks created before this date (ISO 8601: YYYY-MM-DD).",
+    ),
+    search: str | None = typer.Option(
+        None,
+        "--search",
+        help="Search tasks by name or details (case-insensitive).",
     ),
     long: bool = typer.Option(  # noqa: FBT001
         False,  # noqa: FBT003
@@ -141,6 +159,14 @@ def list_command(  # noqa: C901
 
     Tasks are sorted by status: pending first, then completed, then cancelled.
 
+    Filtering:
+        --status:         Filter by task status (pending, completed, cancelled)
+        --created-after:  Show tasks created on or after a date (YYYY-MM-DD)
+        --created-before: Show tasks created before a date (YYYY-MM-DD)
+        --search:         Search task name and details (case-insensitive)
+
+    Multiple filters are combined with AND logic (all must match).
+
     Example:
         $ tasky task list
         ○ 550e8400-e29b-41d4-a716-446655440000 Buy groceries - Get milk and eggs
@@ -148,9 +174,13 @@ def list_command(  # noqa: C901
 
         Showing 2 tasks (1 pending, 1 completed, 0 cancelled)
 
-        $ tasky task list --long
+        $ tasky task list --status pending --created-after 2025-11-01
         ○ 550e8400-e29b-41d4-a716-446655440000 Buy groceries - Get milk and eggs
-          Created: 2025-11-12T10:30:00Z | Modified: 2025-11-12T10:30:00Z
+
+        Showing 1 task (1 pending, 0 completed, 0 cancelled)
+
+        $ tasky task list --search "groceries"
+        ○ 550e8400-e29b-41d4-a716-446655440000 Buy groceries - Get milk and eggs
 
         Showing 1 task (1 pending, 0 completed, 0 cancelled)
 
@@ -170,19 +200,84 @@ def list_command(  # noqa: C901
             raise typer.Exit(1)
         task_status = TaskStatus(status.lower())
 
+    # Parse and validate date arguments
+    created_after_dt: datetime | None = None
+    created_before_dt: datetime | None = None
+
+    if created_after is not None:
+        # Validate format is exactly YYYY-MM-DD (reject time components)
+        if not _is_valid_date_format(created_after):
+            typer.echo(
+                f"Invalid date format: '{created_after}'. "
+                "Expected ISO 8601 format: YYYY-MM-DD (e.g., 2025-01-01)",
+                err=True,
+            )
+            raise typer.Exit(1) from None
+        try:
+            # Parse date and make it timezone-aware (UTC midnight)
+            parsed_date = datetime.fromisoformat(created_after)
+            created_after_dt = parsed_date.replace(tzinfo=UTC)
+        except ValueError:
+            typer.echo(
+                f"Invalid date format: '{created_after}'. "
+                "Expected ISO 8601 format: YYYY-MM-DD (e.g., 2025-01-01)",
+                err=True,
+            )
+            raise typer.Exit(1) from None
+
+    if created_before is not None:
+        # Validate format is exactly YYYY-MM-DD (reject time components)
+        if not _is_valid_date_format(created_before):
+            typer.echo(
+                f"Invalid date format: '{created_before}'. "
+                "Expected ISO 8601 format: YYYY-MM-DD (e.g., 2025-01-01)",
+                err=True,
+            )
+            raise typer.Exit(1) from None
+        try:
+            parsed_date = datetime.fromisoformat(created_before)
+            # Add 1 day to make the exclusive < check inclusive of the entire day
+            # (user expects --created-before 2025-12-31 to include all of Dec 31)
+            created_before_dt = parsed_date.replace(tzinfo=UTC) + timedelta(days=1)
+        except ValueError:
+            typer.echo(
+                f"Invalid date format: '{created_before}'. "
+                "Expected ISO 8601 format: YYYY-MM-DD (e.g., 2025-01-01)",
+                err=True,
+            )
+            raise typer.Exit(1) from None
+
     # Only create service after validating input
     service = _get_service()
 
-    # Fetch tasks based on validated status
-    if task_status is not None:
-        tasks = service.get_tasks_by_status(task_status)
+    # Normalize empty search to None (per spec: empty search = no filter)
+    if search is not None and not search.strip():
+        search = None
+
+    # Build filter and fetch tasks
+    has_filters = (
+        task_status is not None
+        or created_after_dt is not None
+        or created_before_dt is not None
+        or search is not None
+    )
+
+    if has_filters:
+        # Build TaskFilter with specified criteria
+        task_filter = TaskFilter(
+            statuses=[task_status] if task_status is not None else None,
+            created_after=created_after_dt,
+            created_before=created_before_dt,
+            name_contains=search,
+        )
+        tasks = service.find_tasks(task_filter)
     else:
         tasks = service.get_all_tasks()
 
     if not tasks:
-        # Show status-specific message when filtering, generic message otherwise
-        if task_status is not None:
-            typer.echo(f"No {task_status.value} tasks found.")
+        # Show filter-specific message when filtering, generic message otherwise
+        if has_filters:
+            typer.echo("No matching tasks found")
         else:
             typer.echo("No tasks to display")
         return
@@ -215,6 +310,23 @@ def list_command(  # noqa: C901
         f"({pending_count} pending, {completed_count} completed, "
         f"{cancelled_count} cancelled)",
     )
+
+
+def _is_valid_date_format(date_str: str) -> bool:
+    """Validate that date string matches exactly YYYY-MM-DD format.
+
+    Args:
+        date_str: The date string to validate.
+
+    Returns:
+        True if format is YYYY-MM-DD, False otherwise.
+
+    """
+    # Reject any string containing time markers (T, colon, etc.)
+    if "T" in date_str or ":" in date_str or "+" in date_str or "Z" in date_str:
+        return False
+    # Must match YYYY-MM-DD exactly
+    return bool(re.match(r"^\d{4}-\d{2}-\d{2}$", date_str))
 
 
 def _get_status_indicator(status: TaskStatus) -> str:

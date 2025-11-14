@@ -166,3 +166,69 @@ class TaskModel(BaseModel):
 
         """
         self.transition_to(TaskStatus.PENDING)
+
+
+class TaskFilter(BaseModel):
+    """Filter criteria for querying tasks.
+
+    All criteria are combined using AND logic—tasks must match all specified
+    criteria to be included in results. None values indicate no filtering on
+    that dimension.
+    """
+
+    model_config = ConfigDict(
+        validate_assignment=True,
+        extra="forbid",
+    )
+
+    statuses: list[TaskStatus] | None = Field(
+        default=None,
+        description="Filter by one or more task statuses. Tasks must match at least one status.",
+    )
+    created_after: datetime | None = Field(
+        default=None,
+        description="Filter tasks created on or after this datetime (inclusive).",
+    )
+    created_before: datetime | None = Field(
+        default=None,
+        description="Filter tasks created before this datetime (exclusive).",
+    )
+    name_contains: str | None = Field(
+        default=None,
+        description="Filter tasks whose name or details contain this text (case-insensitive).",
+    )
+
+    def matches(self, task: TaskModel) -> bool:  # noqa: C901
+        """Check if a task matches all filter criteria (AND logic).
+
+        Parameters
+        ----------
+        task:
+            The task to evaluate against filter criteria.
+
+        Returns
+        -------
+        bool:
+            True if the task matches all specified criteria, False otherwise.
+
+        """
+        # Status filter: task must be in one of the specified statuses
+        if self.statuses is not None and task.status not in self.statuses:
+            return False
+
+        # Created after filter (inclusive)
+        if self.created_after is not None and task.created_at < self.created_after:
+            return False
+
+        # Created before filter (exclusive)
+        if self.created_before is not None and task.created_at >= self.created_before:
+            return False
+
+        # Text search filter (case-insensitive, searches name and details)
+        if self.name_contains is not None:
+            search_text = self.name_contains.lower()
+            task_text = f"{task.name} {task.details}".lower()
+            if search_text not in task_text:
+                return False
+
+        return True
