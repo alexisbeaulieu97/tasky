@@ -641,8 +641,8 @@ The system SHALL provide a CLI command `tasky task update TASK_ID [--name NAME] 
 
 #### Scenario: Update task name only
 
-**Given** a task with ID `3af4b92f-c4a1-4b2e-9c3d-7a1b8c2e5f6g`, name "Buy milk", and details "From the store"
-**When** the user runs `tasky task update 3af4b92f-c4a1-4b2e-9c3d-7a1b8c2e5f6g --name "Buy organic milk"`
+**Given** a task with ID `3af4b92f-c4a1-4b2e-9c3d-7a1b8c2e5f60`, name "Buy milk", and details "From the store"
+**When** the user runs `tasky task update 3af4b92f-c4a1-4b2e-9c3d-7a1b8c2e5f60 --name "Buy organic milk"`
 **Then** the CLI SHALL call `TaskService.get_task(task_id)`
 **And** the CLI SHALL modify only the name field in the retrieved task
 **And** the CLI SHALL call `TaskService.update_task(modified_task)` to persist changes

@@ -27,12 +27,14 @@ task_app = typer.Typer(no_args_is_help=True)
 
 F = TypeVar("F", bound=Callable[..., object])
 
+
 class Handler(Protocol):
     """Protocol for exception handler functions."""
 
     def __call__(self, exc: Exception, *, verbose: bool) -> NoReturn:
         """Handle an exception with optional verbose output."""
         ...
+
 
 _VERBOSE_KEY = "verbose"
 
@@ -233,6 +235,36 @@ def _get_status_indicator(status: TaskStatus) -> str:
     return indicators[status]
 
 
+def _validate_and_apply_update_fields(
+    task: object,
+    name: str | None,
+    details: str | None,
+) -> None:
+    """Validate and apply update fields to a task object.
+
+    Args:
+        task: The task object to update (must have name and details attributes).
+        name: New task name (optional).
+        details: New task details (optional).
+
+    Raises:
+        typer.Exit: If validation fails (empty fields).
+
+    """
+    if name is not None:
+        name = name.strip()
+        if not name:
+            typer.echo("name cannot be empty", err=True)
+            raise typer.Exit(1)
+        task.name = name  # type: ignore[attr-defined]
+    if details is not None:
+        details = details.strip()
+        if not details:
+            typer.echo("details cannot be empty", err=True)
+            raise typer.Exit(1)
+        task.details = details  # type: ignore[attr-defined]
+
+
 @task_app.command(name="show")
 @with_task_error_handling
 def show_command(task_id: str = typer.Argument(..., help="Task ID (UUID format)")) -> None:
@@ -244,10 +276,10 @@ def show_command(task_id: str = typer.Argument(..., help="Task ID (UUID format)"
         task_id: The UUID of the task to display.
 
     Example:
-        $ tasky task show 3af4b92f-c4a1-4b2e-9c3d-7a1b8c2e5f6g
+        $ tasky task show 3af4b92f-c4a1-4b2e-9c3d-7a1b8c2e5f60
 
         Task Details
-        ID: 3af4b92f-c4a1-4b2e-9c3d-7a1b8c2e5f6g
+        ID: 3af4b92f-c4a1-4b2e-9c3d-7a1b8c2e5f60
         Name: Buy groceries
         Details: Get milk and eggs from the store
         Status: PENDING
@@ -312,8 +344,8 @@ def update_command(
 
     Examples:
         tasky task update <task-id> --name "New name" --details "New details"
-        tasky task update 3af4b92f-c4a1-4b2e-9c3d-7a1b8c2e5f6g --name "Updated name"
-        tasky task update 3af4b92f-c4a1-4b2e-9c3d-7a1b8c2e5f6g --details "Updated details"
+        tasky task update 3af4b92f-c4a1-4b2e-9c3d-7a1b8c2e5f60 --name "Updated name"
+        tasky task update 3af4b92f-c4a1-4b2e-9c3d-7a1b8c2e5f60 --details "Updated details"
 
     """
     # Validate that at least one field is provided
@@ -334,19 +366,8 @@ def update_command(
     # Retrieve the current task
     task = service.get_task(uuid)
 
-    # Trim and validate provided fields to prevent empty updates
-    if name is not None:
-        name = name.strip()
-        if not name:
-            typer.echo("name cannot be empty", err=True)
-            raise typer.Exit(1)
-        task.name = name
-    if details is not None:
-        details = details.strip()
-        if not details:
-            typer.echo("details cannot be empty", err=True)
-            raise typer.Exit(1)
-        task.details = details
+    # Validate and apply updates to task
+    _validate_and_apply_update_fields(task, name, details)
 
     # Persist changes
     service.update_task(task)
