@@ -27,7 +27,7 @@ Tick off each change as you complete it (mirrors the execution order below).
 - [x] 3.3 `add-task-import-export`
 - [x] 4.1 `add-coverage-reporting`
 - [x] 4.2 `standardize-config-format`
-- [ ] 4.3 `implement-project-list`
+- [x] 4.3 `implement-project-list`
 - [ ] 4.4 `align-tasky-projects-format`
 - [ ] 5.1 `add-project-registry`
 - [ ] 6.1 `remove-json-config-support` (optional, flexible timeline)

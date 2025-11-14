@@ -261,7 +261,10 @@ class SqliteTaskRepository:
         return self._execute_find_query(query, params)
 
     def _add_status_filter(
-        self, task_filter: TaskFilter, where_clauses: list[str], params: list[Any],
+        self,
+        task_filter: TaskFilter,
+        where_clauses: list[str],
+        params: list[Any],
     ) -> None:
         """Add status filter to WHERE clauses."""
         if task_filter.statuses is not None and task_filter.statuses:
@@ -270,7 +273,10 @@ class SqliteTaskRepository:
             params.extend(status.value for status in task_filter.statuses)
 
     def _add_date_filters(
-        self, task_filter: TaskFilter, where_clauses: list[str], params: list[Any],
+        self,
+        task_filter: TaskFilter,
+        where_clauses: list[str],
+        params: list[Any],
     ) -> None:
         """Add date range filters to WHERE clauses."""
         if task_filter.created_after is not None:
@@ -282,7 +288,10 @@ class SqliteTaskRepository:
             params.append(task_filter.created_before.isoformat())
 
     def _add_text_filter(
-        self, task_filter: TaskFilter, where_clauses: list[str], params: list[Any],
+        self,
+        task_filter: TaskFilter,
+        where_clauses: list[str],
+        params: list[Any],
     ) -> None:
         """Add text search filter to WHERE clauses."""
         if task_filter.name_contains is not None:
