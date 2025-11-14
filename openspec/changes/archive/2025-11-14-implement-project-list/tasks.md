@@ -6,7 +6,7 @@ This document outlines the ordered implementation tasks for adding the `tasky pr
 
 ### Phase 1: Project Locator Service (Foundation)
 
-- [ ] **Task 1.1**: Create project locator module
+- [x] **Task 1.1**: Create project locator module
   - Create `packages/tasky-projects/src/tasky_projects/locator.py`
   - Define `ProjectLocation` dataclass with fields: path, backend, storage_path
   - Implement `find_projects_upward(start_dir: Path) -> List[ProjectLocation]`
@@ -14,7 +14,7 @@ This document outlines the ordered implementation tasks for adding the `tasky pr
   - Return list of found projects sorted by path
   - **Validation**: Module imports without errors
 
-- [ ] **Task 1.2**: Implement recursive project search
+- [x] **Task 1.2**: Implement recursive project search
   - Add `find_projects_recursive(root_dir: Path) -> List[ProjectLocation]`
   - Use `os.walk()` to traverse entire tree
   - Collect all `.tasky/config.toml` files
@@ -22,7 +22,7 @@ This document outlines the ordered implementation tasks for adding the `tasky pr
   - Handle permission errors gracefully
   - **Validation**: Method compiles and type-checks
 
-- [ ] **Task 1.3**: Parse project configuration files
+- [x] **Task 1.3**: Parse project configuration files
   - Implement `_load_project_config(config_path: Path) -> dict`
   - Read and parse `.tasky/config.toml`
   - Extract `storage.backend` and `storage.path` fields
@@ -30,7 +30,7 @@ This document outlines the ordered implementation tasks for adding the `tasky pr
   - Return configuration dictionary
   - **Validation**: Successfully parses valid config files
 
-- [ ] **Task 1.4**: Write unit tests for locator
+- [x] **Task 1.4**: Write unit tests for locator
   - Create `packages/tasky-projects/tests/test_locator.py`
   - Test `find_projects_upward()` finds parent directories
   - Test `find_projects_recursive()` finds nested projects
@@ -41,27 +41,27 @@ This document outlines the ordered implementation tasks for adding the `tasky pr
 
 ### Phase 2: CLI Integration
 
-- [ ] **Task 2.1**: Add `project list` command
+- [x] **Task 2.1**: Add `project list` command
   - Update `packages/tasky-cli/src/tasky_cli/commands/projects.py`
   - Add `list_command()` function
   - Add `--recursive` boolean flag (default: False)
   - Add `--root` string option for custom search directory (default: current directory)
   - **Validation**: Run `uv run tasky project list --help` and verify options appear
 
-- [ ] **Task 2.2**: Implement project discovery logic
+- [x] **Task 2.2**: Implement project discovery logic
   - Call `find_projects_upward()` or `find_projects_recursive()` based on flags
   - Use `--root` value or current directory as starting point
   - Collect results from locator service
   - **Validation**: Command runs without errors
 
-- [ ] **Task 2.3**: Format and display results
+- [x] **Task 2.3**: Format and display results
   - Display each project with: path, backend, storage path
   - Show count: "Found N projects" or "Found 1 project"
   - Use consistent table or line-based formatting
   - Sort results by path for consistency
   - **Validation**: Manual testing shows clear, readable output
 
-- [ ] **Task 2.4**: Handle empty results gracefully
+- [x] **Task 2.4**: Handle empty results gracefully
   - Display helpful message when no projects found
   - Message should suggest: "No projects found. Run 'tasky project init' to create one."
   - Exit with status code 0 (success)
@@ -69,7 +69,7 @@ This document outlines the ordered implementation tasks for adding the `tasky pr
 
 ### Phase 3: Testing and Validation
 
-- [ ] **Task 3.1**: Add CLI integration tests
+- [x] **Task 3.1**: Add CLI integration tests
   - Create `packages/tasky-cli/tests/test_project_list.py`
   - Test listing projects with upward search (default)
   - Test listing with `--recursive` flag
@@ -78,14 +78,14 @@ This document outlines the ordered implementation tasks for adding the `tasky pr
   - Test output formatting and count display
   - **Validation**: Run `uv run pytest packages/tasky-cli/tests/test_project_list.py -v`
 
-- [ ] **Task 3.2**: End-to-end scenario testing
+- [x] **Task 3.2**: End-to-end scenario testing
   - Create test fixture with multiple .tasky directories
   - Initialize projects at various nesting levels
   - Test discovering all projects with `--recursive`
   - Test discovering projects upward from nested directory
   - **Validation**: All scenarios pass
 
-- [ ] **Task 3.3**: Run full test suite
+- [x] **Task 3.3**: Run full test suite
   - Run `uv run pytest` across all packages
   - Address any failures or regressions
   - Verify test coverage meets ≥80% target
@@ -93,7 +93,7 @@ This document outlines the ordered implementation tasks for adding the `tasky pr
 
 ### Phase 4: Final Validation
 
-- [ ] **Task 4.1**: Manual smoke testing
+- [x] **Task 4.1**: Manual smoke testing
   - Initialize projects in different directories
   - Test `tasky project list` from various locations
   - Test `--recursive` flag behavior
@@ -101,14 +101,14 @@ This document outlines the ordered implementation tasks for adding the `tasky pr
   - Verify output is clear and correct
   - **Validation**: All variations work correctly
 
-- [ ] **Task 4.2**: Code quality checks
+- [x] **Task 4.2**: Code quality checks
   - Run `uv run ruff check --fix`
   - Run `uv run ruff format`
   - Ensure no linting errors
   - Verify type hints are complete
   - **Validation**: Code passes all quality checks
 
-- [ ] **Task 4.3**: Documentation and help text
+- [x] **Task 4.3**: Documentation and help text
   - Update help text with clear descriptions of flags
   - Add usage examples to help output
   - Document behavior in code comments

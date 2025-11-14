@@ -110,6 +110,50 @@ def info_command() -> None:
 
 
 @project_app.command(name="list")
-def list_command() -> None:
-    """List all projects."""
-    typer.echo("Listing projects...")
+def list_command(
+    recursive: bool = typer.Option(  # noqa: FBT001
+        False,  # noqa: FBT003
+        "--recursive",
+        "-r",
+        help="Search recursively in all subdirectories",
+    ),
+    root: Path | None = typer.Option(  # noqa: B008
+        None,
+        "--root",
+        help="Root directory to search from (default: current directory)",
+    ),
+) -> None:
+    """List all tasky projects.
+
+    By default, searches upward from current directory to find parent projects.
+    Use --recursive to search all subdirectories instead.
+    Use --root to specify a different starting directory.
+
+    """
+    from tasky_projects import find_projects_recursive, find_projects_upward  # noqa: PLC0415
+
+    # Determine search directory
+    search_dir = root if root else Path.cwd()
+
+    # Find projects based on flags
+    if recursive:
+        projects = find_projects_recursive(search_dir)
+    else:
+        projects = find_projects_upward(search_dir)
+
+    # Handle empty results
+    if not projects:
+        typer.echo("No projects found.")
+        typer.echo("Run 'tasky project init' to create one.")
+        return
+
+    # Display results
+    count = len(projects)
+    plural = "project" if count == 1 else "projects"
+    typer.echo(f"Found {count} {plural}:\n")
+
+    for project in projects:
+        typer.echo(f"  Path:    {project.path}")
+        typer.echo(f"  Backend: {project.backend}")
+        typer.echo(f"  Storage: {project.storage_path}")
+        typer.echo()  # Blank line between projects
