@@ -185,7 +185,7 @@ class TestTaskFilteringCLI:
         result = runner.invoke(task_app, ["list", "--status", "completed"])
 
         assert result.exit_code == 0
-        assert "No completed tasks found" in result.stdout
+        assert "No tasks match the specified filters" in result.stdout
 
     def test_help_shows_status_option(self, runner: CliRunner) -> None:
         """Test that help text documents the status option."""

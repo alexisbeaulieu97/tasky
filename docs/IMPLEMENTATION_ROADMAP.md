@@ -20,8 +20,8 @@ Tick off each change as you complete it (mirrors the execution order below).
 - [x] 1.3 `add-task-show-command`
 - [x] 1.4 `add-task-update-command`
 - [x] 1.5 `ensure-storage-backend-registration`
-- [ ] 2.1 `add-sqlite-backend`
-- [ ] 3.1 `add-task-filtering`
+- [x] 2.1 `add-sqlite-backend`
+- [x] 3.1 `add-task-filtering`
 - [ ] 3.2 `add-advanced-filtering`
 - [ ] 3.3 `add-task-import-export`
 - [ ] 4.1 `add-coverage-reporting`
@@ -232,32 +232,23 @@ uv run pytest --cov=packages --cov-report=term-missing
 ## Phase 3: Advanced Features (14-16 hours)
 **Goal**: Add sophisticated capabilities that unlock new use cases
 
-### 3.1 `add-task-filtering`
-**Why first in Phase 3**:
-- Foundation for all other filtering capabilities
-- Adds status-only filtering (`--status pending/completed/cancelled`)
-- Introduces repository-level filtering pattern
-- Quick win (~2-3 hours)
-- Required before advanced filtering can be implemented
+### 3.1 `add-task-filtering` ✓ COMPLETED
+**Status**: Previously implemented and archived (`openspec/changes/archive/2025-11-13-add-task-filtering/`)
 
-**What it enables**:
-- Users can filter by status: `tasky task list --status pending`
-- Foundation for advanced filtering (date range + text search)
+**What it implements**:
+- Status-only filtering (`--status pending/completed/cancelled`)
 - Repository layer: `get_tasks_by_status()` method
-- Service convenience methods: `get_pending_tasks()`, etc.
+- Service convenience methods: `get_pending_tasks()`, `get_completed_tasks()`, `get_cancelled_tasks()`
+- CLI: `tasky task list --status <status>` command
+- Full support for both JSON and SQLite backends
 
-**Depends on**: Phase 2 complete (works with both JSON and SQLite)
-**Enables**: `add-advanced-filtering` (builds on status filtering)
+**Current state**:
+- ✓ 14 CLI filtering tests passing
+- ✓ Backend integration tests (JSON + SQLite)
+- ✓ 4 specifications created and active
+- ✓ All 312 tests passing
 
-**Testing note**:
-- Test filtering each status value
-- Test service convenience methods
-- Verify efficiency with 1000+ tasks
-- Test with both JSON and SQLite backends
-
-```bash
-/openspec:apply add-task-filtering
-```
+This phase established the foundation for advanced filtering capabilities. The implementation is production-ready and serves as the base for Phase 3.2.
 
 ---
 

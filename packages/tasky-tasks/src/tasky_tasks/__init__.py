@@ -6,10 +6,14 @@ from tasky_tasks.exceptions import (
     TaskNotFoundError,
     TaskValidationError,
 )
+from tasky_tasks.models import TaskFilter, TaskModel, TaskStatus
 
 __all__ = [
     "InvalidStateTransitionError",
     "TaskDomainError",
+    "TaskFilter",
+    "TaskModel",
     "TaskNotFoundError",
+    "TaskStatus",
     "TaskValidationError",
 ]

@@ -12,9 +12,10 @@ from typing import TYPE_CHECKING
 from tasky_logging import get_logger  # type: ignore[import-untyped]
 
 from tasky_tasks.exceptions import TaskNotFoundError, TaskValidationError
-from tasky_tasks.models import TaskModel, TaskStatus
+from tasky_tasks.models import TaskFilter, TaskModel, TaskStatus
 
 if TYPE_CHECKING:
+    from datetime import datetime
     from uuid import UUID
 
     from tasky_tasks.ports import TaskRepository
@@ -157,6 +158,125 @@ class TaskService:
 
         """
         return self.get_tasks_by_status(TaskStatus.CANCELLED)
+
+    def find_tasks(self, task_filter: TaskFilter) -> list[TaskModel]:
+        """Find tasks matching the specified filter criteria.
+
+        All criteria in the filter are combined using AND logic—tasks must
+        match all specified criteria to be included in the results.
+
+        Parameters
+        ----------
+        task_filter:
+            The filter criteria to apply. None values in filter fields
+            indicate no filtering on that dimension.
+
+        Returns
+        -------
+        list[TaskModel]:
+            List of tasks matching all specified filter criteria.
+
+        Raises
+        ------
+        TaskValidationError:
+            Raised when stored task data is invalid.
+        StorageError:
+            Propagated when lower layers encounter infrastructure failures.
+
+        """
+        logger.debug("Finding tasks with filter: %s", task_filter)
+        try:
+            tasks = self.repository.find_tasks(task_filter)
+        except StorageDataError as exc:
+            message = "Unable to retrieve tasks due to corrupted data."
+            raise TaskValidationError(message) from exc
+
+        logger.debug("Found tasks: count=%d", len(tasks))
+        return tasks
+
+    def get_tasks_by_date_range(
+        self,
+        created_after: datetime,
+        created_before: datetime,
+    ) -> list[TaskModel]:
+        """Get tasks created within a specific date range.
+
+        Parameters
+        ----------
+        created_after:
+            Include tasks created on or after this datetime (inclusive).
+        created_before:
+            Include tasks created before this datetime (exclusive).
+
+        Returns
+        -------
+        list[TaskModel]:
+            List of tasks created within the specified date range.
+
+        Raises
+        ------
+        TaskValidationError:
+            Raised when stored task data is invalid.
+        StorageError:
+            Propagated when lower layers encounter infrastructure failures.
+
+        """
+        task_filter = TaskFilter(
+            created_after=created_after,
+            created_before=created_before,
+        )
+        return self.find_tasks(task_filter)
+
+    def search_tasks(self, text: str) -> list[TaskModel]:
+        """Search tasks by name or details (case-insensitive).
+
+        Parameters
+        ----------
+        text:
+            The text to search for in task names and details.
+
+        Returns
+        -------
+        list[TaskModel]:
+            List of tasks containing the search text.
+
+        Raises
+        ------
+        TaskValidationError:
+            Raised when stored task data is invalid.
+        StorageError:
+            Propagated when lower layers encounter infrastructure failures.
+
+        """
+        task_filter = TaskFilter(name_contains=text)
+        return self.find_tasks(task_filter)
+
+    def get_pending_tasks_since(self, date: datetime) -> list[TaskModel]:
+        """Get pending tasks created on or after a specific date.
+
+        Parameters
+        ----------
+        date:
+            Include tasks created on or after this datetime (inclusive).
+
+        Returns
+        -------
+        list[TaskModel]:
+            List of pending tasks created on or after the specified date.
+
+        Raises
+        ------
+        TaskValidationError:
+            Raised when stored task data is invalid.
+        StorageError:
+            Propagated when lower layers encounter infrastructure failures.
+
+        """
+        task_filter = TaskFilter(
+            statuses=[TaskStatus.PENDING],
+            created_after=date,
+        )
+        return self.find_tasks(task_filter)
 
     def update_task(self, task: TaskModel) -> None:
         """Update an existing task."""
