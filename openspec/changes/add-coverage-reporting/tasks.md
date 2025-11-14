@@ -6,24 +6,24 @@ This document outlines the ordered implementation tasks for adding test coverage
 
 ### Phase 1: Dependency Configuration
 
-- [ ] **Task 1.1**: Add pytest-cov to dev dependencies
+- [x] **Task 1.1**: Add pytest-cov to dev dependencies
   - Update `pyproject.toml` in root
   - Add `pytest-cov>=4.1.0` to `[dependency-groups] dev` section
   - **Validation**: Run `uv sync` and verify pytest-cov is installed
 
-- [ ] **Task 1.2**: Configure coverage.py in pyproject.toml
+- [x] **Task 1.2**: Configure coverage.py in pyproject.toml
   - Add `[tool.coverage.run]` section:
     - Set `branch = true` for branch coverage
     - Set `source = ["packages"]` to measure only src code
     - Configure `omit` to exclude test files and generated code
   - Add `[tool.coverage.report]` section:
     - Configure `exclude_lines` for non-testable patterns
-    - Set `min_covered_percentage = 80`
+    - Set `fail_under = 80`
   - Add `[tool.coverage.html]` section:
     - Set `directory = "htmlcov"`
   - **Validation**: pyproject.toml is valid TOML with no syntax errors
 
-- [ ] **Task 1.3**: Verify configuration loads correctly
+- [x] **Task 1.3**: Verify configuration loads correctly
   - Run `uv run python -m coverage --version`
   - Run `uv run python -m coverage --help`
   - Verify configuration is recognized
@@ -31,20 +31,20 @@ This document outlines the ordered implementation tasks for adding test coverage
 
 ### Phase 2: Coverage Measurement
 
-- [ ] **Task 2.1**: Run pytest with coverage measurement
+- [x] **Task 2.1**: Run pytest with coverage measurement
   - Execute `uv run pytest --cov=packages --cov-report=term-missing --cov-report=html`
   - Observe coverage output in terminal
   - Verify HTML report is generated in `htmlcov/` directory
   - **Validation**: Command completes successfully with coverage summary
 
-- [ ] **Task 2.2**: Analyze coverage report
+- [x] **Task 2.2**: Analyze coverage report
   - Review terminal output for overall coverage percentage
   - Open `htmlcov/index.html` in browser
   - Navigate through package coverage details
   - Identify any packages below 80% threshold
   - **Validation**: Coverage report is navigable and shows package-level details
 
-- [ ] **Task 2.3**: Verify branch coverage is measured
+- [x] **Task 2.3**: Verify branch coverage is measured
   - Check terminal report shows both "line" and "branch" coverage percentages
   - Confirm HTML report includes branch coverage details
   - Identify untested branches
@@ -52,20 +52,20 @@ This document outlines the ordered implementation tasks for adding test coverage
 
 ### Phase 3: Threshold Enforcement
 
-- [ ] **Task 3.1**: Test coverage threshold enforcement
+- [x] **Task 3.1**: Test coverage threshold enforcement
   - Run `uv run pytest --cov=packages --cov-fail-under=80`
   - Verify command succeeds if coverage ≥80%
   - Verify command fails if coverage <80%
   - **Validation**: Exit codes match expected behavior (0 for pass, 1 for fail)
 
-- [ ] **Task 3.2**: Fix coverage gaps if needed
+- [x] **Task 3.2**: Fix coverage gaps if needed
   - Identify packages or modules below 80%
   - Analyze untested code paths
   - Add tests to bring coverage to target
   - Re-run coverage until ≥80% is achieved
   - **Validation**: Full test suite passes and coverage ≥80%
 
-- [ ] **Task 3.3**: Verify complete test coverage
+- [x] **Task 3.3**: Verify complete test coverage
   - Run full test suite: `uv run pytest`
   - Run coverage measurement: `uv run pytest --cov=packages --cov-fail-under=80`
   - Confirm both pass without errors
@@ -73,20 +73,20 @@ This document outlines the ordered implementation tasks for adding test coverage
 
 ### Phase 4: Documentation and Best Practices
 
-- [ ] **Task 4.1**: Create coverage documentation
+- [x] **Task 4.1**: Create coverage documentation
   - Update `CLAUDE.md` or README with coverage workflow
   - Document how to run coverage command
   - Explain coverage report interpretation
   - Include examples of viewing HTML report
   - **Validation**: Documentation is clear and complete
 
-- [ ] **Task 4.2**: Document coverage exceptions
+- [x] **Task 4.2**: Document coverage exceptions
   - Document use of `pragma: no cover` for legitimate exclusions
   - Provide examples of when to exclude lines
   - Explain branch exclusion guidelines
   - **Validation**: Examples and guidelines are clear
 
-- [ ] **Task 4.3**: Add coverage check to development workflow
+- [x] **Task 4.3**: Add coverage check to development workflow
   - Update any development scripts or makefiles
   - Ensure coverage runs as part of standard workflow
   - Document in contributing guidelines if applicable
@@ -94,19 +94,19 @@ This document outlines the ordered implementation tasks for adding test coverage
 
 ### Phase 5: Validation and Quality
 
-- [ ] **Task 5.1**: Code quality checks
+- [x] **Task 5.1**: Code quality checks
   - Run `uv run ruff check --fix`
   - Run `uv run ruff format`
   - Verify no linting errors from coverage changes
   - **Validation**: Code passes all quality checks
 
-- [ ] **Task 5.2**: Full test suite execution
+- [x] **Task 5.2**: Full test suite execution
   - Run `uv run pytest` across all packages
-  - Verify all 200+ tests pass
+  - Verify all 379+ tests pass
   - No regressions from coverage setup
   - **Validation**: All tests pass (0 failures, 0 errors)
 
-- [ ] **Task 5.3**: Final coverage verification
+- [x] **Task 5.3**: Final coverage verification
   - Run `uv run pytest --cov=packages --cov-fail-under=80`
   - Confirm ≥80% coverage target achieved
   - Verify HTML report generates correctly
