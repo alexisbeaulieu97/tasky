@@ -154,7 +154,7 @@ class TestProjectListCommand:
         empty_dir: Path,
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
-        """Test listing from a custom root directory."""
+        """Test listing from a custom root directory with recursive flag."""
         # Change to empty directory
         monkeypatch.chdir(empty_dir)
 
@@ -166,6 +166,30 @@ class TestProjectListCommand:
 
         assert result.exit_code == 0
         assert "Found 4 project" in result.stdout
+
+    def test_list_with_custom_root_upward_search(
+        self,
+        runner: CliRunner,
+        nested_projects: Path,
+        empty_dir: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Test listing from a custom root directory without recursive (upward search)."""
+        # Change to empty directory
+        monkeypatch.chdir(empty_dir)
+
+        # List from nested/subproject2 directory searching upward
+        subproject2 = nested_projects / "subproject2"
+        result = runner.invoke(
+            project_app,
+            ["list", "--root", str(subproject2)],
+        )
+
+        assert result.exit_code == 0
+        # Should find subproject2 and root (upward search)
+        assert "Found 2 project" in result.stdout
+        assert str(subproject2) in result.stdout
+        assert str(nested_projects) in result.stdout
 
     def test_list_recursive_short_flag(
         self,

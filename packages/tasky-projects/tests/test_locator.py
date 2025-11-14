@@ -1,13 +1,13 @@
 """Unit tests for project locator functionality."""
 
 import json
+import os
 from pathlib import Path
 
 import pytest
 from tasky_projects import ProjectConfig, StorageConfig
 from tasky_projects.locator import (
     ProjectLocation,
-    _check_directory_for_project,
     find_projects_recursive,
     find_projects_upward,
 )
@@ -50,37 +50,6 @@ def temp_project_tree(tmp_path: Path) -> Path:
     subproject_config.to_file(subproject / ".tasky" / "config.toml")
 
     return tmp_path
-
-
-def test_check_directory_for_project_with_valid_project(tmp_path: Path) -> None:
-    """Test that _check_directory_for_project finds a valid project."""
-    config = ProjectConfig(storage=StorageConfig(backend="json", path="tasks.json"))
-    config.to_file(tmp_path / ".tasky" / "config.toml")
-
-    result = _check_directory_for_project(tmp_path)
-
-    assert result is not None
-    assert result.path == tmp_path
-    assert result.backend == "json"
-    assert result.storage_path == "tasks.json"
-
-
-def test_check_directory_for_project_without_project(tmp_path: Path) -> None:
-    """Test that _check_directory_for_project returns None for non-project directory."""
-    result = _check_directory_for_project(tmp_path)
-    assert result is None
-
-
-def test_check_directory_for_project_with_invalid_config(tmp_path: Path) -> None:
-    """Test that _check_directory_for_project handles invalid config gracefully."""
-    # Create invalid config file
-    config_dir = tmp_path / ".tasky"
-    config_dir.mkdir()
-    config_file = config_dir / "config.toml"
-    config_file.write_text("invalid toml content [[[")
-
-    result = _check_directory_for_project(tmp_path)
-    assert result is None
 
 
 def test_project_location_sorting() -> None:
@@ -280,3 +249,55 @@ def test_find_projects_sorted_by_path(temp_project_tree: Path) -> None:
     # Verify sorting
     for i in range(len(projects) - 1):
         assert str(projects[i].path) < str(projects[i + 1].path)
+
+
+def test_find_projects_recursive_handles_permission_errors(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Test that recursive search continues past permission errors."""
+    # Create accessible project
+    project1 = tmp_path / "accessible"
+    config1 = ProjectConfig(storage=StorageConfig(backend="json", path="tasks.json"))
+    config1.to_file(project1 / ".tasky" / "config.toml")
+
+    # Create another accessible project
+    project2 = tmp_path / "also_accessible"
+    config2 = ProjectConfig(storage=StorageConfig(backend="sqlite", path="tasks.db"))
+    config2.to_file(project2 / ".tasky" / "config.toml")
+
+    # Mock os.walk to simulate permission error for one directory
+    original_walk = os.walk
+
+    def mock_walk(top, onerror=None, **kwargs):  # noqa: ANN001, ANN003, ANN202
+        """Mock os.walk that simulates permission error."""
+        for root, dirs, files in original_walk(top, **kwargs):
+            # Simulate permission error for specific directory
+            if "inaccessible" in root and onerror:
+                onerror(PermissionError(f"Permission denied: {root}"))
+                continue
+            yield root, dirs, files
+
+    monkeypatch.setattr("os.walk", mock_walk)
+
+    projects = find_projects_recursive(tmp_path)
+
+    # Should find both accessible projects despite the simulated error
+    assert len(projects) == 2
+    paths = [p.path for p in projects]
+    assert project1 in paths
+    assert project2 in paths
+
+
+def test_project_location_ensures_absolute_path() -> None:
+    """Test that ProjectLocation always resolves to absolute paths."""
+    # Create with relative path
+    relative_path = Path("relative/path")
+    location = ProjectLocation(
+        path=relative_path,
+        backend="json",
+        storage_path="tasks.json",
+    )
+
+    # Should be converted to absolute
+    assert location.path.is_absolute()

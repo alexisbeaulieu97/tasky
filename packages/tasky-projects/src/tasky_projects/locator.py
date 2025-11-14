@@ -27,6 +27,10 @@ class ProjectLocation:
     backend: str
     storage_path: str
 
+    def __post_init__(self) -> None:
+        """Ensure path is always absolute."""
+        self.path = self.path.resolve()
+
     def __lt__(self, other: ProjectLocation) -> bool:
         """Compare by path for sorting."""
         return str(self.path) < str(other.path)
@@ -133,18 +137,18 @@ def find_projects_recursive(root_dir: Path | None = None) -> list[ProjectLocatio
     root_dir = Path.cwd() if root_dir is None else root_dir.resolve()
     projects: list[ProjectLocation] = []
 
-    try:
-        for dirpath, dirnames, _filenames in os.walk(root_dir):
-            current_path = Path(dirpath)
-            project = _check_directory_for_project(current_path)
+    def handle_error(err: OSError) -> None:
+        """Handle permission errors by logging and continuing."""
+        logger.debug("Skipping directory due to error: %s", err)
 
-            if project:
-                projects.append(project)
-                # Don't descend into .tasky directories
-                if ".tasky" in dirnames:
-                    dirnames.remove(".tasky")
+    for dirpath, dirnames, _filenames in os.walk(root_dir, onerror=handle_error):
+        current_path = Path(dirpath)
+        project = _check_directory_for_project(current_path)
 
-    except PermissionError as exc:
-        logger.debug("Permission denied accessing directory: %s", exc)
+        if project:
+            projects.append(project)
+            # Don't descend into .tasky directories
+            if ".tasky" in dirnames:
+                dirnames.remove(".tasky")
 
     return sorted(projects)

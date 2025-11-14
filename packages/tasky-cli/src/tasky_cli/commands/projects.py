@@ -117,7 +117,7 @@ def list_command(
         "-r",
         help="Search recursively in all subdirectories",
     ),
-    root: Path = typer.Option(  # noqa: B008
+    root: Path | None = typer.Option(  # noqa: B008
         None,
         "--root",
         help="Root directory to search from (default: current directory)",
