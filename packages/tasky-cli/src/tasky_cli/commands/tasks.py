@@ -18,10 +18,14 @@ from pydantic import ValidationError as PydanticValidationError
 from tasky_settings import ProjectNotFoundError, create_task_service
 from tasky_storage.errors import StorageError
 from tasky_tasks import (
+    ExportError,
     ImportResult,
+    IncompatibleVersionError,
+    InvalidExportFormatError,
     InvalidStateTransitionError,
     TaskDomainError,
     TaskFilter,
+    TaskImportError,
     TaskImportExportService,
     TaskNotFoundError,
     TaskValidationError,
@@ -614,35 +618,119 @@ def _route_exception_to_handler(exc: Exception, *, verbose: bool) -> NoReturn:
 
 
 def _handle_task_domain_error(exc: TaskDomainError, *, verbose: bool) -> NoReturn:
-    if isinstance(exc, TaskNotFoundError):
-        _render_error(
-            f"Task '{exc.task_id}' not found.",
-            suggestion="Run 'tasky task list' to view available tasks.",
-            verbose=verbose,
-            exc=exc,
-        )
-    elif isinstance(exc, TaskValidationError):
-        suggestion = None
-        if getattr(exc, "field", None):
-            suggestion = f"Check the value provided for '{exc.field}'."
-        message = str(exc) or "Task validation failed."
-        _render_error(message, suggestion=suggestion, verbose=verbose, exc=exc)
-    elif isinstance(exc, InvalidStateTransitionError):
-        suggestion = _suggest_transition(
-            from_status=exc.from_status,
-            to_status=exc.to_status,
-            task_id=str(exc.task_id),
-        )
-        _render_error(
-            f"Cannot transition from {exc.from_status} to {exc.to_status}.",
-            suggestion=suggestion,
-            verbose=verbose,
-            exc=exc,
-        )
-    else:
-        _render_error(str(exc) or "Task operation failed.", verbose=verbose, exc=exc)
-
+    # Route to specific handlers
+    _route_task_domain_error(exc, verbose=verbose)
     raise typer.Exit(1) from exc
+
+
+def _route_task_domain_error(exc: TaskDomainError, *, verbose: bool) -> None:
+    """Route task domain error to appropriate handler."""
+    if isinstance(exc, TaskNotFoundError):
+        _handle_task_not_found(exc, verbose=verbose)
+        return
+
+    if isinstance(exc, TaskValidationError):
+        _handle_task_validation_error(exc, verbose=verbose)
+        return
+
+    if isinstance(exc, InvalidStateTransitionError):
+        _handle_invalid_transition(exc, verbose=verbose)
+        return
+
+    if _try_handle_import_export_errors(exc, verbose=verbose):
+        return
+
+    _render_error(str(exc) or "Task operation failed.", verbose=verbose, exc=exc)
+
+
+def _try_handle_import_export_errors(exc: TaskDomainError, *, verbose: bool) -> bool:
+    """Try to handle import/export errors. Returns True if handled."""
+    # Handle all import/export errors together
+    import_export_types = (
+        InvalidExportFormatError,
+        IncompatibleVersionError,
+        ExportError,
+        TaskImportError,
+    )
+    if not isinstance(exc, import_export_types):
+        return False
+
+    if isinstance(exc, (InvalidExportFormatError, IncompatibleVersionError)):
+        _handle_import_format_error(exc, verbose=verbose)
+    else:
+        _handle_import_export_error(exc, verbose=verbose)
+    return True
+
+
+def _handle_task_not_found(exc: TaskNotFoundError, *, verbose: bool) -> None:
+    """Handle TaskNotFoundError."""
+    _render_error(
+        f"Task '{exc.task_id}' not found.",
+        suggestion="Run 'tasky task list' to view available tasks.",
+        verbose=verbose,
+        exc=exc,
+    )
+
+
+def _handle_task_validation_error(exc: TaskValidationError, *, verbose: bool) -> None:
+    """Handle TaskValidationError."""
+    suggestion = None
+    if getattr(exc, "field", None):
+        suggestion = f"Check the value provided for '{exc.field}'."
+    message = str(exc) or "Task validation failed."
+    _render_error(message, suggestion=suggestion, verbose=verbose, exc=exc)
+
+
+def _handle_invalid_transition(exc: InvalidStateTransitionError, *, verbose: bool) -> None:
+    """Handle InvalidStateTransitionError."""
+    suggestion = _suggest_transition(
+        from_status=exc.from_status,
+        to_status=exc.to_status,
+        task_id=str(exc.task_id),
+    )
+    _render_error(
+        f"Cannot transition from {exc.from_status} to {exc.to_status}.",
+        suggestion=suggestion,
+        verbose=verbose,
+        exc=exc,
+    )
+
+
+def _handle_import_format_error(exc: TaskDomainError, *, verbose: bool) -> None:
+    """Handle InvalidExportFormatError and IncompatibleVersionError."""
+    if isinstance(exc, InvalidExportFormatError):
+        _render_error(
+            f"Invalid file format: {exc}",
+            suggestion="Ensure the file is a valid JSON export from tasky.",
+            verbose=verbose,
+            exc=exc,
+        )
+    elif isinstance(exc, IncompatibleVersionError):
+        version_info = f" (found: {exc.actual})" if exc.actual else ""
+        _render_error(
+            f"Incompatible format version{version_info}",
+            suggestion="The export file may be from a different version of tasky.",
+            verbose=verbose,
+            exc=exc,
+        )
+
+
+def _handle_import_export_error(exc: TaskDomainError, *, verbose: bool) -> None:
+    """Handle ExportError and TaskImportError."""
+    if isinstance(exc, ExportError):
+        _render_error(
+            f"Export failed: {exc}",
+            suggestion="Check file permissions and disk space.",
+            verbose=verbose,
+            exc=exc,
+        )
+    elif isinstance(exc, TaskImportError):
+        _render_error(
+            f"Import failed: {exc}",
+            suggestion="Verify the import file exists and is readable.",
+            verbose=verbose,
+            exc=exc,
+        )
 
 
 def _handle_storage_error(exc: StorageError, *, verbose: bool) -> NoReturn:
@@ -794,7 +882,7 @@ def import_command(
     strategy: str = typer.Option(
         "append",
         "--strategy",
-        "-s",
+        "-S",
         help="Import strategy: append (add new), replace (clear all first), merge (update by ID)",
     ),
     dry_run: bool = typer.Option(  # noqa: FBT001
@@ -818,8 +906,8 @@ def import_command(
         tasky task import backup.json --dry-run
 
     """
-    # Validate strategy
-    _validate_import_strategy(strategy)
+    # Validate and normalize strategy (case-insensitive)
+    strategy = _validate_import_strategy(strategy)
 
     service = create_task_service()
     export_service = TaskImportExportService(service)
@@ -831,33 +919,32 @@ def import_command(
     _display_import_results(result, dry_run=dry_run)
 
 
-def _validate_import_strategy(strategy: str) -> None:
-    """Validate import strategy and exit if invalid."""
+def _validate_import_strategy(strategy: str) -> str:
+    """Validate import strategy (case-insensitive) and return normalized value."""
     valid_strategies = ["append", "replace", "merge"]
-    if strategy not in valid_strategies:
+    normalized = strategy.lower()
+    if normalized not in valid_strategies:
         typer.echo(f"✗ Invalid strategy: {strategy}", err=True)
         typer.echo(f"  Valid strategies: {', '.join(valid_strategies)}", err=True)
         raise typer.Exit(1)
+    return normalized
 
 
 def _display_import_results(result: ImportResult, *, dry_run: bool) -> None:
     """Display import results with statistics."""
     max_errors_shown = 5
-    action = "Would import" if dry_run else "Imported"
-    typer.echo(f"✓ {action} {result.total_processed} tasks:")
 
-    _show_import_counts(result)
-    _show_import_errors(result.errors, max_shown=max_errors_shown)
+    # Format output per spec requirements
+    if dry_run:
+        typer.echo(f"[DRY RUN] Would import: {result.created} created, {result.updated} updated")
+    else:
+        typer.echo(f"✓ Import complete: {result.created} created, {result.updated} updated")
 
-
-def _show_import_counts(result: ImportResult) -> None:
-    """Display import operation counts."""
-    if result.created > 0:
-        typer.echo(f"  Created: {result.created}")
-    if result.updated > 0:
-        typer.echo(f"  Updated: {result.updated}")
+    # Show skipped count if there were errors
     if result.skipped > 0:
         typer.echo(f"  Skipped: {result.skipped} (errors)")
+
+    _show_import_errors(result.errors, max_shown=max_errors_shown)
 
 
 def _show_import_errors(errors: list[str], *, max_shown: int) -> None:

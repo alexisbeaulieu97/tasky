@@ -10,7 +10,7 @@ import json
 import logging
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 from uuid import UUID, uuid4
 
 from pydantic import BaseModel, Field
@@ -20,6 +20,7 @@ from tasky_tasks.exceptions import (
     ExportError,
     IncompatibleVersionError,
     InvalidExportFormatError,
+    TaskImportError,
 )
 from tasky_tasks.models import TaskModel, TaskStatus
 
@@ -218,7 +219,7 @@ class TaskImportExportService:
             result = self._apply_merge_strategy(export_doc, dry_run=dry_run)
         else:
             msg = f"Invalid import strategy: {strategy}"
-            raise ImportError(msg)
+            raise TaskImportError(msg)
 
         action = "Would import" if dry_run else "Imported"
         logger.info(
@@ -247,7 +248,7 @@ class TaskImportExportService:
 
         Raises
         ------
-        ImportError:
+        TaskImportError:
             Raised when the file cannot be read.
         InvalidExportFormatError:
             Raised when the JSON is malformed or validation fails.
@@ -255,27 +256,97 @@ class TaskImportExportService:
             Raised when the format version is not supported.
 
         """
+        # Check file exists first
+        if not file_path.exists():
+            msg = f"File not found: {file_path}"
+            logger.error(msg)
+            raise TaskImportError(msg)
+
+        data = self._load_json_file(file_path)
+        export_doc = self._validate_export_schema(data)
+        self._check_version_compatibility(export_doc)
+
+        logger.debug(
+            "Loaded and validated export document: version=%s, tasks=%d",
+            export_doc.version,
+            export_doc.task_count,
+        )
+
+        return export_doc
+
+    def _load_json_file(self, file_path: Path) -> dict[str, Any]:
+        """Load JSON data from file.
+
+        Parameters
+        ----------
+        file_path:
+            Path to the JSON file.
+
+        Returns
+        -------
+        dict:
+            The parsed JSON data.
+
+        Raises
+        ------
+        TaskImportError:
+            Raised when the file cannot be read.
+        InvalidExportFormatError:
+            Raised when the JSON is malformed.
+
+        """
         try:
             with file_path.open("r", encoding="utf-8") as f:
-                data = json.load(f)
+                return json.load(f)
         except OSError as exc:
             msg = f"Failed to read import file: {exc}"
             logger.exception(msg)
-            raise ImportError(msg) from exc
+            raise TaskImportError(msg) from exc
         except json.JSONDecodeError as exc:
             msg = f"Invalid JSON in import file: {exc}"
             logger.exception(msg)
             raise InvalidExportFormatError(msg) from exc
 
-        # Validate against schema
+    def _validate_export_schema(self, data: dict[str, Any]) -> ExportDocument:
+        """Validate data against export schema.
+
+        Parameters
+        ----------
+        data:
+            The JSON data to validate.
+
+        Returns
+        -------
+        ExportDocument:
+            The validated export document.
+
+        Raises
+        ------
+        InvalidExportFormatError:
+            Raised when validation fails.
+
+        """
         try:
-            export_doc = ExportDocument.model_validate(data)
+            return ExportDocument.model_validate(data)
         except Exception as exc:
             msg = f"Invalid export format: {exc}"
             logger.exception(msg)
             raise InvalidExportFormatError(msg) from exc
 
-        # Check version compatibility
+    def _check_version_compatibility(self, export_doc: ExportDocument) -> None:
+        """Check if export document version is compatible.
+
+        Parameters
+        ----------
+        export_doc:
+            The export document to check.
+
+        Raises
+        ------
+        IncompatibleVersionError:
+            Raised when version is incompatible.
+
+        """
         if export_doc.version != self.CURRENT_VERSION:
             msg = (
                 f"Incompatible export version: {export_doc.version} "
@@ -287,13 +358,6 @@ class TaskImportExportService:
                 expected=self.CURRENT_VERSION,
                 actual=export_doc.version,
             )
-
-        logger.debug(
-            "Loaded and validated export document: version=%s, tasks=%d",
-            export_doc.version,
-            export_doc.task_count,
-        )
-        return export_doc
 
     def _apply_append_strategy(self, export_doc: ExportDocument, *, dry_run: bool) -> ImportResult:
         """Apply append strategy: add all tasks, re-key duplicates.
@@ -321,12 +385,7 @@ class TaskImportExportService:
         for snapshot in export_doc.tasks:
             try:
                 task = self._snapshot_to_task(snapshot)
-
-                # Re-key if ID already exists
-                if task.task_id in existing_ids:
-                    old_id = task.task_id
-                    task.task_id = uuid4()
-                    logger.debug("Re-keyed duplicate task: %s -> %s", old_id, task.task_id)
+                task = self._rekey_if_duplicate(task, existing_ids)
 
                 if not dry_run:
                     self.task_service.repository.save_task(task)
@@ -346,6 +405,34 @@ class TaskImportExportService:
             skipped=len(errors),
             errors=errors,
         )
+
+    def _rekey_if_duplicate(self, task: TaskModel, existing_ids: set[UUID]) -> TaskModel:
+        """Re-key task if its ID already exists.
+
+        Parameters
+        ----------
+        task:
+            The task to potentially re-key.
+        existing_ids:
+            Set of existing task IDs.
+
+        Returns
+        -------
+        TaskModel:
+            The task with original or new ID.
+
+        """
+        if task.task_id not in existing_ids:
+            return task
+
+        old_id = task.task_id
+        # Ensure new UUID doesn't collide with any existing or re-keyed IDs
+        new_id = uuid4()
+        while new_id in existing_ids:
+            new_id = uuid4()
+        task.task_id = new_id
+        logger.debug("Re-keyed duplicate task: %s -> %s", old_id, task.task_id)
+        return task
 
     def _apply_replace_strategy(self, export_doc: ExportDocument, *, dry_run: bool) -> ImportResult:
         """Apply replace strategy: clear all existing tasks, then import.
@@ -389,14 +476,22 @@ class TaskImportExportService:
         updated_count = 0
         errors: list[str] = []
 
-        # Get existing task IDs
+        # Get existing task IDs and map for preserving created_at
         existing_tasks = self.task_service.get_all_tasks()
         existing_ids = {task.task_id for task in existing_tasks}
+        existing_tasks_by_id = {task.task_id: task for task in existing_tasks}
 
         for snapshot in export_doc.tasks:
             try:
                 task = self._snapshot_to_task(snapshot)
                 is_update = task.task_id in existing_ids
+
+                # Preserve original created_at for existing tasks
+                task = self._preserve_created_at_if_update(
+                    task,
+                    is_update=is_update,
+                    existing_tasks_by_id=existing_tasks_by_id,
+                )
 
                 if not dry_run:
                     self.task_service.repository.save_task(task)
@@ -420,6 +515,34 @@ class TaskImportExportService:
             skipped=len(errors),
             errors=errors,
         )
+
+    def _preserve_created_at_if_update(
+        self,
+        task: TaskModel,
+        *,
+        is_update: bool,
+        existing_tasks_by_id: dict[UUID, TaskModel],
+    ) -> TaskModel:
+        """Preserve the original created_at timestamp for existing tasks.
+
+        Parameters
+        ----------
+        task:
+            The task being imported.
+        is_update:
+            Whether this is an update to an existing task.
+        existing_tasks_by_id:
+            Map of existing tasks by ID.
+
+        Returns
+        -------
+        TaskModel:
+            The task with preserved or imported created_at.
+
+        """
+        if is_update:
+            task.created_at = existing_tasks_by_id[task.task_id].created_at
+        return task
 
     def _task_to_snapshot(self, task: TaskModel) -> TaskSnapshot:
         """Convert a TaskModel to a TaskSnapshot for export.
