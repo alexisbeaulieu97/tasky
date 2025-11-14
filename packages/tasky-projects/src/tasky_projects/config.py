@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import tomllib
 from datetime import UTC, datetime
 from pathlib import Path
@@ -97,6 +98,7 @@ class ProjectConfig(BaseModel):
 
         Creates parent directories if they don't exist.
         Always writes in TOML format regardless of input format.
+        Sets file permissions to user read/write only (0o600) for security.
 
         Args:
             path: Path where configuration should be saved
@@ -110,3 +112,8 @@ class ProjectConfig(BaseModel):
 
         with path.open("wb") as f:
             tomli_w.dump(self.model_dump(mode="json"), f)
+
+        # Set file permissions to user read/write only (0o600)
+        # Only on POSIX systems (Linux, macOS, etc.)
+        if os.name == "posix":
+            path.chmod(0o600)

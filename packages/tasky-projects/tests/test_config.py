@@ -1,6 +1,9 @@
 """Tests for project configuration models."""
 
 import json
+import os
+import stat
+import sys
 import tomllib
 from datetime import UTC
 from pathlib import Path
@@ -64,7 +67,7 @@ def test_project_config_from_file_missing(tmp_path: Path) -> None:
         ProjectConfig.from_file(config_file)
 
 
-def test_project_config_from_file_invalid_json(tmp_path: Path) -> None:
+def test_project_config_from_file_invalid_toml(tmp_path: Path) -> None:
     """Test from_file handles invalid TOML."""
     config_file = tmp_path / "config.toml"
     config_file.write_text("{invalid toml}")
@@ -194,6 +197,44 @@ def test_project_config_auto_detects_toml(tmp_path: Path) -> None:
     assert config.storage.backend == "sqlite"
 
 
+def test_project_config_auto_detects_with_nonexistent_path(tmp_path: Path) -> None:
+    """Test auto-detection works when provided path doesn't exist."""
+    # Create config.toml but call from_file with a different (non-existent) path
+    toml_file = tmp_path / "config.toml"
+    toml_data = {
+        "version": "1.5",
+        "storage": {"backend": "sqlite", "path": "db.sqlite"},
+        "created_at": "2025-11-12T11:00:00Z",
+    }
+    with toml_file.open("wb") as f:
+        tomli_w.dump(toml_data, f)
+
+    # Call with a non-existent path - should auto-detect config.toml
+    nonexistent = tmp_path / "nonexistent.toml"
+    config = ProjectConfig.from_file(nonexistent)
+    assert config.version == "1.5"
+
+
+def test_project_config_auto_detects_legacy_json_with_nonexistent_path(
+    tmp_path: Path,
+) -> None:
+    """Test auto-detection finds legacy JSON when TOML doesn't exist."""
+    # Create only config.json
+    json_file = tmp_path / "config.json"
+    json_data = {
+        "version": "1.0",
+        "storage": {"backend": "json", "path": "tasks.json"},
+        "created_at": "2025-11-12T10:00:00Z",
+    }
+    json_file.write_text(json.dumps(json_data))
+
+    # Call with a non-existent path - should auto-detect config.json
+    nonexistent = tmp_path / "nonexistent.toml"
+    config = ProjectConfig.from_file(nonexistent)
+    assert config.version == "1.0"
+    assert config.storage.backend == "json"
+
+
 def test_project_config_json_to_toml_migration(tmp_path: Path) -> None:
     """Test migrating from JSON to TOML on write."""
     json_file = tmp_path / "config.json"
@@ -231,3 +272,18 @@ def test_project_config_to_file_forces_toml_extension(tmp_path: Path) -> None:
     toml_path = tmp_path / "config.toml"
     assert toml_path.exists()
     assert not json_path.exists()
+
+
+def test_project_config_to_file_sets_secure_permissions(tmp_path: Path) -> None:
+    """Test to_file sets file permissions to 0o600 on POSIX systems."""
+    config_file = tmp_path / "config.toml"
+    config = ProjectConfig()
+
+    config.to_file(config_file)
+
+    # Only check permissions on POSIX systems (Linux, macOS, etc.)
+    if os.name == "posix" and sys.platform != "win32":
+        file_stat = config_file.stat()
+        # Get permission bits (last 3 octal digits)
+        permissions = stat.S_IMODE(file_stat.st_mode)
+        assert permissions == 0o600, f"Expected 0o600, got {oct(permissions)}"

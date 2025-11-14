@@ -2,7 +2,7 @@
 
 import tomllib
 from pathlib import Path
-from typing import Any, cast
+from typing import Any
 
 import typer
 from tasky_settings import get_settings, registry
@@ -35,7 +35,7 @@ def _save_toml_file(path: Path, data: dict[str, Any]) -> None:
 
 
 @project_app.command(name="init")
-def init_command(
+def init_command(  # noqa: C901
     backend: str = typer.Option("json", "--backend", "-b", help="Storage backend to use"),
 ) -> None:
     """Initialize a new project."""
@@ -58,22 +58,28 @@ def init_command(
         if not confirm:
             raise typer.Exit(code=0)
 
-    # Load existing config or start fresh
-    config_data = _load_toml_file(config_file)
+    # Import ProjectConfig to use proper schema
+    from tasky_projects import ProjectConfig, StorageConfig  # noqa: PLC0415
 
-    # Ensure storage section exists and update backend
-    if "storage" not in config_data:
-        config_data["storage"] = {}
-    storage = cast("dict[str, Any]", config_data["storage"])
-    storage["backend"] = backend
-    storage["path"] = storage.get("path", "tasks.json")
+    # Load existing config or create new one
+    if config_file.exists():
+        try:
+            config = ProjectConfig.from_file(config_file)
+            # Update backend while preserving other settings
+            config.storage.backend = backend
+        except Exception:  # noqa: BLE001
+            # If loading fails, create fresh config
+            config = ProjectConfig(storage=StorageConfig(backend=backend))
+    else:
+        # Create new config with proper schema
+        config = ProjectConfig(storage=StorageConfig(backend=backend))
 
-    # Save configuration
-    _save_toml_file(config_file, config_data)
+    # Save configuration using ProjectConfig (ensures version, created_at, etc.)
+    config.to_file(config_file)
 
     typer.echo(f"✓ Project initialized in {storage_root}")
-    typer.echo(f"  Backend: {backend}")
-    typer.echo(f"  Storage: {storage['path']}")
+    typer.echo(f"  Backend: {config.storage.backend}")
+    typer.echo(f"  Storage: {config.storage.path}")
 
 
 @project_app.command(name="info")
