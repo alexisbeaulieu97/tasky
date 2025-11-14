@@ -8,6 +8,7 @@ import traceback
 from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 from functools import wraps
+from pathlib import Path
 from typing import NoReturn, Protocol, TypeVar, cast
 from uuid import UUID
 
@@ -17,9 +18,11 @@ from pydantic import ValidationError as PydanticValidationError
 from tasky_settings import ProjectNotFoundError, create_task_service
 from tasky_storage.errors import StorageError
 from tasky_tasks import (
+    ImportResult,
     InvalidStateTransitionError,
     TaskDomainError,
     TaskFilter,
+    TaskImportExportService,
     TaskNotFoundError,
     TaskValidationError,
 )
@@ -749,3 +752,123 @@ def reopen_command(task_id: str) -> None:
     service, uuid = _parse_task_id_and_get_service(task_id)
     task = service.reopen_task(uuid)
     typer.echo(f"↻ Task reopened: {task.name}")
+
+
+@task_app.command(name="export")
+@with_task_error_handling
+def export_command(
+    file_path: str = typer.Argument(..., help="Path to export JSON file"),
+    status: str | None = typer.Option(
+        None,
+        "--status",
+        help="Filter by status (pending, completed, cancelled)",
+    ),
+) -> None:
+    """Export tasks to a JSON file.
+
+    Exports all tasks (or filtered tasks) to a JSON backup file. The file can be
+    imported later using the 'task import' command.
+
+    Examples:
+        tasky task export backup.json
+        tasky task export completed-tasks.json --status completed
+
+    """
+    service = create_task_service()
+    export_service = TaskImportExportService(service)
+
+    # Filter not yet supported - export all for now
+    if status is not None:
+        typer.echo("⚠ Warning: --status filter not yet supported, exporting all tasks", err=True)
+
+    export_path = Path(file_path)
+    export_doc = export_service.export_tasks(export_path)
+
+    typer.echo(f"✓ Exported {export_doc.task_count} tasks to: {file_path}")
+
+
+@task_app.command(name="import")
+@with_task_error_handling
+def import_command(
+    file_path: str = typer.Argument(..., help="Path to import JSON file"),
+    strategy: str = typer.Option(
+        "append",
+        "--strategy",
+        "-s",
+        help="Import strategy: append (add new), replace (clear all first), merge (update by ID)",
+    ),
+    dry_run: bool = typer.Option(  # noqa: FBT001
+        False,  # noqa: FBT003
+        "--dry-run",
+        "-n",
+        help="Show what would be imported without making changes",
+    ),
+) -> None:
+    """Import tasks from a JSON file.
+
+    Imports tasks from a JSON backup file with different merge strategies:
+
+    - append: Adds imported tasks (default), re-keys duplicates with new IDs
+    - replace: Clears all existing tasks first, then imports
+    - merge: Updates existing tasks by ID, creates new ones
+
+    Examples:
+        tasky task import backup.json
+        tasky task import backup.json --strategy merge
+        tasky task import backup.json --dry-run
+
+    """
+    # Validate strategy
+    _validate_import_strategy(strategy)
+
+    service = create_task_service()
+    export_service = TaskImportExportService(service)
+
+    import_path = Path(file_path)
+    result = export_service.import_tasks(import_path, strategy=strategy, dry_run=dry_run)
+
+    # Show results
+    _display_import_results(result, dry_run=dry_run)
+
+
+def _validate_import_strategy(strategy: str) -> None:
+    """Validate import strategy and exit if invalid."""
+    valid_strategies = ["append", "replace", "merge"]
+    if strategy not in valid_strategies:
+        typer.echo(f"✗ Invalid strategy: {strategy}", err=True)
+        typer.echo(f"  Valid strategies: {', '.join(valid_strategies)}", err=True)
+        raise typer.Exit(1)
+
+
+def _display_import_results(result: ImportResult, *, dry_run: bool) -> None:
+    """Display import results with statistics."""
+    max_errors_shown = 5
+    action = "Would import" if dry_run else "Imported"
+    typer.echo(f"✓ {action} {result.total_processed} tasks:")
+
+    _show_import_counts(result)
+    _show_import_errors(result.errors, max_shown=max_errors_shown)
+
+
+def _show_import_counts(result: ImportResult) -> None:
+    """Display import operation counts."""
+    if result.created > 0:
+        typer.echo(f"  Created: {result.created}")
+    if result.updated > 0:
+        typer.echo(f"  Updated: {result.updated}")
+    if result.skipped > 0:
+        typer.echo(f"  Skipped: {result.skipped} (errors)")
+
+
+def _show_import_errors(errors: list[str], *, max_shown: int) -> None:
+    """Display import errors with truncation."""
+    if not errors:
+        return
+
+    typer.echo("\n⚠ Errors encountered:", err=True)
+    for error in errors[:max_shown]:
+        typer.echo(f"  - {error}", err=True)
+
+    if len(errors) > max_shown:
+        remaining = len(errors) - max_shown
+        typer.echo(f"  ... and {remaining} more errors", err=True)
