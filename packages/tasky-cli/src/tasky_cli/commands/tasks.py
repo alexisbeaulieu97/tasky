@@ -334,10 +334,18 @@ def update_command(
     # Retrieve the current task
     task = service.get_task(uuid)
 
-    # Update only the specified fields
+    # Trim and validate provided fields to prevent empty updates
     if name is not None:
+        name = name.strip()
+        if not name:
+            typer.echo("name cannot be empty", err=True)
+            raise typer.Exit(1)
         task.name = name
     if details is not None:
+        details = details.strip()
+        if not details:
+            typer.echo("details cannot be empty", err=True)
+            raise typer.Exit(1)
         task.details = details
 
     # Persist changes
