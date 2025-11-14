@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any, cast
 from uuid import UUID, uuid4
 
 import pytest
@@ -95,7 +96,7 @@ class TestExportDocument:
 
     def test_export_document_defaults(self) -> None:
         """Test export document with default values."""
-        doc = ExportDocument(task_count=0)
+        doc = ExportDocument.model_validate({"task_count": 0})
 
         assert doc.version == "1.0"
         assert doc.source_project == "default"
@@ -166,9 +167,10 @@ class TestExportTasks:
 
         # Verify file contents
         with export_file.open("r") as f:
-            data = json.load(f)
+            data: dict[str, Any] = json.load(f)
         assert data["task_count"] == 1
-        assert len(data["tasks"]) == 1
+        tasks_data = cast("list[dict[str, Any]]", data["tasks"])
+        assert len(tasks_data) == 1
 
     def test_export_multiple_tasks(
         self,
@@ -288,7 +290,7 @@ class TestImportTasks:
     ) -> None:
         """Test importing from a file with incompatible version."""
         invalid_file = tmp_path / "invalid.json"
-        data = {
+        data: dict[str, object] = {
             "version": "999.0",
             "task_count": 0,
             "tasks": [],
@@ -318,7 +320,12 @@ class TestImportTasks:
             created_at=datetime.now(tz=UTC),
             updated_at=datetime.now(tz=UTC),
         )
-        doc = ExportDocument(task_count=1, tasks=[new_task])
+        doc = ExportDocument(
+            version="1.0",
+            source_project="default",
+            task_count=1,
+            tasks=[new_task],
+        )
         export_file.write_text(json.dumps(doc.model_dump(mode="json"), default=str))
 
         # Import with append strategy
@@ -354,7 +361,12 @@ class TestImportTasks:
             created_at=datetime.now(tz=UTC),
             updated_at=datetime.now(tz=UTC),
         )
-        doc = ExportDocument(task_count=1, tasks=[new_task])
+        doc = ExportDocument(
+            version="1.0",
+            source_project="default",
+            task_count=1,
+            tasks=[new_task],
+        )
         export_file.write_text(json.dumps(doc.model_dump(mode="json"), default=str))
 
         # Import with replace strategy
@@ -384,7 +396,12 @@ class TestImportTasks:
             created_at=datetime.now(tz=UTC),
             updated_at=datetime.now(tz=UTC),
         )
-        doc = ExportDocument(task_count=1, tasks=[new_task])
+        doc = ExportDocument(
+            version="1.0",
+            source_project="default",
+            task_count=1,
+            tasks=[new_task],
+        )
         export_file.write_text(json.dumps(doc.model_dump(mode="json"), default=str))
 
         # Import with merge strategy
@@ -414,7 +431,12 @@ class TestImportTasks:
             created_at=existing.created_at,
             updated_at=datetime.now(tz=UTC),
         )
-        doc = ExportDocument(task_count=1, tasks=[updated_task])
+        doc = ExportDocument(
+            version="1.0",
+            source_project="default",
+            task_count=1,
+            tasks=[updated_task],
+        )
         export_file.write_text(json.dumps(doc.model_dump(mode="json"), default=str))
 
         # Import with merge strategy
@@ -447,7 +469,12 @@ class TestImportTasks:
             created_at=datetime.now(tz=UTC),
             updated_at=datetime.now(tz=UTC),
         )
-        doc = ExportDocument(task_count=1, tasks=[new_task])
+        doc = ExportDocument(
+            version="1.0",
+            source_project="default",
+            task_count=1,
+            tasks=[new_task],
+        )
         export_file.write_text(json.dumps(doc.model_dump(mode="json"), default=str))
 
         # Import with dry run
@@ -467,7 +494,12 @@ class TestImportTasks:
     ) -> None:
         """Test importing with an invalid strategy."""
         export_file = tmp_path / "import.json"
-        doc = ExportDocument(task_count=0, tasks=[])
+        doc = ExportDocument(
+            version="1.0",
+            source_project="default",
+            task_count=0,
+            tasks=[],
+        )
         export_file.write_text(json.dumps(doc.model_dump(mode="json"), default=str))
 
         with pytest.raises(TaskImportError, match="Invalid import strategy"):
