@@ -2,11 +2,45 @@
 
 from __future__ import annotations
 
+import threading
 from pathlib import Path
 
 from tasky_tasks.service import TaskService
 
 from tasky_settings.backend_registry import registry
+
+# Backend initialization state (thread-safe)
+_backends_initialized = False
+_init_lock = threading.Lock()
+
+
+def _ensure_backends_registered() -> None:
+    """Ensure storage backends are registered before using the registry.
+
+    This function imports tasky_storage, which triggers backend self-registration
+    via module-level code. It runs once on first call to create_task_service().
+
+    Thread-safe: Uses a lock to ensure single initialization even in multi-threaded
+    environments (e.g., MCP servers).
+
+    This pattern allows:
+    - Service factory to work without requiring explicit tasky_storage import
+    - Future backends to follow the same self-registration pattern
+    - Tests to use the factory in isolation
+
+    Implementation note:
+    Storage adapters register themselves at import time by calling:
+        from tasky_settings import registry
+        registry.register("backend-name", factory_function)
+
+    """
+    global _backends_initialized
+    with _init_lock:
+        if not _backends_initialized:
+            # Import triggers backend registration via tasky_storage.__init__.py
+            import tasky_storage
+
+            _backends_initialized = True
 
 
 class ProjectNotFoundError(Exception):
@@ -58,11 +92,12 @@ def create_task_service(project_root: Path | None = None) -> TaskService:
     """Create a TaskService instance from project configuration.
 
     This factory function:
-    1. Finds the project root (if not provided)
-    2. Loads the settings from .tasky/config.toml
-    3. Gets the appropriate backend factory from the registry
-    4. Creates and initializes the repository
-    5. Returns a configured TaskService
+    1. Ensures storage backends are initialized (auto-imports tasky_storage)
+    2. Finds the project root (if not provided)
+    3. Loads the settings from .tasky/config.toml
+    4. Gets the appropriate backend factory from the registry
+    5. Creates and initializes the repository
+    6. Returns a configured TaskService
 
     Args:
         project_root: Path to project root. If None, searches from current directory.
@@ -72,12 +107,14 @@ def create_task_service(project_root: Path | None = None) -> TaskService:
 
     Raises:
         ProjectNotFoundError: If no project directory is found
-        KeyError: If configured backend is not registered
 
     """
+    # Ensure backends are available before accessing registry
+    _ensure_backends_registered()
+
     # Avoid circular import by importing locally
     # get_settings is defined in __init__.py
-    from tasky_settings import get_settings as _get_settings  # noqa: PLC0415
+    from tasky_settings import get_settings as _get_settings
 
     # Find project root if not provided
     if project_root is None:
