@@ -7,8 +7,9 @@ This roadmap organizes all 10 OpenSpec changes in optimal implementation order, 
 
 ## Overview
 
-**Total Effort**: ~35.5-40.5 hours of implementation
-**Phases**: 5 sequential phases (1, 1.5, 2, 3, 4, 4.4, 5)
+**Total Effort (Phases 1-5)**: ~56-62 hours of implementation
+**Total Effort (with optional Phase 6)**: ~62-70 hours
+**Phases**: 5 sequential phases (1, 1.5, 2, 3, 4, 4.4, 5) + 1 optional cleanup phase (6)
 **Test Gate**: After each phase, run `uv run pytest` to ensure all tests still pass
 
 ## Change Checklist
@@ -29,6 +30,7 @@ Tick off each change as you complete it (mirrors the execution order below).
 - [ ] 4.3 `implement-project-list`
 - [ ] 4.4 `align-tasky-projects-format`
 - [ ] 5.1 `add-project-registry`
+- [ ] 6.1 `remove-json-config-support` (optional, flexible timeline)
 
 ---
 
@@ -443,6 +445,9 @@ uv run ruff format
 
 # Phase 5 - Global Project Registry
 /openspec:apply add-project-registry
+
+# Phase 6 - Future Cleanup (Optional, flexible timeline)
+/openspec:apply remove-json-config-support
 ```
 
 ---
@@ -520,7 +525,9 @@ Only Phase 4's `standardize-config-format` is breaking:
 | 4 | 3 | 28 | 8-9 | Low-Med |
 | 4.4 | 1 | 13 | 0.5 | Low |
 | 5 | 1 | 48 | 18-20 | High |
-| **TOTAL** | **14** | **242+** | **56-62** | **Balanced** |
+| 6 (Optional) | 1 | 8 | 6-8 | Low-Med |
+| **TOTAL (Phases 1-5)** | **11** | **242+** | **56-62** | **Balanced** |
+| **TOTAL (with optional Phase 6)** | **12** | **250+** | **62-70** | **Balanced** |
 
 ---
 
@@ -635,7 +642,7 @@ Only Phase 4's `standardize-config-format` is breaking:
 
 ---
 
-## After Implementation: Archival Process
+## Phase 6: Future Cleanup & Optimization (Optional)\n**Goal**: Simplify codebase after all features are stable\n\n### 6.1 `remove-json-config-support` (Optional - Flexible Timeline)\n**Why optional**:\n- Cleanup task, not a feature\n- Can be executed anytime after decision to remove JSON\n- No blocking dependencies\n- Simplifies configuration code but not required for users\n- ~6-8 hours (includes comprehensive code audit)\n\n**What it enables**:\n- 100% clean codebase (zero JSON references)\n- Simplified configuration logic (single TOML path)\n- Reduced test maintenance (~12-15 fewer tests)\n- Cleaner future configuration changes\n\n**When to do it**:\n- **Option A (Soon)**: Execute when codebase is stable if JSON removal is priority\n- **Option B (Planned)**: Bundle with next major release (v2.0)\n- **Option C (Defer)**: Keep JSON support if broader backwards compatibility is valued\n\n**What changes**:\n- Remove `_load_json()` method from `tasky-projects/config.py`\n- Remove JSON detection from `ProjectConfig.from_file()`\n- Remove JSON source handling from `tasky-settings/sources.py`\n- Delete all JSON-specific test cases (~12-15 tests)\n- Remove all JSON references, comments, and examples\n- Update CHANGELOG with breaking change note\n\n**Success criteria**:\n- ✅ Zero JSON references in production code (`rg -i \"json\" packages/` returns nothing)\n- ✅ All tests pass with ≥80% coverage\n- ✅ Code reads as if TOML was always the only format\n- ✅ Error messages are generic (no JSON mentions)\n- ✅ CHANGELOG documents breaking change (only place mentioning removal)\n\n**Depends on**: All Phases 1-5 (no blocking dependencies, cleanup only)\n**Enables**: Cleaner future development, reduced cognitive load\n\n```bash\n/openspec:apply remove-json-config-support\n```\n\n---\n\n## After Implementation: Archival Process
 
 Once each change is merged (after PR):
 ```bash
