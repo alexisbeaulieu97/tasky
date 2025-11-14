@@ -3,10 +3,16 @@
 from __future__ import annotations
 
 import json
+import logging
+import os
+import tomllib
 from datetime import UTC, datetime
 from pathlib import Path
 
+import tomli_w
 from pydantic import BaseModel, Field
+
+logger = logging.getLogger(__name__)
 
 
 class StorageConfig(BaseModel):
@@ -38,10 +44,12 @@ class ProjectConfig(BaseModel):
 
     @classmethod
     def from_file(cls, path: Path) -> ProjectConfig:
-        """Load configuration from a JSON file.
+        """Load configuration from a TOML file.
+
+        Supports legacy JSON format with automatic detection and migration warning.
 
         Args:
-            path: Path to the configuration file
+            path: Path to the configuration file (.tasky/config.toml or .tasky/config.json)
 
         Returns:
             ProjectConfig instance loaded from file
@@ -50,19 +58,47 @@ class ProjectConfig(BaseModel):
             FileNotFoundError: If the configuration file doesn't exist
 
         """
-        if not path.exists():
-            msg = f"Configuration file not found: {path}"
-            raise FileNotFoundError(msg)
+        # Try TOML first (preferred format)
+        toml_path = path.parent / "config.toml"
+        json_path = path.parent / "config.json"
 
-        with path.open("r", encoding="utf-8") as f:
-            data = json.load(f)
+        # If specific path provided, use it
+        if path.exists():
+            if path.suffix == ".json":
+                logger.warning(
+                    "Legacy JSON config detected at %s, will migrate to TOML format on next write",
+                    path,
+                )
+                with path.open("r", encoding="utf-8") as f:
+                    data = json.load(f)
+                return cls.model_validate(data)
+            # Assume TOML
+            with path.open("rb") as f:
+                data = tomllib.load(f)
+            return cls.model_validate(data)
 
-        return cls.model_validate(data)
+        # Auto-detect if path doesn't exist
+        if toml_path.exists():
+            with toml_path.open("rb") as f:
+                data = tomllib.load(f)
+            return cls.model_validate(data)
+        if json_path.exists():
+            logger.warning(
+                "Legacy JSON config detected at %s, will migrate to TOML format on next write",
+                json_path,
+            )
+            with json_path.open("r", encoding="utf-8") as f:
+                data = json.load(f)
+            return cls.model_validate(data)
+        msg = f"Configuration file not found: {path}"
+        raise FileNotFoundError(msg)
 
     def to_file(self, path: Path) -> None:
-        """Save configuration to a JSON file.
+        """Save configuration to a TOML file.
 
         Creates parent directories if they don't exist.
+        Always writes in TOML format regardless of input format.
+        Sets file permissions to user read/write only (0o600) for security.
 
         Args:
             path: Path where configuration should be saved
@@ -70,5 +106,14 @@ class ProjectConfig(BaseModel):
         """
         path.parent.mkdir(parents=True, exist_ok=True)
 
-        with path.open("w", encoding="utf-8") as f:
-            f.write(self.model_dump_json(indent=2))
+        # Ensure we always write TOML format
+        if path.suffix != ".toml":
+            path = path.parent / "config.toml"
+
+        with path.open("wb") as f:
+            tomli_w.dump(self.model_dump(mode="json"), f)
+
+        # Set file permissions to user read/write only (0o600)
+        # Only on POSIX systems (Linux, macOS, etc.)
+        if os.name == "posix":
+            path.chmod(0o600)

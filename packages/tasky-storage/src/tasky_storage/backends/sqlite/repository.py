@@ -244,17 +244,35 @@ class SqliteTaskRepository:
         where_clauses = []
         params = []
 
-        # Status filter
-        if task_filter.statuses is not None:
-            if task_filter.statuses:  # Non-empty list
-                placeholders = ",".join("?" * len(task_filter.statuses))
-                where_clauses.append(f"status IN ({placeholders})")
-                params.extend(status.value for status in task_filter.statuses)
-            else:  # Empty list means no status will match
-                # Return empty list immediately
-                return []
+        # Add status filter
+        self._add_status_filter(task_filter, where_clauses, params)
+        if not where_clauses and task_filter.statuses is not None:
+            # Empty statuses list means no results
+            return []
 
-        # Date range filters
+        # Add date range filters
+        self._add_date_filters(task_filter, where_clauses, params)
+
+        # Add text search filter
+        self._add_text_filter(task_filter, where_clauses, params)
+
+        # Build and execute query
+        query = self._build_query(where_clauses)
+        return self._execute_find_query(query, params)
+
+    def _add_status_filter(
+        self, task_filter: TaskFilter, where_clauses: list[str], params: list[Any],
+    ) -> None:
+        """Add status filter to WHERE clauses."""
+        if task_filter.statuses is not None and task_filter.statuses:
+            placeholders = ",".join("?" * len(task_filter.statuses))
+            where_clauses.append(f"status IN ({placeholders})")
+            params.extend(status.value for status in task_filter.statuses)
+
+    def _add_date_filters(
+        self, task_filter: TaskFilter, where_clauses: list[str], params: list[Any],
+    ) -> None:
+        """Add date range filters to WHERE clauses."""
         if task_filter.created_after is not None:
             where_clauses.append("created_at >= ?")
             params.append(task_filter.created_after.isoformat())
@@ -263,7 +281,10 @@ class SqliteTaskRepository:
             where_clauses.append("created_at < ?")
             params.append(task_filter.created_before.isoformat())
 
-        # Text search filter (case-insensitive)
+    def _add_text_filter(
+        self, task_filter: TaskFilter, where_clauses: list[str], params: list[Any],
+    ) -> None:
+        """Add text search filter to WHERE clauses."""
         if task_filter.name_contains is not None:
             # Escape LIKE metacharacters to prevent wildcard interpretation
             # Users expect literal substring matching, not SQL wildcard behavior
@@ -273,17 +294,20 @@ class SqliteTaskRepository:
                 .replace("_", "\\_")
             )
             # SQLite LIKE is case-insensitive by default for ASCII characters
-            # Use || for string concatenation in SQLite
             where_clauses.append("(name LIKE ? ESCAPE '\\' OR details LIKE ? ESCAPE '\\')")
             search_pattern = f"%{escaped_search}%"
             params.extend([search_pattern, search_pattern])
 
-        # Build complete query
+    def _build_query(self, where_clauses: list[str]) -> str:
+        """Build SQL query string from WHERE clauses."""
         query = "SELECT * FROM tasks"
         if where_clauses:
             query += " WHERE " + " AND ".join(where_clauses)
         query += " ORDER BY created_at DESC"
+        return query
 
+    def _execute_find_query(self, query: str, params: list[Any]) -> list[TaskModel]:
+        """Execute find query and convert rows to TaskModels."""
         try:
             with get_connection(self.path) as conn:
                 cursor = conn.cursor()

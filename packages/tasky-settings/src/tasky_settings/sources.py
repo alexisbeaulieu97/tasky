@@ -1,5 +1,6 @@
 """Custom settings sources for loading configuration from TOML files."""
 
+import json
 import logging
 import tomllib
 from pathlib import Path
@@ -134,7 +135,10 @@ class GlobalConfigSource(TomlConfigSource):
 
 
 class ProjectConfigSource(TomlConfigSource):
-    """Settings source for project configuration (.tasky/config.toml)."""
+    """Settings source for project configuration (.tasky/config.toml).
+
+    Supports legacy JSON config with automatic detection and migration warning.
+    """
 
     def __init__(self, settings_cls: type, project_root: Path | None = None) -> None:
         """Initialize project config source.
@@ -148,3 +152,52 @@ class ProjectConfigSource(TomlConfigSource):
             project_root = Path.cwd()
         config_path = project_root / ".tasky" / "config.toml"
         super().__init__(settings_cls, config_path)
+        self.project_root = project_root
+
+    def _load_config(self) -> dict[str, Any]:  # noqa: C901
+        """Load configuration from TOML or legacy JSON file.
+
+        Returns:
+            Dictionary of configuration values, or empty dict if file missing/invalid
+
+        """
+        if self._config_data is not None:
+            return self._config_data
+
+        # Try TOML first (preferred format)
+        toml_path = self.project_root / ".tasky" / "config.toml"
+        json_path = self.project_root / ".tasky" / "config.json"
+
+        if toml_path.exists():
+            # Load TOML
+            try:
+                with toml_path.open("rb") as f:
+                    self._config_data = tomllib.load(f)
+            except (OSError, tomllib.TOMLDecodeError) as e:
+                logger.warning(
+                    "Failed to load config from %s: %s. Using defaults.",
+                    toml_path,
+                    e,
+                )
+                self._config_data = {}
+        elif json_path.exists():
+            # Load legacy JSON with migration warning
+            logger.warning(
+                "Legacy JSON config detected at %s, will migrate to TOML format on next write",
+                json_path,
+            )
+            try:
+                with json_path.open("r", encoding="utf-8") as f:
+                    self._config_data = json.load(f)
+            except (OSError, json.JSONDecodeError) as e:
+                logger.warning(
+                    "Failed to load config from %s: %s. Using defaults.",
+                    json_path,
+                    e,
+                )
+                self._config_data = {}
+        else:
+            # No config file found
+            self._config_data = {}
+
+        return self._config_data

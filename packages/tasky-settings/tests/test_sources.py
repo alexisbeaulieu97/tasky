@@ -1,7 +1,10 @@
 """Tests for custom settings sources."""
 
+import json
+import logging
 from pathlib import Path
 
+import pytest
 from tasky_settings.models import AppSettings
 from tasky_settings.sources import (
     GlobalConfigSource,
@@ -170,6 +173,104 @@ class TestProjectConfigSource:
         config = source()
 
         assert config == {}
+
+    def test_loads_legacy_json_config(
+        self,
+        tmp_path: Path,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        """Test loading legacy JSON config with migration warning."""
+        project_root = tmp_path / "legacy_project"
+        project_root.mkdir()
+        config_dir = project_root / ".tasky"
+        config_dir.mkdir()
+        config_file = config_dir / "config.json"
+
+        # Create legacy JSON config
+        config_data = {
+            "logging": {"verbosity": 2, "format": "json"},
+            "storage": {"backend": "json", "path": "tasks.json"},
+        }
+        config_file.write_text(json.dumps(config_data))
+
+        with caplog.at_level(logging.WARNING):
+            source = ProjectConfigSource(AppSettings, project_root=project_root)
+            config = source()
+
+        # Should load JSON successfully
+        assert config["logging"]["verbosity"] == 2
+        assert config["logging"]["format"] == "json"
+        assert config["storage"]["backend"] == "json"
+        # Verify warning was logged
+        assert "Legacy JSON config detected" in caplog.text
+
+    def test_prefers_toml_over_json(self, tmp_path: Path) -> None:
+        """Test that TOML config is preferred when both exist."""
+        project_root = tmp_path / "dual_project"
+        project_root.mkdir()
+        config_dir = project_root / ".tasky"
+        config_dir.mkdir()
+
+        # Create both JSON and TOML configs with different values
+        json_file = config_dir / "config.json"
+        json_data = {"logging": {"verbosity": 1}}
+        json_file.write_text(json.dumps(json_data))
+
+        toml_file = config_dir / "config.toml"
+        toml_file.write_text("""
+[logging]
+verbosity = 3
+""")
+
+        source = ProjectConfigSource(AppSettings, project_root=project_root)
+        config = source()
+
+        # Should prefer TOML
+        assert config["logging"]["verbosity"] == 3
+
+    def test_handles_malformed_json_gracefully(
+        self,
+        tmp_path: Path,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        """Test that malformed JSON returns empty dict and logs warning."""
+        project_root = tmp_path / "bad_json_project"
+        project_root.mkdir()
+        config_dir = project_root / ".tasky"
+        config_dir.mkdir()
+        config_file = config_dir / "config.json"
+        config_file.write_text("{invalid json}")
+
+        with caplog.at_level(logging.WARNING):
+            source = ProjectConfigSource(AppSettings, project_root=project_root)
+            config = source()
+
+        # Should handle error gracefully
+        assert config == {}
+        # Verify warning was logged about loading failure
+        assert "Failed to load config" in caplog.text
+
+    def test_handles_malformed_toml_gracefully(
+        self,
+        tmp_path: Path,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        """Test that malformed TOML returns empty dict and logs warning."""
+        project_root = tmp_path / "bad_toml_project"
+        project_root.mkdir()
+        config_dir = project_root / ".tasky"
+        config_dir.mkdir()
+        config_file = config_dir / "config.toml"
+        config_file.write_text("{{{invalid toml")
+
+        with caplog.at_level(logging.WARNING):
+            source = ProjectConfigSource(AppSettings, project_root=project_root)
+            config = source()
+
+        # Should handle error gracefully
+        assert config == {}
+        # Verify warning was logged about loading failure
+        assert "Failed to load config" in caplog.text
 
 
 class TestSourceIntegration:
