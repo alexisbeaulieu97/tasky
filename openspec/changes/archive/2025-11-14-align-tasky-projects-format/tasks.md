@@ -6,46 +6,46 @@ This document outlines the ordered implementation tasks for aligning `ProjectCon
 
 ### Phase 1: Update Imports and from_file() Method
 
-- [ ] **Task 1.1**: Update import statements in config.py
+- [x] **Task 1.1**: Update import statements in config.py
   - Open `packages/tasky-projects/src/tasky_projects/config.py`
   - Replace `import json` with `import tomllib`
   - Add `import tomli_w` for write operations
   - **Validation**: Code type-checks successfully
 
-- [ ] **Task 1.2**: Update from_file() to read TOML
+- [x] **Task 1.2**: Update from_file() to read TOML
   - Locate `ProjectConfig.from_file()` method in `packages/tasky-projects/src/tasky_projects/config.py`
   - Replace `json.load(f)` with `tomllib.load(f)`
   - Change file open mode from `"r"` to `"rb"` (TOML requires binary mode)
   - Remove `encoding="utf-8"` parameter (not needed for binary mode)
   - **Validation**: Code type-checks successfully
 
-- [ ] **Task 1.3**: Update from_file() docstring
+- [x] **Task 1.3**: Update from_file() docstring
   - Change docstring from "Load configuration from a JSON file" to "Load configuration from a TOML file"
   - Update any JSON references in docstring to TOML
   - **Validation**: Docstring accurately describes method behavior
 
 ### Phase 2: Update to_file() Method
 
-- [ ] **Task 2.1**: Update to_file() to write TOML
+- [x] **Task 2.1**: Update to_file() to write TOML
   - Locate `ProjectConfig.to_file()` method in `packages/tasky-projects/src/tasky_projects/config.py`
   - Replace `f.write(self.model_dump_json(indent=2))` with `tomli_w.dump(self.model_dump(), f)`
   - Change file open mode from `"w"` to `"wb"` (TOML requires binary mode)
   - Remove `encoding="utf-8"` parameter (not needed for binary mode)
   - **Validation**: Code type-checks successfully
 
-- [ ] **Task 2.2**: Update to_file() docstring
+- [x] **Task 2.2**: Update to_file() docstring
   - Change docstring from "Save configuration to a JSON file" to "Save configuration to a TOML file"
   - Update any JSON references in docstring to TOML
   - **Validation**: Docstring accurately describes method behavior
 
 ### Phase 3: Update Tests
 
-- [ ] **Task 3.1**: Update test imports
+- [x] **Task 3.1**: Update test imports
   - Open `packages/tasky-projects/tests/test_config.py`
   - Replace `import json` with `import tomllib` and `import tomli_w`
   - **Validation**: Test file imports successfully
 
-- [ ] **Task 3.2**: Update test file extensions and format expectations
+- [x] **Task 3.2**: Update test file extensions and format expectations
   - Change all `config.json` references to `config.toml`
   - Update test data format from JSON to TOML syntax
   - For example: `test_project_config_from_file_valid` should write TOML, not JSON
@@ -53,7 +53,7 @@ This document outlines the ordered implementation tasks for aligning `ProjectCon
   - Update `test_project_config_to_file_pretty_printed` to verify TOML formatting instead of JSON
   - **Validation**: Code type-checks successfully
 
-- [ ] **Task 3.3**: Update test assertions for TOML format
+- [x] **Task 3.3**: Update test assertions for TOML format
   - Change assertions that read files to use `tomllib.load()` instead of `json.loads()`
   - Update format expectations (TOML uses sections like `[storage]` instead of nested JSON)
   - Verify `test_project_config_round_trip` works with TOML serialization
@@ -61,19 +61,19 @@ This document outlines the ordered implementation tasks for aligning `ProjectCon
 
 ### Phase 4: Validation and Testing
 
-- [ ] **Task 4.1**: Run unit tests for tasky-projects
+- [x] **Task 4.1**: Run unit tests for tasky-projects
   - Execute: `uv run pytest packages/tasky-projects/tests/test_config.py -v`
   - Verify all tests pass
   - Address any failures related to TOML format differences
   - **Validation**: All tests pass
 
-- [ ] **Task 4.2**: Run full test suite
+- [x] **Task 4.2**: Run full test suite
   - Execute: `uv run pytest`
   - Verify no regressions in other packages
   - Confirm round-trip test (save → load) preserves data accurately
   - **Validation**: All tests pass
 
-- [ ] **Task 4.3**: Manual verification of TOML output
+- [x] **Task 4.3**: Manual verification of TOML output
   - Create a temporary test that writes a `ProjectConfig` to file
   - Inspect the output file to verify valid TOML format
   - Verify sections (`[storage]`), datetime format, and readability
@@ -81,13 +81,13 @@ This document outlines the ordered implementation tasks for aligning `ProjectCon
 
 ### Phase 5: Code Quality
 
-- [ ] **Task 5.1**: Run code quality checks
+- [x] **Task 5.1**: Run code quality checks
   - Execute: `uv run ruff check --fix`
   - Execute: `uv run ruff format`
   - Address any linting issues
   - **Validation**: No linting errors
 
-- [ ] **Task 5.2**: Type checking
+- [x] **Task 5.2**: Type checking
   - Verify `tomllib` and `tomli_w` type stubs are available
   - Run type checker if configured
   - Ensure no type errors introduced

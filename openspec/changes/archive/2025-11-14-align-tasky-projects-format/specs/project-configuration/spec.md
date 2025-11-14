@@ -81,8 +81,4 @@ The `ProjectConfig` class SHALL open files in binary mode (`"rb"` for reading, `
 
 ## REMOVED Requirements
 
-### Requirement: ProjectConfig must serialize to JSON format
-
-**Reason**: JSON format was inconsistent with the system-wide TOML configuration standard. Phase 4.2 (`standardize-config-format`) established TOML as the project's configuration format, and this change aligns `tasky-projects` package with that decision.
-
-**Migration**: The system already uses TOML (`.tasky/config.toml`). This change makes internal `ProjectConfig` helper methods consistent with the actual file format used by the system.
+None.
