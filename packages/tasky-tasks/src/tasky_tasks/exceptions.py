@@ -87,3 +87,57 @@ class InvalidStateTransitionError(TaskDomainError):
     @staticmethod
     def _as_status_label(status: TaskStatus | str) -> str:
         return status.value if isinstance(status, TaskStatus) else str(status)
+
+
+class ImportExportError(TaskDomainError):
+    """Base exception for import/export operations."""
+
+    def __init__(self, message: str | None = None) -> None:
+        default_message = message or "Import/export operation failed."
+        super().__init__(default_message)
+
+
+class ExportError(ImportExportError):
+    """Raised when task export fails."""
+
+    def __init__(self, message: str | None = None) -> None:
+        default_message = message or "Task export failed."
+        super().__init__(default_message)
+
+
+class TaskImportError(ImportExportError):
+    """Raised when task import fails."""
+
+    def __init__(self, message: str | None = None) -> None:
+        default_message = message or "Task import failed."
+        super().__init__(default_message)
+
+
+class InvalidExportFormatError(ImportExportError):
+    """Raised when export file format is invalid or malformed."""
+
+    def __init__(self, message: str | None = None) -> None:
+        default_message = message or "Invalid export file format."
+        super().__init__(default_message)
+
+
+class IncompatibleVersionError(ImportExportError):
+    """Raised when export format version is incompatible."""
+
+    def __init__(
+        self,
+        message: str | None = None,
+        *,
+        expected: str | None = None,
+        actual: str | None = None,
+    ) -> None:
+        self.expected = expected
+        self.actual = actual
+        default_message = message or "Incompatible export format version."
+        context: dict[str, object] = {}
+        if expected is not None:
+            context["expected"] = expected
+        if actual is not None:
+            context["actual"] = actual
+        super().__init__(default_message)
+        self.context.update(context)
