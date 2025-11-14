@@ -19,7 +19,7 @@ Tick off each change as you complete it (mirrors the execution order below).
 - [x] 1.2 `enhance-task-list-output`
 - [x] 1.3 `add-task-show-command`
 - [x] 1.4 `add-task-update-command`
-- [ ] 1.5 `ensure-storage-backend-registration`
+- [x] 1.5 `ensure-storage-backend-registration`
 - [ ] 2.1 `add-sqlite-backend`
 - [ ] 3.1 `add-task-filtering`
 - [ ] 3.2 `add-advanced-filtering`

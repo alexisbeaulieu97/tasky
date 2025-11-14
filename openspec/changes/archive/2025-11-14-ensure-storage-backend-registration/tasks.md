@@ -6,7 +6,7 @@ This document outlines the implementation tasks for fixing the hidden backend re
 
 ### Phase 1: Core Implementation (15 minutes)
 
-- [ ] **Task 1.1**: Add backend initialization helper in factory module
+- [x] **Task 1.1**: Add backend initialization helper in factory module
   - Update `packages/tasky-settings/src/tasky_settings/factory.py`
   - Add module-level `_backends_initialized = False` flag
   - Implement `_ensure_backends_registered()` function with:
@@ -15,7 +15,7 @@ This document outlines the implementation tasks for fixing the hidden backend re
     - Comprehensive docstring explaining the pattern
   - **Validation**: Code compiles and type-checks
 
-- [ ] **Task 1.2**: Call initialization in `create_task_service()`
+- [x] **Task 1.2**: Call initialization in `create_task_service()`
   - Update `create_task_service()` function in same file
   - Add `_ensure_backends_registered()` call at the start
   - Add comment explaining why this is needed
@@ -23,7 +23,7 @@ This document outlines the implementation tasks for fixing the hidden backend re
 
 ### Phase 2: Documentation (10 minutes)
 
-- [ ] **Task 2.1**: Document the registration pattern in storage module
+- [x] **Task 2.1**: Document the registration pattern in storage module
   - Update `packages/tasky-storage/src/tasky_storage/__init__.py`
   - Add comment block explaining:
     - Backend self-registration pattern
@@ -31,7 +31,7 @@ This document outlines the implementation tasks for fixing the hidden backend re
     - Template for future backends to follow
   - **Validation**: Comments are clear and accurate
 
-- [ ] **Task 2.2**: Update factory docstring
+- [x] **Task 2.2**: Update factory docstring
   - Enhance `create_task_service()` docstring
   - Remove mention of `KeyError: If configured backend is not registered`
   - Note that backends are auto-initialized on first use
@@ -39,21 +39,21 @@ This document outlines the implementation tasks for fixing the hidden backend re
 
 ### Phase 3: Testing (15 minutes)
 
-- [ ] **Task 3.1**: Add isolated import test
+- [x] **Task 3.1**: Add isolated import test
   - Create `packages/tasky-settings/tests/test_factory_isolation.py`
   - Test scenario: Import only from `tasky_settings`, verify factory works
   - Use subprocess or import isolation to ensure `tasky_storage` isn't pre-imported
   - Verify `registry.list_backends()` shows `["json"]` after factory call
   - **Validation**: Test passes and proves isolation works
 
-- [ ] **Task 3.2**: Add initialization idempotency test
+- [x] **Task 3.2**: Add initialization idempotency test
   - Add test in same file
   - Call `create_task_service()` multiple times
   - Verify backend is only registered once (check logs or registry state)
   - Ensure no errors on repeated calls
   - **Validation**: Test passes and proves single initialization
 
-- [ ] **Task 3.3**: Verify existing tests still pass
+- [x] **Task 3.3**: Verify existing tests still pass
   - Run `uv run pytest packages/tasky-settings/tests/`
   - Run `uv run pytest packages/tasky-cli/tests/`
   - Ensure no regressions from the change
@@ -61,19 +61,19 @@ This document outlines the implementation tasks for fixing the hidden backend re
 
 ### Phase 4: Final Validation (5 minutes)
 
-- [ ] **Task 4.1**: Run full test suite
+- [x] **Task 4.1**: Run full test suite
   - Execute `uv run pytest` across all packages
   - Verify no unexpected failures
   - Check test coverage for new code
   - **Validation**: All tests pass, coverage ≥80%
 
-- [ ] **Task 4.2**: Code quality checks
+- [x] **Task 4.2**: Code quality checks
   - Run `uv run ruff check --fix`
   - Run `uv run ruff format`
   - Ensure no linting errors
   - **Validation**: Code passes all quality checks
 
-- [ ] **Task 4.3**: Manual smoke test
+- [x] **Task 4.3**: Manual smoke test
   - Create simple Python script that imports only `tasky_settings`
   - Call `create_task_service()` from a test project
   - Verify it works without explicit `tasky_storage` import
