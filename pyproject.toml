@@ -21,7 +21,31 @@ members = ["packages/*"]
 tasky-cli = { workspace = true }
 
 [dependency-groups]
-dev = ["pytest>=9.0.0", "ruff>=0.14.4"]
+dev = [
+    "pytest>=9.0.0",
+    "pytest-cov>=4.1.0",
+    "ruff>=0.14.4",
+]
 
 [tool.pytest.ini_options]
 addopts = "--import-mode=importlib"
+
+[tool.coverage.run]
+branch = true
+source = ["packages"]
+omit = ["*/tests/*", "*/test_*.py", "*/__init__.py", "*/conftest.py"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+    "if typing.TYPE_CHECKING:",
+]
+fail_under = 80
+
+[tool.coverage.html]
+directory = "htmlcov"

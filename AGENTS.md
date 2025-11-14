@@ -34,8 +34,34 @@ Keep this managed block so 'openspec update' can refresh the instructions.
 - `uv sync` installs the workspace dependencies declared in `pyproject.toml`.
 - `uv run tasky` executes the CLI entry point for smoke checks.
 - `uv run pytest` (optionally `-k <pattern>`) runs the project test suite.
+- `uv run pytest --cov=packages --cov-report=html` runs tests with coverage measurement and generates an HTML report in `htmlcov/`.
+- `uv run pytest --cov=packages --cov-fail-under=80` enforces the 80% coverage threshold and fails if not met.
 - Always execute ad-hoc Python via `uv run python …` (e.g., `uv run python -m <module>`), and run tools like Ruff through `uv run ruff …` so everything stays inside the managed environment.
 - End every coding session by running `uv run pytest` followed by `uv run ruff check --fix` to keep tests and linting green before handing off.
+
+## Test Coverage
+The project enforces a minimum of 80% test coverage across all packages. Coverage is measured using `pytest-cov` and configured in `pyproject.toml`.
+
+**Running coverage reports:**
+```bash
+# Run tests with terminal coverage report
+uv run pytest --cov=packages --cov-report=term-missing
+
+# Generate HTML coverage report (opens in browser)
+uv run pytest --cov=packages --cov-report=html
+
+# Enforce 80% threshold (fails if below)
+uv run pytest --cov=packages --cov-fail-under=80
+```
+
+**Coverage Configuration:**
+- Branch coverage is enabled to ensure all conditional paths are tested
+- Test files, `__init__.py`, and `conftest.py` are excluded from coverage measurement
+- Non-testable patterns (e.g., `if __name__ == "__main__"`, `TYPE_CHECKING` blocks) are excluded
+- HTML reports are generated to `htmlcov/` directory (git-ignored)
+
+**Adding coverage exceptions:**
+Use `# pragma: no cover` for legitimate exclusions (e.g., defensive error handlers that are difficult to trigger in tests).
 
 ## Coding Style & Naming Conventions
 Target Python ≥3.13, 4-space indentation, and full type hints. Order imports as standard library, third-party, local. Name Pydantic classes with descriptive suffixes (`TaskModel`, `ProjectMetadata`) and keep services/action classes verb-based (`TaskService`, `ProjectRegistry`). Repository interfaces live with their feature package (e.g., `tasky_tasks.ports.TaskRepository`) while hook contracts in `tasky-hooks` end with `Event` or `Handler`. Keep orchestration helpers pure inside the feature packages and isolate side effects within adapters. Run your preferred formatter/linter (e.g., `ruff format`, `ruff check`) before submitting changes.
@@ -44,6 +70,8 @@ Target Python ≥3.13, 4-space indentation, and full type hints. Order imports a
 
 ## Testing Guidelines
 Adopt `pytest` for unit and integration coverage. Name files `test_<subject>.py` and choose descriptive test functions (`test_create_task_sets_default_priority`). Lean on repository protocols to swap real adapters for fakes when exercising `tasky-tasks` or `tasky-projects`. Add backend-specific integration suites under `tasky-storage/tests/` that hit real JSON/SQLite files, and wire full-stack tests (settings → CLI) when validating new configuration or hook flows. Prioritise the central lifecycle (create → schedule → complete) before layering LLM automation.
+
+**Coverage requirements:** All new code must maintain ≥80% test coverage. Check coverage locally before submitting changes using `uv run pytest --cov=packages --cov-fail-under=80`.
 
 ## Commit & Pull Request Guidelines
 Current history is minimal (`Initial commit`), so set the bar with imperative, 72-character subject lines (`Add sqlite task repository`). Reference issue numbers when available and include concise body context. Pull requests should describe the change, list tests executed (`uv run pytest`), and attach screenshots or CLI transcripts for user-facing updates. Keep PRs focused on a single feature or fix to streamline review.
