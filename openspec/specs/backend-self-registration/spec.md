@@ -5,29 +5,34 @@ TBD - created by archiving change add-configurable-storage-backends. Update Purp
 ## Requirements
 ### Requirement: JSON backend self-registration
 
-The JSON storage backend SHALL automatically register itself with the global backend registry upon module import. **The `tasky_settings` factory SHALL ensure this import happens automatically when needed.**
+The JSON storage backend SHALL automatically register itself with the global backend registry upon module import.
 
 #### Scenario: JSON backend registers on import
 
-**Given** the tasky_settings.registry is available
-**When** `tasky_storage` is imported (either explicitly or via factory initialization)
-**Then** the "json" backend MUST be registered in the global registry
-**And** registry.get("json") MUST return `JsonTaskRepository.from_path`
+```gherkin
+Given the tasky_settings.registry is available
+When I import tasky_storage
+Then the "json" backend is registered in the global registry
+And registry.get("json") returns JsonTaskRepository.from_path
+```
 
 #### Scenario: Registration is idempotent
 
-**Given** tasky_storage has been imported once
-**When** tasky_storage is imported again (or factory initialization runs multiple times)
-**Then** the "json" backend MUST remain registered
-**And** no errors MUST be raised
-**And** the registry state MUST be unchanged
+```gherkin
+Given tasky_storage has been imported once
+When I import tasky_storage again
+Then the "json" backend remains registered
+And no errors are raised
+```
 
 #### Scenario: Graceful handling when registry unavailable
 
-**Given** tasky_settings is not installed (testing isolation)
-**When** I import tasky_storage
-**Then** no ImportError MUST be raised
-**And** the backend MUST function normally (not registered but usable)
+```gherkin
+Given tasky_settings is not installed (testing isolation)
+When I import tasky_storage
+Then no ImportError is raised
+And the backend functions normally (not registered but usable)
+```
 
 ---
 
@@ -78,6 +83,65 @@ The backend registration initialization pattern MUST be documented clearly for f
 **Then** comments MUST explain how backend self-registration works
 **And** comments MUST reference the factory's automatic initialization
 **And** the pattern MUST be clear enough to serve as a template for new backends
+
+---
+
+### Requirement: SQLite backend self-registration
+
+The SQLite storage backend SHALL automatically register itself with the global backend registry upon module import.
+
+#### Scenario: SQLite backend registers on import
+
+```gherkin
+Given the tasky_settings.registry is available
+When I import tasky_storage
+Then the "sqlite" backend is registered in the global registry
+And registry.get("sqlite") returns SqliteTaskRepository.from_path
+```
+
+#### Scenario: Registration is idempotent
+
+```gherkin
+Given tasky_storage has been imported once
+When I import tasky_storage again
+Then the "sqlite" backend remains registered
+And no errors are raised
+```
+
+#### Scenario: Graceful handling when registry unavailable
+
+```gherkin
+Given tasky_settings is not installed (testing isolation)
+When I import tasky_storage
+Then no ImportError is raised
+And the backend functions normally (not registered but usable)
+```
+
+---
+
+### Requirement: Factory method for SQLite backend registration
+
+The SQLite repository SHALL provide a factory class method suitable for backend registration.
+
+#### Scenario: Factory creates repository from path
+
+```gherkin
+Given a path "/home/user/project/.tasky/tasks.db"
+When I call SqliteTaskRepository.from_path(path)
+Then it returns a SqliteTaskRepository instance
+And the repository uses a database file at that path
+And the database schema is initialized if it doesn't exist
+```
+
+#### Scenario: Factory is compatible with BackendFactory protocol
+
+```gherkin
+Given the BackendFactory type requires: Callable[[Path], TaskRepository]
+And SqliteTaskRepository.from_path has signature: (Path) -> SqliteTaskRepository
+When I register it with registry.register("sqlite", SqliteTaskRepository.from_path)
+Then type checkers report no errors
+And the registration succeeds at runtime
+```
 
 ---
 
