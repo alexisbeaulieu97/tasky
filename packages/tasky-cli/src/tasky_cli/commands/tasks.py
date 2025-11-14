@@ -683,13 +683,17 @@ def _handle_task_validation_error(exc: TaskValidationError, *, verbose: bool) ->
 
 def _handle_invalid_transition(exc: InvalidStateTransitionError, *, verbose: bool) -> None:
     """Handle InvalidStateTransitionError."""
+    # Extract user-facing labels from status values (handle both enum and string)
+    from_label = getattr(exc.from_status, "value", str(exc.from_status))
+    to_label = getattr(exc.to_status, "value", str(exc.to_status))
+
     suggestion = _suggest_transition(
         from_status=exc.from_status,
         to_status=exc.to_status,
         task_id=str(exc.task_id),
     )
     _render_error(
-        f"Cannot transition from {exc.from_status} to {exc.to_status}.",
+        f"Cannot transition from {from_label} to {to_label}.",
         suggestion=suggestion,
         verbose=verbose,
         exc=exc,
@@ -846,28 +850,18 @@ def reopen_command(task_id: str) -> None:
 @with_task_error_handling
 def export_command(
     file_path: str = typer.Argument(..., help="Path to export JSON file"),
-    status: str | None = typer.Option(
-        None,
-        "--status",
-        help="Filter by status (pending, completed, cancelled)",
-    ),
 ) -> None:
     """Export tasks to a JSON file.
 
-    Exports all tasks (or filtered tasks) to a JSON backup file. The file can be
-    imported later using the 'task import' command.
+    Exports all tasks to a JSON backup file. The file can be imported later
+    using the 'task import' command.
 
     Examples:
         tasky task export backup.json
-        tasky task export completed-tasks.json --status completed
 
     """
-    service = create_task_service()
+    service = _get_service()
     export_service = TaskImportExportService(service)
-
-    # Filter not yet supported - export all for now
-    if status is not None:
-        typer.echo("⚠ Warning: --status filter not yet supported, exporting all tasks", err=True)
 
     export_path = Path(file_path)
     export_doc = export_service.export_tasks(export_path)
@@ -909,7 +903,7 @@ def import_command(
     # Validate and normalize strategy (case-insensitive)
     strategy = _validate_import_strategy(strategy)
 
-    service = create_task_service()
+    service = _get_service()
     export_service = TaskImportExportService(service)
 
     import_path = Path(file_path)

@@ -192,8 +192,8 @@ class TaskImportExportService:
 
         Raises
         ------
-        ImportError:
-            Raised when import fails due to invalid file or data.
+        TaskImportError:
+            Raised when import fails due to invalid file or data errors.
         InvalidExportFormatError:
             Raised when the JSON file is malformed or missing required fields.
         IncompatibleVersionError:
