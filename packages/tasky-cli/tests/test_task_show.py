@@ -255,9 +255,9 @@ class TestTaskShowCommandErrors:
         result = runner.invoke(task_app, ["show", "--help"])
 
         assert result.exit_code == 0
-        # The spec requires the help to show this specific UUID example
-        assert "3af4b92f-c4a1-4b2e-9c3d-7a1b8c2e5f6g" in result.stdout
-        assert "tasky task show 3af4b92f-c4a1-4b2e-9c3d-7a1b8c2e5f6g" in result.stdout
+        # The spec requires the help to show a valid UUID example
+        assert "3af4b92f-c4a1-4b2e-9c3d-7a1b8c2e5f60" in result.stdout
+        assert "tasky task show 3af4b92f-c4a1-4b2e-9c3d-7a1b8c2e5f60" in result.stdout
 
 
 class TestTaskShowCommandIntegration:
