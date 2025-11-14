@@ -172,3 +172,51 @@ The project configuration file MUST be optional. Applications should work correc
 - **AND** all other settings use global config or defaults
 - **AND** no validation errors occur for missing fields
 
+
+---
+
+### Requirement: ProjectConfig class must serialize to TOML format
+
+The `ProjectConfig` helper in `tasky-projects` SHALL provide `from_file()` and `to_file()` helpers that read and write `.tasky/config.toml` files using TOML serialization so the domain layer matches the storage format.
+
+#### Scenario: ProjectConfig reads TOML files
+
+- **GIVEN** a valid TOML file containing project metadata and `[storage]` configuration
+- **WHEN** `ProjectConfig.from_file(Path(".tasky/config.toml"))` is called
+- **THEN** a populated `ProjectConfig` instance is returned
+- **AND** storage backend and path fields reflect the TOML contents
+- **AND** datetime fields (such as `created_at`) are parsed as timezone-aware values
+
+#### Scenario: ProjectConfig writes TOML files
+
+- **GIVEN** a `ProjectConfig` instance with custom values
+- **WHEN** `config.to_file(Path(".tasky/config.toml"))` is called
+- **THEN** the target directory is created if necessary
+- **AND** the resulting file uses valid TOML syntax with `[storage]` sections
+- **AND** a subsequent `from_file()` round-trip returns the same values
+
+#### Scenario: ProjectConfig reports invalid TOML
+
+- **GIVEN** `.tasky/config.toml` contains invalid TOML
+- **WHEN** `ProjectConfig.from_file()` is called
+- **THEN** a parsing error is raised that identifies the file as malformed
+
+---
+
+### Requirement: ProjectConfig must use binary file mode for TOML operations
+
+`ProjectConfig.from_file()` MUST open configuration files in binary read mode (`"rb"`), and `ProjectConfig.to_file()` MUST open files in binary write mode (`"wb"`) to satisfy the expectations of `tomllib` and `tomli_w`.
+
+#### Scenario: Binary mode on read
+
+- **GIVEN** a project configuration file exists
+- **WHEN** `ProjectConfig.from_file()` executes
+- **THEN** the file handle is opened in `"rb"` mode without an explicit encoding
+- **AND** TOML parsing succeeds
+
+#### Scenario: Binary mode on write
+
+- **GIVEN** any `ProjectConfig` instance
+- **WHEN** `config.to_file()` executes
+- **THEN** the destination file is opened in `"wb"` mode with no encoding parameter
+- **AND** TOML serialization succeeds
