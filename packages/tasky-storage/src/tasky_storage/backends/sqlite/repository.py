@@ -265,10 +265,17 @@ class SqliteTaskRepository:
 
         # Text search filter (case-insensitive)
         if task_filter.name_contains is not None:
+            # Escape LIKE metacharacters to prevent wildcard interpretation
+            # Users expect literal substring matching, not SQL wildcard behavior
+            escaped_search = (
+                task_filter.name_contains.replace("\\", "\\\\")
+                .replace("%", "\\%")
+                .replace("_", "\\_")
+            )
             # SQLite LIKE is case-insensitive by default for ASCII characters
             # Use || for string concatenation in SQLite
-            where_clauses.append("(name LIKE ? OR details LIKE ?)")
-            search_pattern = f"%{task_filter.name_contains}%"
+            where_clauses.append("(name LIKE ? ESCAPE '\\' OR details LIKE ? ESCAPE '\\')")
+            search_pattern = f"%{escaped_search}%"
             params.extend([search_pattern, search_pattern])
 
         # Build complete query

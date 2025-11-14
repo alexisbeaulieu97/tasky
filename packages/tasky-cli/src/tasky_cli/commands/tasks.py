@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+import re
 import sys
 import traceback
 from collections.abc import Callable
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from functools import wraps
 from typing import NoReturn, Protocol, TypeVar, cast
 from uuid import UUID
@@ -204,13 +205,18 @@ def list_command(  # noqa: C901, PLR0912, PLR0915
     created_before_dt: datetime | None = None
 
     if created_after is not None:
+        # Validate format is exactly YYYY-MM-DD (reject time components)
+        if not _is_valid_date_format(created_after):
+            typer.echo(
+                f"Invalid date format: '{created_after}'. "
+                "Expected ISO 8601 format: YYYY-MM-DD (e.g., 2025-01-01)",
+                err=True,
+            )
+            raise typer.Exit(1) from None
         try:
+            # Parse date and make it timezone-aware (UTC midnight)
             parsed_date = datetime.fromisoformat(created_after)
-            # Make timezone-aware if naive (use UTC)
-            if parsed_date.tzinfo is None:
-                created_after_dt = parsed_date.replace(tzinfo=UTC)
-            else:
-                created_after_dt = parsed_date
+            created_after_dt = parsed_date.replace(tzinfo=UTC)
         except ValueError:
             typer.echo(
                 f"Invalid date format: '{created_after}'. "
@@ -220,13 +226,19 @@ def list_command(  # noqa: C901, PLR0912, PLR0915
             raise typer.Exit(1) from None
 
     if created_before is not None:
+        # Validate format is exactly YYYY-MM-DD (reject time components)
+        if not _is_valid_date_format(created_before):
+            typer.echo(
+                f"Invalid date format: '{created_before}'. "
+                "Expected ISO 8601 format: YYYY-MM-DD (e.g., 2025-01-01)",
+                err=True,
+            )
+            raise typer.Exit(1) from None
         try:
             parsed_date = datetime.fromisoformat(created_before)
-            # Make timezone-aware if naive (use UTC)
-            if parsed_date.tzinfo is None:
-                created_before_dt = parsed_date.replace(tzinfo=UTC)
-            else:
-                created_before_dt = parsed_date
+            # Add 1 day to make the exclusive < check inclusive of the entire day
+            # (user expects --created-before 2025-12-31 to include all of Dec 31)
+            created_before_dt = parsed_date.replace(tzinfo=UTC) + timedelta(days=1)
         except ValueError:
             typer.echo(
                 f"Invalid date format: '{created_before}'. "
@@ -237,6 +249,10 @@ def list_command(  # noqa: C901, PLR0912, PLR0915
 
     # Only create service after validating input
     service = _get_service()
+
+    # Normalize empty search to None (per spec: empty search = no filter)
+    if search is not None and not search.strip():
+        search = None
 
     # Build filter and fetch tasks
     has_filters = (
@@ -261,7 +277,7 @@ def list_command(  # noqa: C901, PLR0912, PLR0915
     if not tasks:
         # Show filter-specific message when filtering, generic message otherwise
         if has_filters:
-            typer.echo("No tasks match the specified filters.")
+            typer.echo("No matching tasks found")
         else:
             typer.echo("No tasks to display")
         return
@@ -294,6 +310,23 @@ def list_command(  # noqa: C901, PLR0912, PLR0915
         f"({pending_count} pending, {completed_count} completed, "
         f"{cancelled_count} cancelled)",
     )
+
+
+def _is_valid_date_format(date_str: str) -> bool:
+    """Validate that date string matches exactly YYYY-MM-DD format.
+
+    Args:
+        date_str: The date string to validate.
+
+    Returns:
+        True if format is YYYY-MM-DD, False otherwise.
+
+    """
+    # Reject any string containing time markers (T, colon, etc.)
+    if "T" in date_str or ":" in date_str or "+" in date_str or "Z" in date_str:
+        return False
+    # Must match YYYY-MM-DD exactly
+    return bool(re.match(r"^\d{4}-\d{2}-\d{2}$", date_str))
 
 
 def _get_status_indicator(status: TaskStatus) -> str:

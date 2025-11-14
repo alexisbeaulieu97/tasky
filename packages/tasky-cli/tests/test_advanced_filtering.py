@@ -108,7 +108,7 @@ class TestAdvancedDateFiltering:
 
         assert result.exit_code == 0
         assert "Old Task" in result.stdout
-        assert "Mid Task" not in result.stdout
+        assert "Mid Task" in result.stdout  # Nov 10 is included (spec requires <=)
         assert "Recent Task" not in result.stdout
 
     def test_filter_by_date_range(
@@ -168,7 +168,7 @@ class TestAdvancedDateFiltering:
         result = runner.invoke(task_app, ["list", "--created-after", "2025-12-01"])
 
         assert result.exit_code == 0
-        assert "No tasks match the specified filters" in result.stdout
+        assert "No matching tasks found" in result.stdout
 
 
 class TestTextSearchFiltering:
@@ -240,7 +240,7 @@ class TestTextSearchFiltering:
         result = runner.invoke(task_app, ["list", "--search", "nonexistent"])
 
         assert result.exit_code == 0
-        assert "No tasks match the specified filters" in result.stdout
+        assert "No matching tasks found" in result.stdout
 
 
 class TestCombinedFiltering:
@@ -355,7 +355,7 @@ class TestCombinedFiltering:
         )
 
         assert result.exit_code == 0
-        assert "No tasks match the specified filters" in result.stdout
+        assert "No matching tasks found" in result.stdout
 
 
 class TestFilteringHelpText:
