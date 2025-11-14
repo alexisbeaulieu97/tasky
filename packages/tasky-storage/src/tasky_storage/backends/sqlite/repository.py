@@ -215,7 +215,7 @@ class SqliteTaskRepository:
             msg = f"Database error filtering tasks by status {status.value}: {exc}"
             raise StorageError(msg) from exc
 
-    def find_tasks(self, task_filter: TaskFilter) -> list[TaskModel]:  # noqa: C901
+    def find_tasks(self, task_filter: TaskFilter) -> list[TaskModel]:
         """Retrieve tasks matching the specified filter criteria.
 
         All criteria in the filter are combined using AND logic—tasks must
