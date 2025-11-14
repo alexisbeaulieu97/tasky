@@ -5,14 +5,24 @@ TBD - created by archiving change add-hierarchical-configuration. Update Purpose
 ## Requirements
 ### Requirement: Project configuration must be stored in .tasky directory
 
-The application SHALL store project-specific configuration in `.tasky/config.toml` relative to the project root. This file provides settings that override global configuration and apply only to the specific project.
+The application SHALL store project-specific configuration in `.tasky/config.toml` relative to the project root. This file provides settings that override global configuration and apply only to the specific project. Existing `.tasky/config.json` files are automatically converted to TOML format on first read with a warning message.
 
-#### Scenario: Project config file location is .tasky directory
+#### Scenario: Project config file location is .tasky directory with TOML format
 
 - **WHEN** the application looks for project configuration
 - **THEN** it checks `.tasky/config.toml` in the project root
 - **AND** the file is optional (missing file uses global/defaults)
 - **AND** the `.tasky/` directory is the project identifier
+
+#### Scenario: Legacy JSON config is auto-converted to TOML
+
+- **GIVEN** a project exists with `.tasky/config.json` (legacy format)
+- **AND** no `.tasky/config.toml` exists
+- **WHEN** the application loads the project configuration
+- **THEN** the JSON file is detected
+- **AND** a clear warning message is logged: "Legacy JSON config detected, will migrate to TOML format on next write"
+- **AND** the configuration is successfully loaded
+- **AND** on next write, the file is written as `.tasky/config.toml` (TOML format)
 
 #### Scenario: Project config is independent per project
 
@@ -93,7 +103,7 @@ The application SHALL locate the project configuration by checking for `.tasky/c
 
 #### Scenario: Missing project config uses defaults
 
-- **GIVEN** the current directory has no `.tasky/config.toml`
+- **GIVEN** the current directory has no `.tasky/config.toml` or `.tasky/config.json`
 - **WHEN** a command is run
 - **THEN** global configuration and defaults are used
 - **AND** no error occurs
@@ -103,7 +113,7 @@ The application SHALL locate the project configuration by checking for `.tasky/c
 
 - **GIVEN** the `get_settings()` function accepts a `project_root` parameter
 - **WHEN** `get_settings(project_root=Path("/explicit/path"))` is called
-- **THEN** project config is loaded from `/explicit/path/.tasky/config.toml`
+- **THEN** project config is loaded from `/explicit/path/.tasky/config.toml` or auto-converted from `/explicit/path/.tasky/config.json`
 - **AND** the current directory is not used
 
 ---
@@ -127,6 +137,13 @@ The project configuration file MUST use TOML format, matching the global configu
 - **AND** the error identifies the file path
 - **AND** the error describes the syntax problem
 
+#### Scenario: New project initialization creates TOML config
+
+- **GIVEN** a new project is created with `tasky project init`
+- **WHEN** the project is initialized
+- **THEN** `.tasky/config.toml` is created (not `.tasky/config.json`)
+- **AND** the file uses valid TOML syntax
+
 ---
 
 ### Requirement: Project configuration file is optional
@@ -136,6 +153,7 @@ The project configuration file MUST be optional. Applications should work correc
 #### Scenario: Commands work without project config
 
 - **GIVEN** no `.tasky/config.toml` file exists
+- **AND** no `.tasky/config.json` file exists
 - **AND** no global config exists
 - **WHEN** any tasky command is run
 - **THEN** the command executes successfully
@@ -153,6 +171,4 @@ The project configuration file MUST be optional. Applications should work correc
 - **THEN** `logging.verbosity` is 2
 - **AND** all other settings use global config or defaults
 - **AND** no validation errors occur for missing fields
-
----
 
