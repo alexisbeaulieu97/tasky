@@ -10,7 +10,8 @@ from tasky_tasks.service import TaskService
 from tasky_settings.backend_registry import registry
 
 # Backend initialization state (thread-safe)
-_backends_initialized = False
+# Using a list to avoid global statement - mutable container can be modified
+_backends_initialized = [False]
 _init_lock = threading.Lock()
 
 
@@ -34,13 +35,11 @@ def _ensure_backends_registered() -> None:
         registry.register("backend-name", factory_function)
 
     """
-    global _backends_initialized
     with _init_lock:
-        if not _backends_initialized:
+        if not _backends_initialized[0]:
             # Import triggers backend registration via tasky_storage.__init__.py
-            import tasky_storage
 
-            _backends_initialized = True
+            _backends_initialized[0] = True
 
 
 class ProjectNotFoundError(Exception):
@@ -112,9 +111,10 @@ def create_task_service(project_root: Path | None = None) -> TaskService:
     # Ensure backends are available before accessing registry
     _ensure_backends_registered()
 
-    # Avoid circular import by importing locally
-    # get_settings is defined in __init__.py
-    from tasky_settings import get_settings as _get_settings
+    # Import here to avoid circular dependency during module initialization
+    from tasky_settings import get_settings  # noqa: PLC0415
+
+    # Find project root if not providedendency during module initialization
 
     # Find project root if not provided
     if project_root is None:
@@ -127,7 +127,7 @@ def create_task_service(project_root: Path | None = None) -> TaskService:
             raise ProjectNotFoundError(project_root)
 
     # Load settings with project root context
-    settings = _get_settings(project_root=project_root)
+    settings = get_settings(project_root=project_root)
 
     # Get backend factory
     factory = registry.get(settings.storage.backend)
