@@ -1,11 +1,13 @@
 """Tasky storage infrastructure for task persistence."""
 
 from .backends.json import JsonStorage, JsonTaskRepository, TaskDocument
+from .backends.sqlite import SqliteTaskRepository
 from .errors import StorageConfigurationError, StorageDataError, StorageError
 
 __all__ = [
     "JsonStorage",
     "JsonTaskRepository",
+    "SqliteTaskRepository",
     "StorageConfigurationError",
     "StorageDataError",
     "StorageError",
@@ -28,16 +30,7 @@ __all__ = [
 # The tasky_settings.factory module ensures this module is imported before
 # accessing the registry, so backends are always available when needed.
 #
-# Template for new backends:
-#
-# .. code-block:: python
-#
-#    try:
-#        from tasky_settings import registry
-#        registry.register("backend-name", YourRepository.from_path)
-#    except ImportError:
-#        # tasky-settings may not be installed yet (e.g., during development)
-#        pass
+# See existing backends (JsonTaskRepository, SqliteTaskRepository) for examples.
 #
 # ============================================================================
 

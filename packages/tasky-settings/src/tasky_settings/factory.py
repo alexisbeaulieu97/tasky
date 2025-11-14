@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import threading
+from importlib import import_module
 from pathlib import Path
 
 from tasky_tasks.service import TaskService
@@ -10,7 +11,8 @@ from tasky_tasks.service import TaskService
 from tasky_settings.backend_registry import registry
 
 # Backend initialization state (thread-safe)
-_backends_initialized = False
+# Using a list to avoid global statement - mutable container can be modified
+_backends_initialized = [False]
 _init_lock = threading.Lock()
 
 
@@ -23,24 +25,40 @@ def _ensure_backends_registered() -> None:
     Thread-safe: Uses a lock to ensure single initialization even in multi-threaded
     environments (e.g., MCP servers).
 
-    This pattern allows:
-    - Service factory to work without requiring explicit tasky_storage import
-    - Future backends to follow the same self-registration pattern
-    - Tests to use the factory in isolation
+    Backend Registration Pattern
+    ============================
 
-    Implementation note:
-    Storage adapters register themselves at import time by calling:
-        from tasky_settings import registry
-        registry.register("backend-name", factory_function)
+    This implements an intentional self-registration pattern:
+
+    1. Each backend registers itself at import time by calling:
+           from tasky_settings import registry
+           registry.register("backend-name", factory_function)
+
+    2. tasky_settings.factory._ensure_backends_registered() triggers import of
+       tasky_storage, which causes all backends to register
+
+    3. This design choice enables:
+       - tasky_settings remains generic (no backend-specific knowledge)
+       - New backends added without modifying settings
+       - Third-party backends can self-register by following the pattern
+       - Service factory works without requiring explicit tasky_storage import
+       - Tests can use the factory in isolation
+
+    Why not explicit registration in settings?
+    - Would couple settings to every backend
+    - Would require settings changes for each new backend (SQLite, PostgreSQL, etc.)
+    - Would break third-party backend extensibility
+    - Settings should remain a configuration/wiring layer, not a coupling point
+
+    See: docs/architecture.md#backend-registration-pattern for full details
 
     """
-    global _backends_initialized
     with _init_lock:
-        if not _backends_initialized:
+        if not _backends_initialized[0]:
             # Import triggers backend registration via tasky_storage.__init__.py
-            import tasky_storage
+            import_module("tasky_storage")
 
-            _backends_initialized = True
+            _backends_initialized[0] = True
 
 
 class ProjectNotFoundError(Exception):
@@ -112,9 +130,8 @@ def create_task_service(project_root: Path | None = None) -> TaskService:
     # Ensure backends are available before accessing registry
     _ensure_backends_registered()
 
-    # Avoid circular import by importing locally
-    # get_settings is defined in __init__.py
-    from tasky_settings import get_settings as _get_settings
+    # Import here to avoid circular dependency during module initialization
+    from tasky_settings import get_settings  # noqa: PLC0415
 
     # Find project root if not provided
     if project_root is None:
@@ -127,7 +144,7 @@ def create_task_service(project_root: Path | None = None) -> TaskService:
             raise ProjectNotFoundError(project_root)
 
     # Load settings with project root context
-    settings = _get_settings(project_root=project_root)
+    settings = get_settings(project_root=project_root)
 
     # Get backend factory
     factory = registry.get(settings.storage.backend)

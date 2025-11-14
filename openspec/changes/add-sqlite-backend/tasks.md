@@ -6,27 +6,27 @@ This document outlines the ordered implementation tasks for the SQLite backend. 
 
 ### Phase 1: Storage Adapter Foundation (SQLite Backend Module)
 
-- [ ] **Task 1.1**: Create SQLite backend module structure
+- [x] **Task 1.1**: Create SQLite backend module structure
   - Create `packages/tasky-storage/src/tasky_storage/backends/sqlite/` directory
   - Create `__init__.py`, `repository.py`, `storage.py`, `models.py` files
   - Set up imports and module exports
   - **Validation**: Module imports without errors
 
-- [ ] **Task 1.2**: Implement database schema creation
+- [x] **Task 1.2**: Implement database schema creation
   - Create `packages/tasky-storage/src/tasky_storage/backends/sqlite/schema.py`
   - Define SQL CREATE TABLE statement for tasks table
   - Define SQL CREATE INDEX statements (status, project_id, created_at, composite)
   - Implement schema validation (PRAGMA integrity_check)
   - **Validation**: Schema creation tested in isolation
 
-- [ ] **Task 1.3**: Implement connection management and pooling
+- [x] **Task 1.3**: Implement connection management and pooling
   - Create connection manager with RLock per database file
   - Implement WAL mode pragmas (journal_mode, synchronous, busy_timeout, foreign_keys)
   - Implement connection lifecycle (acquire, release, cleanup)
   - Add connection pool with lazy initialization
   - **Validation**: Connections created and closed properly; thread safety verified
 
-- [ ] **Task 1.4**: Implement task serialization mappers
+- [x] **Task 1.4**: Implement task serialization mappers
   - Create `packages/tasky-storage/src/tasky_storage/backends/sqlite/mappers.py`
   - Implement `task_model_to_snapshot()` (reuse from JSON if possible)
   - Implement `snapshot_to_task_model()` (reuse from JSON if possible)
@@ -35,21 +35,21 @@ This document outlines the ordered implementation tasks for the SQLite backend. 
 
 ### Phase 2: SQLite Repository Implementation
 
-- [ ] **Task 2.1**: Implement `SqliteTaskRepository` class
+- [x] **Task 2.1**: Implement `SqliteTaskRepository` class
   - Create `packages/tasky-storage/src/tasky_storage/backends/sqlite/repository.py`
   - Implement class with connection management
   - Add type hints and docstrings
   - Set up error handling with domain exceptions
   - **Validation**: Class structure matches TaskRepository protocol
 
-- [ ] **Task 2.2**: Implement repository initialization
+- [x] **Task 2.2**: Implement repository initialization
   - Implement `initialize()` method
   - Create schema if not exists
   - Verify database integrity
   - Handle already-initialized database gracefully
   - **Validation**: Manual test: `repo.initialize()` creates tables
 
-- [ ] **Task 2.3**: Implement CRUD operations
+- [x] **Task 2.3**: Implement CRUD operations
   - Implement `save_task(task: TaskModel) -> None` with INSERT OR REPLACE
   - Implement `get_task(task_id: UUID) -> TaskModel | None`
   - Implement `get_all_tasks() -> list[TaskModel]`
@@ -58,13 +58,13 @@ This document outlines the ordered implementation tasks for the SQLite backend. 
   - All operations use transaction context managers
   - **Validation**: Manual testing with small task set
 
-- [ ] **Task 2.4**: Implement filtering by status
+- [x] **Task 2.4**: Implement filtering by status
   - Implement `get_tasks_by_status(status: TaskStatus) -> list[TaskModel]`
   - Use indexed status column for efficiency
   - Return empty list when no matches
   - **Validation**: Filter returns correct subset; verify query uses index
 
-- [ ] **Task 2.5**: Implement error handling and recovery
+- [x] **Task 2.5**: Implement error handling and recovery
   - Map sqlite3 exceptions to domain exceptions
   - Handle database locked (busy_timeout should cover)
   - Handle integrity constraint violations
@@ -73,26 +73,26 @@ This document outlines the ordered implementation tasks for the SQLite backend. 
 
 ### Phase 3: Backend Registration and Wiring
 
-- [ ] **Task 3.1**: Create SQLite backend factory function
+- [x] **Task 3.1**: Create SQLite backend factory function
   - Implement `sqlite_factory(path: Path) -> SqliteTaskRepository`
   - Ensure factory signature matches `BackendFactory` protocol
   - Add docstring and type hints
   - **Validation**: Factory creates repository; type checker passes
 
-- [ ] **Task 3.2**: Implement self-registration
+- [x] **Task 3.2**: Implement self-registration
   - Add registration call in `packages/tasky-storage/src/tasky_storage/backends/sqlite/__init__.py`
   - Import global registry and call `registry.register("sqlite", sqlite_factory)`
   - Ensure registration happens on module import
   - Make idempotent (safe to import multiple times)
   - **Validation**: Import tasky_storage; verify "sqlite" available via registry
 
-- [ ] **Task 3.3**: Update storage module exports
+- [x] **Task 3.3**: Update storage module exports
   - Update `packages/tasky-storage/src/tasky_storage/__init__.py`
   - Export SqliteTaskRepository and factory
   - Ensure backward compatibility (JSON still exported)
   - **Validation**: `from tasky_storage import SqliteTaskRepository` works
 
-- [ ] **Task 3.4**: Update settings for SQLite configuration
+- [x] **Task 3.4**: Update settings for SQLite configuration
   - Update `packages/tasky-settings/src/tasky_settings/factory.py`
   - Add SQLite URI parsing: `sqlite://<path>`
   - Route sqlite:// URIs to SQLite backend factory
@@ -100,7 +100,7 @@ This document outlines the ordered implementation tasks for the SQLite backend. 
 
 ### Phase 4: Unit & Integration Testing
 
-- [ ] **Task 4.1**: Create SQLite backend unit tests
+- [x] **Task 4.1**: Create SQLite backend unit tests
   - Create `packages/tasky-storage/tests/test_sqlite_repository.py`
   - Test CRUD operations (create, read, update, delete)
   - Test filtering by status
@@ -109,28 +109,28 @@ This document outlines the ordered implementation tasks for the SQLite backend. 
   - Test transactions (insert fails on duplicate)
   - **Validation**: Run `uv run pytest packages/tasky-storage/tests/test_sqlite_repository.py -v`
 
-- [ ] **Task 4.2**: Test concurrent access
+- [x] **Task 4.2**: Test concurrent access
   - Add concurrent read/write tests
   - Test multiple threads creating different tasks
   - Test thread A writing while thread B reads
   - Test two threads writing same task ID (second should succeed with update or fail)
   - **Validation**: Concurrent tests pass; no deadlocks or data corruption
 
-- [ ] **Task 4.3**: Test error handling and recovery
+- [x] **Task 4.3**: Test error handling and recovery
   - Test database locked scenario (trigger with low timeout)
   - Test corrupted database detection
   - Test constraint violation handling
   - Test missing file handling
   - **Validation**: Correct exceptions raised; helpful messages
 
-- [ ] **Task 4.4**: Test serialization and round-trip
+- [x] **Task 4.4**: Test serialization and round-trip
   - Create task in memory → save to SQLite → retrieve → verify equality
   - Test with all TaskStatus values
   - Test with null/optional fields
   - Test with special characters in name/description
   - **Validation**: Data integrity verified
 
-- [ ] **Task 4.5**: Test initialization and idempotence
+- [x] **Task 4.5**: Test initialization and idempotence
   - Test `initialize()` creates schema first time
   - Test second `initialize()` call succeeds without error
   - Test schema matches expected structure
@@ -139,7 +139,7 @@ This document outlines the ordered implementation tasks for the SQLite backend. 
 
 ### Phase 5: Integration with Filtering Feature
 
-- [ ] **Task 5.1**: Verify task filtering works with SQLite
+- [x] **Task 5.1**: Verify task filtering works with SQLite
   - Run existing filtering tests against SQLite backend
   - Create tasks with mixed statuses
   - Test `--status pending` filtering via CLI
@@ -147,7 +147,7 @@ This document outlines the ordered implementation tasks for the SQLite backend. 
   - Verify results match JSON backend behavior
   - **Validation**: `uv run pytest packages/tasky-cli/tests/ -k filtering -v` passes with SQLite
 
-- [ ] **Task 5.2**: Test filtering performance
+- [x] **Task 5.2**: Test filtering performance
   - Create 1000+ tasks with mixed statuses
   - Query by status and verify O(log n) performance (index-based)
   - Compare with JSON backend if applicable
@@ -155,14 +155,14 @@ This document outlines the ordered implementation tasks for the SQLite backend. 
 
 ### Phase 6: End-to-End & CLI Integration
 
-- [ ] **Task 6.1**: Test project initialization with SQLite
+- [x] **Task 6.1**: Test project initialization with SQLite
   - Initialize project with `--storage sqlite://.tasky/tasks.db`
   - Verify database file created
   - Verify schema matches expected
   - Verify subsequent commands work
   - **Validation**: Manual test: `uv run tasky project init --storage sqlite://test.db`
 
-- [ ] **Task 6.2**: Test full CLI workflows with SQLite
+- [x] **Task 6.2**: Test full CLI workflows with SQLite
   - Create project with SQLite backend
   - Create multiple tasks with different statuses
   - List all tasks
@@ -171,14 +171,14 @@ This document outlines the ordered implementation tasks for the SQLite backend. 
   - Delete task
   - **Validation**: All workflows work identically to JSON backend
 
-- [ ] **Task 6.3**: Test cross-backend compatibility
+- [x] **Task 6.3**: Test cross-backend compatibility
   - Initialize project with JSON backend
   - Verify JSON and SQLite backends coexist (both registered)
   - Create project with SQLite backend
   - Verify no conflicts
   - **Validation**: Both backends available; no registry conflicts
 
-- [ ] **Task 6.4**: Create end-to-end test scenarios
+- [x] **Task 6.4**: Create end-to-end test scenarios
   - Create `tests/test_sqlite_cli_workflow.py` (if needed)
   - Test: init → create → filter → update → delete workflow
   - Test: concurrent task creation via CLI
@@ -186,21 +186,21 @@ This document outlines the ordered implementation tasks for the SQLite backend. 
 
 ### Phase 7: Testing & Quality Assurance
 
-- [ ] **Task 7.1**: Run full test suite
+- [x] **Task 7.1**: Run full test suite
   - Run `uv run pytest` across all packages
   - Address any failures or regressions
   - Verify no tests broken by SQLite addition
   - Check test coverage for SQLite backend (target ≥80%)
   - **Validation**: All tests pass (baseline + new SQLite tests)
 
-- [ ] **Task 7.2**: Code quality and linting
+- [x] **Task 7.2**: Code quality and linting
   - Run `uv run ruff check --fix` on new SQLite modules
   - Run `uv run ruff format` on new SQLite modules
   - Fix any import ordering issues
   - Verify type hints are complete
   - **Validation**: No linting errors; clean ruff output
 
-- [ ] **Task 7.3**: Manual regression testing
+- [x] **Task 7.3**: Manual regression testing
   - Initialize fresh project with JSON backend
   - Verify all existing features work
   - Initialize fresh project with SQLite backend
@@ -208,7 +208,7 @@ This document outlines the ordered implementation tasks for the SQLite backend. 
   - Verify filtering by status works with both backends
   - **Validation**: No regressions; identical behavior
 
-- [ ] **Task 7.4**: Documentation updates
+- [x] **Task 7.4**: Documentation updates
   - Add SQLite backend section to README (if exists)
   - Document configuration options (sqlite:// URI format)
   - Document schema and indexes
@@ -217,27 +217,27 @@ This document outlines the ordered implementation tasks for the SQLite backend. 
 
 ### Phase 8: Final Validation
 
-- [ ] **Task 8.1**: Verify backend registry integration
+- [x] **Task 8.1**: Verify backend registry integration
   - Import tasky_storage
   - Call `registry.list_backends()` and verify ["json", "sqlite"]
   - Call `registry.get("sqlite")` and verify factory returned
   - Create repository via factory and verify it works
   - **Validation**: Registry integration complete
 
-- [ ] **Task 8.2**: Verify self-registration idempotency
+- [x] **Task 8.2**: Verify self-registration idempotency
   - Import tasky_storage multiple times
   - Verify no errors
   - Verify "sqlite" still available
   - **Validation**: Self-registration is idempotent
 
-- [ ] **Task 8.3**: Performance validation
+- [x] **Task 8.3**: Performance validation
   - Create 10,000 tasks in SQLite database
   - Verify filtering by status completes in <1 second
   - Verify retrieval of all tasks completes in <2 seconds
   - Verify schema with indexes performs better than full table scan
   - **Validation**: Performance meets expectations
 
-- [ ] **Task 8.4**: Smoke test complete workflow
+- [x] **Task 8.4**: Smoke test complete workflow
   - `uv run tasky project init --storage sqlite://.tasky/tasks.db`
   - `uv run tasky task create "Test task 1"`
   - `uv run tasky task create "Test task 2"`
