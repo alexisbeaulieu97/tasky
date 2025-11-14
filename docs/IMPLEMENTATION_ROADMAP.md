@@ -23,7 +23,7 @@ Tick off each change as you complete it (mirrors the execution order below).
 - [x] 2.1 `add-sqlite-backend`
 - [x] 3.1 `add-task-filtering`
 - [x] 3.2 `add-advanced-filtering`
-- [ ] 3.3 `add-task-import-export`
+- [x] 3.3 `add-task-import-export`
 - [ ] 4.1 `add-coverage-reporting`
 - [ ] 4.2 `standardize-config-format`
 - [ ] 4.3 `implement-project-list`
