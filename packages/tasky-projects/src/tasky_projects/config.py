@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import logging
 import os
 import tomllib
@@ -46,10 +45,8 @@ class ProjectConfig(BaseModel):
     def from_file(cls, path: Path) -> ProjectConfig:
         """Load configuration from a TOML file.
 
-        Supports legacy JSON format with automatic detection and migration warning.
-
         Args:
-            path: Path to the configuration file (.tasky/config.toml or .tasky/config.json)
+            path: Path to the configuration file (.tasky/config.toml)
 
         Returns:
             ProjectConfig instance loaded from file
@@ -58,21 +55,10 @@ class ProjectConfig(BaseModel):
             FileNotFoundError: If the configuration file doesn't exist
 
         """
-        # Try TOML first (preferred format)
         toml_path = path.parent / "config.toml"
-        json_path = path.parent / "config.json"
 
         # If specific path provided, use it
         if path.exists():
-            if path.suffix == ".json":
-                logger.warning(
-                    "Legacy JSON config detected at %s, will migrate to TOML format on next write",
-                    path,
-                )
-                with path.open("r", encoding="utf-8") as f:
-                    data = json.load(f)
-                return cls.model_validate(data)
-            # Assume TOML
             with path.open("rb") as f:
                 data = tomllib.load(f)
             return cls.model_validate(data)
@@ -82,14 +68,7 @@ class ProjectConfig(BaseModel):
             with toml_path.open("rb") as f:
                 data = tomllib.load(f)
             return cls.model_validate(data)
-        if json_path.exists():
-            logger.warning(
-                "Legacy JSON config detected at %s, will migrate to TOML format on next write",
-                json_path,
-            )
-            with json_path.open("r", encoding="utf-8") as f:
-                data = json.load(f)
-            return cls.model_validate(data)
+
         msg = f"Configuration file not found: {path}"
         raise FileNotFoundError(msg)
 

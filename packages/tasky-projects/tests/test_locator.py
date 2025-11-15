@@ -1,6 +1,5 @@
 """Unit tests for project locator functionality."""
 
-import json
 import os
 from collections.abc import Callable, Generator
 from pathlib import Path
@@ -221,28 +220,6 @@ def test_find_projects_recursive_skips_tasky_directories(tmp_path: Path) -> None
     # Should only find the root project, not the nested one inside .tasky
     assert len(projects) == 1
     assert projects[0].path == tmp_path
-
-
-def test_find_projects_with_legacy_json_config(tmp_path: Path) -> None:
-    """Test that locator can find projects with legacy config.json files."""
-    # Create a legacy JSON config
-    config_dir = tmp_path / ".tasky"
-    config_dir.mkdir()
-    config_file = config_dir / "config.json"
-
-    config_data = {
-        "version": "1.0",
-        "storage": {"backend": "json", "path": "legacy.json"},
-        "created_at": "2025-11-14T12:00:00Z",
-    }
-    config_file.write_text(json.dumps(config_data))
-
-    projects = find_projects_recursive(tmp_path)
-
-    assert len(projects) == 1
-    assert projects[0].path == tmp_path
-    assert projects[0].backend == "json"
-    assert projects[0].storage_path == "legacy.json"
 
 
 def test_find_projects_sorted_by_path(temp_project_tree: Path) -> None:

@@ -69,9 +69,6 @@ def _check_directory_for_project(directory: Path) -> ProjectLocation | None:
     config_path = tasky_dir / "config.toml"
 
     if not config_path.exists():
-        config_path = tasky_dir / "config.json"
-
-    if not config_path.exists():
         return None
 
     config_data = _load_project_config(config_path)

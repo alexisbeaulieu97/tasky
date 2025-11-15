@@ -101,10 +101,9 @@ def info_command(  # noqa: C901
         # Show info for current directory
         tasky_dir = Path(".tasky")
         config_toml = tasky_dir / "config.toml"
-        config_json = tasky_dir / "config.json"
 
-        # Check for either TOML or JSON config
-        if not config_toml.exists() and not config_json.exists():
+        # Check for TOML config
+        if not config_toml.exists():
             typer.echo("Error: No project found in current directory.", err=True)
             typer.echo("Run 'tasky project init' to create a project.", err=True)
             raise typer.Exit(code=1)
@@ -198,7 +197,8 @@ def list_command(  # noqa: C901, PLR0912, PLR0915
             # Shorten path to use ~ for home directory (safe)
             try:
                 path_display = str(project.path.expanduser()).replace(
-                    str(Path.home()), "~",
+                    str(Path.home()),
+                    "~",
                 )
                 if not project.path.is_relative_to(Path.home()):
                     path_display = str(project.path)
@@ -214,12 +214,12 @@ def list_command(  # noqa: C901, PLR0912, PLR0915
             name_display = (
                 project.name
                 if len(project.name) <= max_name_width
-                else f"{project.name[:max_name_width - 1]}…"
+                else f"{project.name[: max_name_width - 1]}…"
             )
             path_truncated = (
                 path_display
                 if len(path_display) <= max_path_width
-                else f"{path_display[:max_path_width - 1]}…"
+                else f"{path_display[: max_path_width - 1]}…"
             )
 
             # Format as: name  path  Last accessed: timestamp

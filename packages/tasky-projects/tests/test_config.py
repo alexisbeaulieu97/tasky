@@ -1,6 +1,5 @@
 """Tests for project configuration models."""
 
-import json
 import os
 import stat
 import sys
@@ -151,47 +150,20 @@ def test_project_config_to_file_creates_toml(tmp_path: Path) -> None:
     assert "storage" in data
 
 
-# Legacy JSON Migration Tests
-
-
-def test_project_config_from_file_legacy_json(tmp_path: Path) -> None:
-    """Test loading legacy JSON configuration with migration warning."""
-    config_file = tmp_path / "config.json"
-    config_data: dict[str, object] = {
-        "version": "1.0",
-        "storage": {"backend": "json", "path": "tasks.json"},
-        "created_at": "2025-11-12T10:00:00Z",
-    }
-    config_file.write_text(json.dumps(config_data))
-
-    config = ProjectConfig.from_file(config_file)
-    assert config.version == "1.0"
-    assert config.storage.backend == "json"
-    assert config.storage.path == "tasks.json"
-
-
 def test_project_config_auto_detects_toml(tmp_path: Path) -> None:
-    """Test auto-detection prefers TOML over JSON."""
-    # Create both files
-    json_file = tmp_path / "config.json"
+    """Test auto-detection loads TOML when it exists."""
     toml_file = tmp_path / "config.toml"
 
-    json_data = {
-        "version": "1.0",
-        "storage": {"backend": "json", "path": "tasks.json"},
-        "created_at": "2025-11-12T10:00:00Z",
-    }
     toml_data = {
         "version": "2.0",
         "storage": {"backend": "sqlite", "path": "db.sqlite"},
         "created_at": "2025-11-12T11:00:00Z",
     }
 
-    json_file.write_text(json.dumps(json_data))
     with toml_file.open("wb") as f:
         tomli_w.dump(toml_data, f)
 
-    # When both exist, TOML should be preferred
+    # Should load TOML
     config = ProjectConfig.from_file(tmp_path / "config.toml")
     assert config.version == "2.0"
     assert config.storage.backend == "sqlite"
@@ -215,54 +187,8 @@ def test_project_config_auto_detects_with_nonexistent_path(tmp_path: Path) -> No
     assert config.version == "1.5"
 
 
-def test_project_config_auto_detects_legacy_json_with_nonexistent_path(
-    tmp_path: Path,
-) -> None:
-    """Test auto-detection finds legacy JSON when TOML doesn't exist."""
-    # Create only config.json
-    json_file = tmp_path / "config.json"
-    json_data = {
-        "version": "1.0",
-        "storage": {"backend": "json", "path": "tasks.json"},
-        "created_at": "2025-11-12T10:00:00Z",
-    }
-    json_file.write_text(json.dumps(json_data))
-
-    # Call with a non-existent path - should auto-detect config.json
-    nonexistent = tmp_path / "nonexistent.toml"
-    config = ProjectConfig.from_file(nonexistent)
-    assert config.version == "1.0"
-    assert config.storage.backend == "json"
-
-
-def test_project_config_json_to_toml_migration(tmp_path: Path) -> None:
-    """Test migrating from JSON to TOML on write."""
-    json_file = tmp_path / "config.json"
-    toml_file = tmp_path / "config.toml"
-
-    # Create legacy JSON config
-    config_data = {
-        "version": "1.0",
-        "storage": {"backend": "json", "path": "tasks.json"},
-        "created_at": "2025-11-12T10:00:00Z",
-    }
-    json_file.write_text(json.dumps(config_data))
-
-    # Load from JSON
-    config = ProjectConfig.from_file(json_file)
-
-    # Save (should create TOML)
-    config.to_file(toml_file)
-
-    # Verify TOML was created
-    assert toml_file.exists()
-    with toml_file.open("rb") as f:
-        loaded = tomllib.load(f)
-    assert loaded["version"] == "1.0"
-
-
 def test_project_config_to_file_forces_toml_extension(tmp_path: Path) -> None:
-    """Test to_file always creates .toml file even if .json path provided."""
+    """Test to_file always creates .toml file even if non-.toml path provided."""
     json_path = tmp_path / "config.json"
     config = ProjectConfig()
 
