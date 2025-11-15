@@ -29,7 +29,7 @@ class ProjectMetadata(BaseModel):
     @field_validator("path")
     @classmethod
     def validate_path_is_absolute(cls, v: Path) -> Path:
-        """Ensure path is absolute."""
+        """Normalize path to absolute form by resolving relative paths."""
         if not v.is_absolute():
             return v.resolve()
         return v
@@ -60,7 +60,9 @@ class ProjectRegistry(BaseModel):
 
     """
 
-    projects: list[ProjectMetadata] = Field(default=[])
+    projects: list[ProjectMetadata] = Field(
+        default_factory=lambda: [],  # noqa: PIE807
+    )
     registry_version: str = "1.0"
 
     def get_by_name(self, name: str) -> ProjectMetadata | None:
