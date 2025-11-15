@@ -127,7 +127,7 @@ def info_command(  # noqa: C901
 
 
 @project_app.command(name="list")
-def list_command(  # noqa: C901
+def list_command(  # noqa: C901, PLR0912, PLR0915
     no_discover: bool = typer.Option(  # noqa: FBT001
         False,  # noqa: FBT003
         "--no-discover",
@@ -195,12 +195,36 @@ def list_command(  # noqa: C901
         for project in projects:
             # Check if path still exists
             status = "" if project.path.exists() else " [MISSING]"
-            # Shorten path to use ~ for home directory
-            path_display = str(project.path).replace(str(Path.home()), "~")
+            # Shorten path to use ~ for home directory (safe)
+            try:
+                path_display = str(project.path.expanduser()).replace(
+                    str(Path.home()), "~",
+                )
+                if not project.path.is_relative_to(Path.home()):
+                    path_display = str(project.path)
+            except (ValueError, OSError):
+                # If expanduser fails, use the full path
+                path_display = str(project.path)
+
             last_accessed_str = project.last_accessed.strftime("%Y-%m-%d %H:%M")
+
+            # Truncate name and path if too long
+            max_name_width = 20
+            max_path_width = 30
+            name_display = (
+                project.name
+                if len(project.name) <= max_name_width
+                else f"{project.name[:max_name_width - 1]}…"
+            )
+            path_truncated = (
+                path_display
+                if len(path_display) <= max_path_width
+                else f"{path_display[:max_path_width - 1]}…"
+            )
+
             # Format as: name  path  Last accessed: timestamp
             formatted_line = (
-                f"  {project.name:<20} {path_display:<30} "
+                f"  {name_display:<20} {path_truncated:<30} "
                 f"Last accessed: {last_accessed_str}{status}"
             )
             typer.echo(formatted_line)
@@ -336,9 +360,11 @@ def discover_command(  # noqa: C901
 
         # Progress callback to show directory count during discovery
         def show_progress(directories_checked: int) -> None:
-            # Use \r to overwrite the line (carriage return)
-            typer.echo(f"Scanning... ({directories_checked} directories checked)", nl=False)
-            typer.echo("\r", nl=False)
+            # Use \r at the start to overwrite the previous line (carriage return)
+            typer.echo(
+                f"\rScanning... ({directories_checked} directories checked)",
+                nl=False,
+            )
 
         # Discover and register with progress
         new_count = registry_service.discover_and_register(

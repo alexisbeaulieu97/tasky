@@ -66,7 +66,7 @@ class ProjectRegistryService:
             backup_path = self.registry_path.with_stem(
                 f"{self.registry_path.stem}.corrupted.{timestamp}",
             )
-            self.registry_path.rename(backup_path)
+            self.registry_path.replace(backup_path)
             logger.warning("Backed up corrupted registry to %s", backup_path)
             logger.warning("Creating new empty registry")
             return ProjectRegistry()
@@ -105,7 +105,7 @@ class ProjectRegistryService:
             self._registry = self._load()
         return self._registry
 
-    def register_project(self, path: Path) -> ProjectMetadata:
+    def register_project(self, path: Path) -> ProjectMetadata:  # noqa: C901
         """Register a project in the registry.
 
         Args:
@@ -130,13 +130,43 @@ class ProjectRegistryService:
             msg = "Not a tasky project (missing .tasky directory)"
             raise ValueError(msg)
 
+        # Compute candidate name and check for collisions
+        candidate_name = path.name
+        registry = self.registry
+
+        # Check for duplicate names and disambiguate if needed
+        existing_with_same_name = registry.get_by_name(candidate_name)
+        if existing_with_same_name and existing_with_same_name.path != path:
+            # Name collision: disambiguate by including parent folder
+            try:
+                parent_name = path.parent.name
+                candidate_name = f"{candidate_name} ({parent_name})"
+                # If still colliding, add numeric suffix
+                i = 1
+                while registry.get_by_name(candidate_name):
+                    existing = registry.get_by_name(candidate_name)
+                    if existing and existing.path == path:
+                        break
+                    candidate_name = f"{path.name}-{i}"
+                    i += 1
+            except Exception:  # noqa: BLE001
+                # Fallback to numeric suffix if parent name isn't available
+                i = 1
+                while registry.get_by_name(f"{path.name}-{i}"):
+                    i += 1
+                candidate_name = f"{path.name}-{i}"
+            logger.warning(
+                "Name collision for '%s'; disambiguated to '%s'",
+                path.name,
+                candidate_name,
+            )
+
         # Create or update project metadata
         project = ProjectMetadata(
-            name=path.name,
+            name=candidate_name,
             path=path,
         )
 
-        registry = self.registry
         registry.add_or_update(project)
         self._save(registry)
 
@@ -192,15 +222,21 @@ class ProjectRegistryService:
         Args:
             path: Path to the project directory
 
+        Raises:
+            ValueError: If project is not found in registry
+
         """
         path = path.resolve()
         registry = self.registry
         project = registry.get_by_path(path)
 
-        if project:
-            project.last_accessed = datetime.now(tz=UTC)
-            self._save(registry)
-            logger.debug("Updated last accessed for project: %s", path)
+        if not project:
+            msg = f"Project not found: {path}"
+            raise ValueError(msg)
+
+        project.last_accessed = datetime.now(tz=UTC)
+        self._save(registry)
+        logger.debug("Updated last accessed for project: %s", path)
 
     def _walk_directories(
         self,

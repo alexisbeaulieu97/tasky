@@ -89,10 +89,9 @@ class ProjectRegistry(BaseModel):
         """
         existing = self.get_by_path(project.path)
         if existing:
-            # Update existing project
-            existing.name = project.name
-            existing.last_accessed = project.last_accessed
-            existing.tags = project.tags
+            # Update existing project by replacing it in the list
+            index = self.projects.index(existing)
+            self.projects[index] = project
             return False
         # Add new project
         self.projects.append(project)

@@ -280,6 +280,18 @@ class TestProjectRegistryService:
 
         assert new_timestamp > old_timestamp
 
+    def test_update_last_accessed_nonexistent_project(
+        self,
+        service: ProjectRegistryService,
+        tmp_path: Path,
+    ) -> None:
+        """Test updating last accessed for nonexistent project raises ValueError."""
+        project_path = tmp_path / "nonexistent"
+        project_path.mkdir()
+
+        with pytest.raises(ValueError, match="Project not found"):
+            service.update_last_accessed(project_path)
+
     def test_walk_directories(
         self,
         service: ProjectRegistryService,
@@ -469,28 +481,40 @@ class TestEdgeCases:
         self, service: ProjectRegistryService, tmp_path: Path,
     ) -> None:
         """Test discovery respects max depth with deeply nested directories."""
-        # Create a deeply nested structure
+        # Create a deeply nested structure with projects at each depth
+        # The walk visits depth 0, 1, 2 before stopping (max_depth=3 means depth >= 3 stops)
         current = tmp_path / "level0"
         current.mkdir()
+        (current / ".tasky").mkdir()  # Depth 0 project
 
         depths = {}
-        for depth in range(10):
-            current = current / f"level{depth + 1}"
+        for depth in range(1, 10):
+            current = current / f"level{depth}"
             current.mkdir()
             depths[depth] = current
 
             # Create a project at this depth
-            if depth < 5:  # Create at depths 0-4
-                proj = current / "project"
-                proj.mkdir()
-                (proj / ".tasky").mkdir()
+            proj = current / "project"
+            proj.mkdir()
+            (proj / ".tasky").mkdir()
 
-        # Discover with default max_depth (should be 3)
+        # Discover with default max_depth (3)
+        # This will visit directories at depth 0, 1, 2 (stops when depth >= 3)
         discovered = service.discover_projects([tmp_path])
 
-        # Should only find projects at depth 0-3
-        # Depth 0-3 should be found (0-indexed, so depth 0, 1, 2 projects should exist)
-        assert len(discovered) > 0
+        # Should find projects at depth 0 and depth 1 only
+        # (level0 is depth 0, level0/level1/project is depth 1)
+        expected_project_paths: set[Path] = set()
+        expected_project_paths.add(tmp_path / "level0")  # Depth 0
+
+        p = tmp_path / "level0" / "level1" / "project"
+        expected_project_paths.add(p)  # Depth 1
+
+        discovered_paths = {proj.path for proj in discovered}
+        assert (
+            len(discovered) == 2
+        ), f"Expected 2 projects, got {len(discovered)}: {discovered_paths}"
+        assert discovered_paths == expected_project_paths
 
     def test_discovery_with_many_excluded_directories(
         self, service: ProjectRegistryService, tmp_path: Path,
@@ -617,7 +641,7 @@ class TestEdgeCases:
         updated_time = updated_projects[0].last_accessed
 
         # Time should have advanced
-        assert updated_time >= initial_time
+        assert updated_time > initial_time
 
     def test_unregister_then_rediscover_same_project(
         self, service: ProjectRegistryService, tmp_path: Path,
