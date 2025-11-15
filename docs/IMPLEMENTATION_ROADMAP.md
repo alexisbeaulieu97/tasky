@@ -45,10 +45,14 @@ Tick off each change as you complete it (mirrors the execution order below).
 - [ ] 7b.1 `add-cli-input-validators` (25 tasks, ~3h)
 - [ ] 7b.2 `refactor-cli-error-handling` (26 tasks, ~2h)
 
-### 📋 Future Phases (TBD - No OpenSpec Proposals Yet)
-- [ ] Phase 8: MCP Server Integration (Not yet proposed)
-- [ ] Phase 9: Task Hooks & Automation (Not yet proposed)
-- [ ] Phase 10: Advanced Storage Backends (Not yet proposed)
+### 🚀 Phase 8: AI Integration (45 tasks, ~40-50 hours)
+- [ ] 8.1 `add-mcp-server` (MCP protocol integration for Claude)
+
+### 🎯 Phase 9: Event-Driven Automation (35 tasks, ~30-40 hours)
+- [ ] 9.1 `implement-task-hooks` (Lifecycle events and automation)
+
+### 💾 Phase 10: Enterprise Features (55 tasks, ~50-60 hours)
+- [ ] 10.1 `add-advanced-backends` (PostgreSQL, multi-user, audit trails)
 
 ---
 
@@ -903,27 +907,113 @@ Week 4: CLI Improvements (Optional but recommended)
 
 ---
 
-## Phase 8+: Future Directions (TBD - No Proposals Yet)
+## Phase 8: MCP Server Integration (45 tasks, ~40-50 hours)
+**Goal**: Enable Claude and other AI assistants to manage tasks via MCP protocol
 
-After Phase 7-7b completion (production-ready codebase), consider:
+### Status: ✅ PROPOSED & VALIDATED
 
-### Phase 8: MCP Server Integration (Estimated ~40-50 hours)
-**Status**: Not yet proposed
-- Expose tasky as Claude MCP server
-- Enable AI assistants to manage tasks directly
-- Structured logging and request correlation
+**Why After Phase 7b**: Production-ready codebase with clean CLI error handling. MCP inherits all these improvements.
 
-### Phase 9: Task Hooks & Automation (Estimated ~30-40 hours)
-**Status**: Not yet proposed
-- Lifecycle event system (created, completed, etc.)
-- User-defined automation triggers
-- Integration with external systems
+**What it does**:
+- Exposes 10+ task and project operations via MCP tools
+- Enables Claude to create, list, update, complete, delete tasks
+- Service caching for long-lived MCP connections
+- Request-scoped logging with correlation IDs
+- Thread-safe concurrent request handling
 
-### Phase 10: Advanced Storage Backends (Estimated ~50+ hours per backend)
-**Status**: Not yet proposed
-- PostgreSQL backend (shared multi-user database)
-- Cloud storage backends (S3, Google Cloud, etc.)
-- Device synchronization
+**Tasks**: 45 total
+- Server core (caching, logging, config): 7 tasks
+- Task operations (10 tools): 12 tasks
+- Project operations (4 tools): 6 tasks
+- Error handling & resilience: 5 tasks
+- Threading & concurrency: 6 tasks
+- Integration testing: 7 tasks
+- Documentation & examples: 2 tasks
+
+**Depends on**: Phase 7b complete (clean CLI foundation)
+**Enables**: AI-assisted task management, future integrations
+
+```bash
+/openspec:apply add-mcp-server
+```
+
+---
+
+## Phase 9: Task Lifecycle Hooks (35 tasks, ~30-40 hours)
+**Goal**: Enable event-driven automation and external system integration
+
+### Status: ✅ PROPOSED & VALIDATED
+
+**Why After Phase 8**: After MCP proves external system integration works well. Hooks follow same patterns.
+
+**What it does**:
+- 7 lifecycle events (created, updated, completed, cancelled, reopened, deleted, imported)
+- Hook dispatcher and event broadcasting
+- Default handlers (logging, optional CLI output)
+- User-defined hooks support (`~/.tasky/hooks.py`)
+- Integration with all task service methods
+
+**Tasks**: 35 total
+- Event types definition: 8 tasks
+- Dispatcher implementation: 6 tasks
+- Default handlers: 3 tasks
+- Task service integration: 7 tasks
+- CLI integration: 4 tasks
+- Extension points & user hooks: 3 tasks
+- Documentation & examples: 4 tasks
+
+**Depends on**: Phase 8 complete (patterns established)
+**Enables**: Workflow automation, Slack notifications, calendar sync, audit logs
+
+```bash
+/openspec:apply implement-task-hooks
+```
+
+---
+
+## Phase 10: Advanced Storage Backends - PostgreSQL (55 tasks, ~50-60 hours)
+**Goal**: Enable multi-user, enterprise-grade task management
+
+### Status: ✅ PROPOSED & VALIDATED
+
+**Why After Phase 9**: After hooks enable audit trail concept. PostgreSQL audit feature benefits from hook patterns.
+
+**What it does**:
+- Full PostgreSQL backend implementation (matches JSON/SQLite protocol)
+- Multi-user support (project ownership, access control foundation)
+- Audit trail (immutable change log)
+- Transaction support with conflict detection
+- Connection pooling for scalability
+- Automatic schema management (migrations)
+
+**Tasks**: 55 total
+- Schema design & migrations: 9 tasks
+- Backend implementation (CRUD): 10 tasks
+- Transaction & concurrency: 6 tasks
+- Configuration & connection pooling: 7 tasks
+- Error handling & resilience: 6 tasks
+- Audit trail: 6 tasks
+- Testing (unit + integration): 7 tasks
+- Documentation & migration guide: 7 tasks
+- Multi-user foundation: 4 tasks
+
+**Depends on**: Phase 9 complete (hooks established)
+**Enables**: Shared task databases, multi-user collaboration, audit compliance
+
+```bash
+/openspec:apply add-advanced-backends
+```
+
+---
+
+### Future Directions Beyond Phase 10
+
+After Phase 8-10 complete, consider:
+- **Cloud Storage Backends** (S3, Google Cloud for sync across devices)
+- **User Management** (proper multi-user authentication, permissions)
+- **API Server** (HTTP API for mobile/web clients)
+- **Mobile Apps** (iOS/Android clients)
+- **Analytics & Insights** (task metrics, completion trends)
 
 ---
 
