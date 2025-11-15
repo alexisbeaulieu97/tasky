@@ -200,4 +200,7 @@ class ProjectConfigSource(TomlConfigSource):
             # No config file found
             self._config_data = {}
 
+        if self._config_data is None:
+            self._config_data = {}
+
         return self._config_data

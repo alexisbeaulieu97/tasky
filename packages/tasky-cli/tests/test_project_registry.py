@@ -2,6 +2,7 @@
 
 # ruff: noqa: ARG002
 import shutil
+import tomllib
 from collections.abc import Iterator
 from pathlib import Path
 from unittest.mock import patch
@@ -272,7 +273,7 @@ class TestUnregisterCommand:
         result = runner.invoke(project_app, ["unregister", "my-project"], input="n\n")
 
         # Typer aborts with exit code 1 when confirmation is declined
-        assert result.exit_code in (0, 1)
+        assert result.exit_code == 1
         assert "Cancelled" in result.stdout or "Aborted" in result.stdout
 
     def test_unregister_nonexistent_project(
@@ -370,6 +371,89 @@ class TestDiscoverCommand:
         assert "Discovered and registered 2 new project(s)" in result.stdout
 
 
+class TestInitCommand:
+    """Tests for the init command."""
+
+    def test_init_creates_new_project(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Test initializing a new project."""
+        monkeypatch.chdir(tmp_path)
+        result = runner.invoke(project_app, ["init"])
+
+        assert result.exit_code == 0
+        assert "Project initialized" in result.stdout
+        assert (tmp_path / ".tasky" / "config.toml").exists()
+
+    def test_init_with_custom_backend(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Test initializing with a specific backend."""
+        monkeypatch.chdir(tmp_path)
+        result = runner.invoke(project_app, ["init", "--backend", "sqlite"])
+
+        assert result.exit_code == 0
+        assert (tmp_path / ".tasky" / "config.toml").exists()
+        # Verify backend in config
+        with (tmp_path / ".tasky" / "config.toml").open("rb") as f:
+            config = tomllib.load(f)
+        assert config["storage"]["backend"] == "sqlite"
+
+    def test_init_invalid_backend(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Test initializing with an invalid backend."""
+        monkeypatch.chdir(tmp_path)
+        result = runner.invoke(project_app, ["init", "--backend", "invalid"])
+
+        assert result.exit_code == 1
+        output = result.stdout + result.stderr
+        assert "Backend 'invalid' not registered" in output
+
+    def test_init_overwrite_declined(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Test declining to overwrite existing project."""
+        config_file = tmp_path / ".tasky" / "config.toml"
+        config_file.parent.mkdir(parents=True)
+        config_file.write_text("[storage]\nbackend = 'json'\n")
+
+        monkeypatch.chdir(tmp_path)
+        result = runner.invoke(project_app, ["init"], input="n\n")
+
+        assert result.exit_code == 0
+        # Should not show "Project initialized" message after declining
+        assert "Project initialized" not in result.stdout
+
+    def test_init_overwrite_accepted(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Test accepting to overwrite existing project."""
+        config_file = tmp_path / ".tasky" / "config.toml"
+        config_file.parent.mkdir(parents=True)
+        config_file.write_text("[storage]\nbackend = 'json'\n")
+
+        monkeypatch.chdir(tmp_path)
+        result = runner.invoke(project_app, ["init", "--backend", "sqlite"], input="y\n")
+
+        assert result.exit_code == 0
+        assert "Project initialized" in result.stdout
+        # Verify backend was updated
+        with config_file.open("rb") as f:
+            config = tomllib.load(f)
+        assert config["storage"]["backend"] == "sqlite"
+
+
 class TestInfoCommand:
     """Tests for the info command with project name."""
 
@@ -423,3 +507,35 @@ class TestInfoCommand:
         assert result.exit_code == 0
         output = result.stdout + result.stderr
         assert "[MISSING]" in output
+
+    def test_info_current_directory(
+        self,
+        mock_settings: AppSettings,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Test showing info for current directory project."""
+        config_file = tmp_path / ".tasky" / "config.toml"
+        config_file.parent.mkdir(parents=True)
+        config_file.write_text("[storage]\nbackend = 'json'\npath = '.tasky/tasks.json'\n")
+
+        monkeypatch.chdir(tmp_path)
+        result = runner.invoke(project_app, ["info"])
+
+        assert result.exit_code == 0
+        assert "Project Information:" in result.stdout
+        assert "Backend: json" in result.stdout
+
+    def test_info_current_directory_no_project(
+        self,
+        mock_settings: AppSettings,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Test showing info when no project exists in current directory."""
+        monkeypatch.chdir(tmp_path)
+        result = runner.invoke(project_app, ["info"])
+
+        assert result.exit_code == 1
+        output = result.stdout + result.stderr
+        assert "No project found in current directory" in output

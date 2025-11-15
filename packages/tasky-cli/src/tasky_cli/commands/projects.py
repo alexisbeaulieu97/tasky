@@ -1,37 +1,11 @@
 """Commands related to project management in Tasky CLI."""
 
-import tomllib
 from pathlib import Path
-from typing import Any
 
 import typer
 from tasky_settings import get_project_registry_service, get_settings, registry
 
 project_app = typer.Typer(no_args_is_help=True)
-
-
-def _load_toml_file(path: Path) -> dict[str, Any]:
-    """Load a TOML file, returning empty dict if not found."""
-    if not path.exists():
-        return {}
-    with path.open("rb") as f:
-        return tomllib.load(f)
-
-
-def _save_toml_file(path: Path, data: dict[str, Any]) -> None:
-    """Save data to a TOML file using tomli_w."""
-    try:
-        import tomli_w  # noqa: PLC0415
-    except ImportError as e:
-        typer.echo(
-            "Error: tomli_w package required for TOML writing. Install with: pip install tomli_w",
-            err=True,
-        )
-        raise typer.Exit(code=1) from e
-
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("wb") as f:
-        tomli_w.dump(data, f)
 
 
 @project_app.command(name="init")
@@ -105,8 +79,7 @@ def info_command(  # noqa: C901
             if project is None:
                 typer.echo(f"Error: Project '{project_name}' not found in registry.", err=True)
                 typer.echo("Run 'tasky project list' to see all registered projects.", err=True)
-                msg = "Project not found in registry"
-                raise ValueError(msg) from None  # noqa: TRY301
+                raise typer.Exit(code=1)  # noqa: TRY301
 
             # Display registry project information
             typer.echo(f"Project: {project.name}")
@@ -119,8 +92,6 @@ def info_command(  # noqa: C901
             # Check if path still exists
             if not project.path.exists():
                 typer.echo("  Status: [MISSING]", err=True)
-        except ValueError:
-            raise typer.Exit(code=1) from None
         except Exception as exc:
             typer.echo(f"Error accessing registry: {exc}", err=True)
             raise typer.Exit(code=1) from exc

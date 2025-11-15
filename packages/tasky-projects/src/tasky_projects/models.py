@@ -48,7 +48,9 @@ class ProjectMetadata(BaseModel):
         return v.strip()
 
 
-ProjectMetadataList = list[ProjectMetadata]
+def _empty_project_list() -> list[ProjectMetadata]:
+    """Provide a typed default factory for project collections."""
+    return []
 
 
 class ProjectRegistry(BaseModel):
@@ -60,9 +62,7 @@ class ProjectRegistry(BaseModel):
 
     """
 
-    projects: list[ProjectMetadata] = Field(
-        default_factory=lambda: [],  # noqa: PIE807
-    )
+    projects: list[ProjectMetadata] = Field(default_factory=_empty_project_list)
     registry_version: str = "1.0"
 
     def get_by_name(self, name: str) -> ProjectMetadata | None:

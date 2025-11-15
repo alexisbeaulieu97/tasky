@@ -102,6 +102,8 @@ class TestProjectMetadata:
         assert restored.name == project.name
         assert restored.path == project.path
         assert restored.tags == project.tags
+        assert restored.created_at == project.created_at
+        assert restored.last_accessed == project.last_accessed
 
 
 class TestProjectRegistry:
@@ -230,3 +232,8 @@ class TestProjectRegistry:
         assert restored.projects[1].name == "project2"
         assert restored.projects[1].tags == ["work"]
         assert restored.registry_version == "1.0"
+        # Verify datetime fields are preserved
+        assert restored.projects[0].created_at == project1.created_at
+        assert restored.projects[0].last_accessed == project1.last_accessed
+        assert restored.projects[1].created_at == project2.created_at
+        assert restored.projects[1].last_accessed == project2.last_accessed

@@ -61,6 +61,13 @@ class ProjectRegistryService:
             registry = ProjectRegistry.model_validate(data)
         except (json.JSONDecodeError, ValueError):
             logger.exception("Failed to load registry from %s", self.registry_path)
+            # Back up corrupted file
+            timestamp = datetime.now(tz=UTC).strftime("%Y%m%d_%H%M%S")
+            backup_path = self.registry_path.with_stem(
+                f"{self.registry_path.stem}.corrupted.{timestamp}",
+            )
+            self.registry_path.rename(backup_path)
+            logger.warning("Backed up corrupted registry to %s", backup_path)
             logger.warning("Creating new empty registry")
             return ProjectRegistry()
         else:
@@ -120,7 +127,7 @@ class ProjectRegistryService:
 
         tasky_dir = path / ".tasky"
         if not tasky_dir.exists() or not tasky_dir.is_dir():
-            msg = f"Not a tasky project (no .tasky directory): {path}"
+            msg = "Not a tasky project (missing .tasky directory)"
             raise ValueError(msg)
 
         # Create or update project metadata
@@ -215,7 +222,6 @@ class ProjectRegistryService:
         if depth >= max_depth:
             return
         for child in self._iter_directory_children(current):
-            yield child
             yield from self._walk_directory_tree(
                 child,
                 max_depth=max_depth,

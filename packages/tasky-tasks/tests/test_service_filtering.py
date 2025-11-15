@@ -5,7 +5,7 @@ from uuid import UUID, uuid4
 
 import pytest
 from tasky_tasks.exceptions import TaskValidationError
-from tasky_tasks.models import TaskModel, TaskStatus
+from tasky_tasks.models import TaskFilter, TaskModel, TaskStatus
 from tasky_tasks.service import TaskService
 
 # Import StorageDataError for testing error handling
@@ -49,6 +49,10 @@ class MockTaskRepository:
     def get_tasks_by_status(self, status: TaskStatus) -> list[TaskModel]:
         """Mock implementation of get_tasks_by_status."""
         return [task for task in self.tasks if task.status == status]
+
+    def find_tasks(self, task_filter: TaskFilter) -> list[TaskModel]:
+        """Mock implementation of find_tasks."""
+        return [task for task in self.tasks if task_filter.matches(task)]
 
 
 class TestTaskFiltering:

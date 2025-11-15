@@ -241,8 +241,8 @@ class SqliteTaskRepository:
         logger.debug("Finding tasks with filter: %s", task_filter)
 
         # Build SQL query with WHERE clauses for specified criteria
-        where_clauses = []
-        params = []
+        where_clauses: list[str] = []
+        params: list[Any] = []
 
         # Add status filter
         self._add_status_filter(task_filter, where_clauses, params)

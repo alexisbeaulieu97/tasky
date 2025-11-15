@@ -148,6 +148,23 @@ def get_project_registry_service() -> ProjectRegistryService:
     Returns:
         ProjectRegistryService: A configured registry service instance.
 
+    Raises:
+        ValueError: If project_registry settings are missing or invalid.
+
     """
     settings = get_settings()
-    return ProjectRegistryService(settings.project_registry.registry_path)
+    project_registry: ProjectRegistrySettings | None = getattr(
+        settings,
+        "project_registry",
+        None,
+    )
+
+    if project_registry is None:
+        msg = "Project registry settings not configured"
+        raise ValueError(msg)
+
+    if not project_registry.registry_path:
+        msg = "Project registry path not configured"
+        raise ValueError(msg)
+
+    return ProjectRegistryService(project_registry.registry_path)

@@ -77,7 +77,7 @@ class TestProjectRegistryService:
         service: ProjectRegistryService,
         registry_path: Path,
     ) -> None:
-        """Test loading corrupted registry file."""
+        """Test loading corrupted registry file creates backup."""
         registry_path.parent.mkdir(parents=True, exist_ok=True)
         with registry_path.open("w") as f:
             f.write("not valid json{")
@@ -86,6 +86,11 @@ class TestProjectRegistryService:
         registry = service._load()
         assert isinstance(registry, ProjectRegistry)
         assert registry.projects == []
+
+        # Verify backup was created with pattern: registry.corrupted.TIMESTAMP.json
+        backups = list(registry_path.parent.glob("registry.corrupted.*.json"))
+        assert len(backups) == 1
+        assert backups[0].read_text() == "not valid json{"
 
     def test_save_registry(
         self,

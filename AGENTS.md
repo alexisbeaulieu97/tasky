@@ -37,7 +37,7 @@ Keep this managed block so 'openspec update' can refresh the instructions.
 - `uv run pytest --cov=packages --cov-report=html` runs tests with coverage measurement and generates an HTML report in `htmlcov/`.
 - `uv run pytest --cov=packages --cov-fail-under=80` enforces the 80% coverage threshold and fails if not met.
 - Always execute ad-hoc Python via `uv run python …` (e.g., `uv run python -m <module>`), and run tools like Ruff through `uv run ruff …` so everything stays inside the managed environment.
-- End every coding session by running `uv run pytest` followed by `uv run ruff check --fix` to keep tests and linting green before handing off.
+- End every coding session by running `uv run pytest`, `uv run ruff check --fix`, **and** `uv run pyright` so tests, lint, and static typing stay green before handing off.
 
 ## Test Coverage
 The project enforces a minimum of 80% test coverage across all packages. Coverage is measured using `pytest-cov` and configured in `pyproject.toml`.
