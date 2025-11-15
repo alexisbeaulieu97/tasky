@@ -16,15 +16,16 @@
 - [ ] 2.6 Create `config.py` with `MCPServerSettings` model
 - [ ] 2.7 Write unit tests for server core (service caching, context)
 
-## 3. Core Tool Implementation (4 tools total)
+## 3. Core Tool Implementation (5 tools total)
 
-- [ ] 3.1 Create `tools.py` with unified tool handlers
-- [ ] 3.2 Implement `list_tasks` tool (status, search, date filters)
-- [ ] 3.3 Implement `modify_task` tool with actions (create, update, complete, cancel, reopen, delete)
-- [ ] 3.4 Implement `manage_tasks` tool (import, export operations)
-- [ ] 3.5 Implement `context_info` tool (current project, projects list, status options)
-- [ ] 3.6 Write unit tests for all 4 tools (30+ test cases covering all action paths)
-- [ ] 3.7 Add integration tests showing tool combinations (list → inspect → modify workflow)
+- [ ] 3.1 Create `tools.py` with tool handlers
+- [ ] 3.2 Implement `project_info` tool (project metadata, status options, task counts)
+- [ ] 3.3 Implement `create_tasks` tool (bulk task creation with atomic semantics)
+- [ ] 3.4 Implement `edit_tasks` tool (bulk updates/deletes/state transitions as unified write)
+- [ ] 3.5 Implement `search_tasks` tool (find tasks with filters, return compact summaries)
+- [ ] 3.6 Implement `get_tasks` tool (retrieve full task details including relationships)
+- [ ] 3.7 Write unit tests for all 5 tools (40+ test cases covering all operations and bulk paths)
+- [ ] 3.8 Add integration tests showing workflow (search → get_tasks → edit_tasks workflow)
 
 ## 5. Error Handling & Resilience
 
@@ -56,12 +57,13 @@
 ## 8. Integration Testing
 
 - [ ] 8.1 Create end-to-end tests (full request/response cycle)
-- [ ] 8.2 Test task creation → listing → update → completion
-- [ ] 8.3 Test project switching and operations across projects
-- [ ] 8.4 Test import/export through MCP interface
-- [ ] 8.5 Test error handling for invalid inputs
-- [ ] 8.6 Test with both JSON and SQLite backends
-- [ ] 8.7 Test concurrent requests (stress test)
+- [ ] 8.2 Test workflow: project_info → search_tasks → get_tasks → edit_tasks
+- [ ] 8.3 Test bulk operations: create 5 tasks, update 3, delete 1
+- [ ] 8.4 Test project_info provides correct status options and constraints
+- [ ] 8.5 Test search returns compact format; get_tasks returns full context
+- [ ] 8.6 Test error handling for invalid task IDs, status values, invalid operations
+- [ ] 8.7 Test with both JSON and SQLite backends
+- [ ] 8.8 Test concurrent requests with bulk operations (stress test)
 
 ## 9. Documentation & Examples
 

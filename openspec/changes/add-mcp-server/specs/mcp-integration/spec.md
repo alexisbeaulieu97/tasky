@@ -29,57 +29,82 @@ The system SHALL provide an MCP (Model Context Protocol) server that exposes Tas
 - **AND** if an error occurs, the request ID is included in the error response
 - **AND** developers can trace full request flow in logs
 
-### Requirement: Minimal Core Tools (4 tools total)
+### Requirement: Minimal Core Tools (5 tools total)
 
-The MCP server SHALL provide ONLY the essential tools Claude needs for practical task management. Tool selection prioritizes decision clarity over feature completeness.
+The MCP server SHALL provide ONLY the essential tools Claude needs for practical task management. Tool selection prioritizes decision clarity over feature completeness. Users manage projects; Claude manages tasks within assigned project context.
 
-#### Tool 1: `list_tasks` - Unified read operation
-- **Parameters**: status (optional), search (optional), created_after (optional)
-- **Returns**: Array of task objects sorted by urgency
-- **Use case**: Claude reviews task state before acting
-- **Handles**: Lists, filters, and searches in one unified tool
+#### Tool 1: `project_info` - Get project context (read-only)
+- **Purpose**: Let Claude understand the current project scope
+- **Parameters**: None (project context provided by server configuration)
+- **Returns**: Project name, description, available status values, task counts by status
+- **Use case**: Claude queries available statuses before filtering/creating
+- **Note**: Single source of truth for valid task statuses and project scope
 
-#### Tool 2: `modify_task` - Unified write operation
-- **Parameters**: task_id (UUID), action (one of: "create", "update", "complete", "cancel", "reopen", "delete")
-- **For create**: name, details parameters
-- **For update**: optional name, details, priority, due_date parameters
-- **For state changes**: only task_id and action parameters
-- **Returns**: Updated task object
-- **Use case**: Claude performs any task operation with single tool
-- **Handles**: CRUD + state transitions
+#### Tool 2: `create_tasks` - Bulk task creation
+- **Purpose**: Create one or more tasks in a single operation
+- **Parameters**: Array of task specifications (each with name, details, priority, due_date)
+- **Returns**: Array of created TaskModel objects with IDs and timestamps
+- **Bulk semantics**: All tasks created atomically; partial failure returns error with details
+- **Use case**: Claude creates multiple tasks or single task (wrapped in array)
+- **Handles**: Task creation with optional metadata
 
-#### Tool 3: `manage_tasks` - Bulk operations
-- **Parameters**: action (one of: "import", "export"), format, strategy (for import)
-- **Returns**: Operation result with count summary
-- **Use case**: Claude manages task datasets
-- **Handles**: Import/export in single tool
+#### Tool 3: `edit_tasks` - Bulk task editing (unified write)
+- **Purpose**: Update, delete, or transition tasks in a single operation
+- **Parameters**: Array of edit operations (each with task_id, action, optional updates)
+- **Actions**: "update" (modify fields), "delete" (remove task), "complete" (mark done), "cancel" (cancel), "reopen" (reopen completed)
+- **For update action**: optional name, details, priority, due_date, status
+- **For state actions**: only task_id and action required
+- **Returns**: Array of updated TaskModel objects
+- **Bulk semantics**: All edits applied atomically; partial failure returns error with details
+- **Use case**: Claude modifies multiple tasks or single task (wrapped in array)
+- **Design**: Unified write operation like database transaction
 
-#### Tool 4: `context_info` - Information retrieval (read-only)
-- **Parameters**: query_type (one of: "current_project", "projects", "status_options")
-- **Returns**: Metadata (current project, project list, valid statuses)
-- **Use case**: Claude understands available context before acting
-- **Handles**: Project discovery, enum values, configuration
+#### Tool 4: `search_tasks` - Find tasks with compact results
+- **Purpose**: Fast filtered search to identify relevant tasks
+- **Parameters**: status (optional), search (optional text), created_after (optional date), due_before (optional date)
+- **Returns**: Array of compact task summaries sorted by priority/due_date
+- **Compact format**: task_id, name, status, due_date, priority only (no descriptions/relationships)
+- **Use case**: Claude discovers which tasks match criteria before inspecting details
+- **Design**: Returns minimal data to prevent token waste; Claude uses get_tasks for deep inspection
 
-#### Scenario: Claude manages tasks with 4 focused tools
-- **WHEN** Claude wants to create a task
-- **THEN** uses `modify_task` with action="create"
-- **AND** all CRUD operations use the same tool
+#### Tool 5: `get_tasks` - Retrieve full task details
+- **Purpose**: Retrieve complete task information including relationships
+- **Parameters**: Array of task IDs
+- **Returns**: Array of full TaskModel objects with all fields, blockers, blocked_by, subtasks, subtask_of
+- **Use case**: Claude needs to understand task dependencies, detailed description, or relationships
+- **Design**: Fetched selectively after search; only when Claude needs to "do the work"
+- **Relationships**: Includes full graph of task dependencies for complex planning
 
-#### Scenario: Claude inspects state before acting
-- **WHEN** Claude needs to understand what projects/tasks exist
-- **THEN** uses `context_info` to understand available options
-- **AND** then `list_tasks` to see current state
-- **AND** then `modify_task` to make changes
+#### Scenario: Claude manages multiple related tasks
+- **WHEN** Claude searches for "pending urgent" tasks
+- **THEN** uses `search_tasks` with status="pending" and search="urgent"
+- **AND** receives compact list (id, name, status, due_date, priority)
+- **AND** Claude identifies 3 relevant tasks to work on
 
-#### Scenario: Claude filters with unified tool
-- **WHEN** Claude needs pending urgent tasks
-- **THEN** uses `list_tasks` with status="pending" and search="urgent"
-- **AND** single tool handles all filtering logic
+#### Scenario: Claude understands task complexity before acting
+- **WHEN** Claude needs to understand blockers and subtasks
+- **THEN** uses `get_tasks` with the identified task IDs
+- **AND** receives full context including dependencies and descriptions
+- **AND** Claude can now make informed decisions about task ordering
 
-#### Scenario: Bulk operations are grouped
-- **WHEN** Claude imports or exports
-- **THEN** uses single `manage_tasks` tool
-- **AND** action parameter determines behavior
+#### Scenario: Claude creates multiple tasks
+- **WHEN** Claude needs to create 5 related tasks
+- **THEN** uses `create_tasks` with array of 5 task specs
+- **AND** all 5 are created atomically
+- **AND** receives created tasks with IDs and timestamps
+
+#### Scenario: Claude modifies multiple tasks atomically
+- **WHEN** Claude needs to update priorities for 3 tasks and complete 1 task
+- **THEN** uses `edit_tasks` with array of 4 operations
+- **AND** operations: {id, action="update", priority=1}, {id, action="update", priority=2}, {id, action="update", priority=3}, {id, action="complete"}
+- **AND** all edits applied atomically
+- **AND** receives updated tasks
+
+#### Scenario: Claude respects project scope
+- **WHEN** Claude starts managing a project
+- **THEN** calls `project_info` first to understand valid statuses
+- **AND** only uses statuses returned by `project_info`
+- **AND** project context is validated by server (not by Claude)
 
 ### Requirement: Error Handling & Reliability
 
