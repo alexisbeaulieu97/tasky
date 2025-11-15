@@ -45,10 +45,10 @@ Tick off each change as you complete it (mirrors the execution order below).
 - [ ] 7b.1 `add-cli-input-validators` (25 tasks, ~3h)
 - [ ] 7b.2 `refactor-cli-error-handling` (26 tasks, ~2h)
 
-### 📋 Future Phases (TBD)
-- [ ] 8.1 `add-mcp-server-integration` (MCP support for Claude)
-- [ ] 9.1 `implement-task-hooks` (Lifecycle automation)
-- [ ] 10.1+ `add-advanced-backends` (PostgreSQL, Cloud storage, etc.)
+### 📋 Future Phases (TBD - No OpenSpec Proposals Yet)
+- [ ] Phase 8: MCP Server Integration (Not yet proposed)
+- [ ] Phase 9: Task Hooks & Automation (Not yet proposed)
+- [ ] Phase 10: Advanced Storage Backends (Not yet proposed)
 
 ---
 
@@ -903,32 +903,55 @@ Week 4: CLI Improvements (Optional but recommended)
 
 ---
 
-## Phase 8+: Future Directions
+## Phase 8+: Future Directions (TBD - No Proposals Yet)
 
-After Phase 7-7b (production-ready codebase):
+After Phase 7-7b completion (production-ready codebase), consider:
 
-### Phase 8: MCP Server Integration (~40-50 hours)
+### Phase 8: MCP Server Integration (Estimated ~40-50 hours)
+**Status**: Not yet proposed
 - Expose tasky as Claude MCP server
 - Enable AI assistants to manage tasks directly
-- Structured logging for request tracing
+- Structured logging and request correlation
 
-### Phase 9: Task Hooks & Automation (~30-40 hours)
+### Phase 9: Task Hooks & Automation (Estimated ~30-40 hours)
+**Status**: Not yet proposed
 - Lifecycle event system (created, completed, etc.)
 - User-defined automation triggers
 - Integration with external systems
 
-### Phase 10: Advanced Storage Backends (~50+ hours per backend)
+### Phase 10: Advanced Storage Backends (Estimated ~50+ hours per backend)
+**Status**: Not yet proposed
 - PostgreSQL backend (shared multi-user database)
-- Cloud storage (S3, Google Cloud, etc.)
-- Sync across devices
+- Cloud storage backends (S3, Google Cloud, etc.)
+- Device synchronization
 
 ---
 
-## Questions Before Starting?
+## Next Steps
 
-- Want to adjust Phase 7 execution order?
-- Want to run certain proposals in parallel?
-- Have questions on dependencies?
-- Need clarification on any phase?
+1. **Complete Phase 7** (Code Quality & Testing)
+   - 5 validated proposals ready for implementation
+   - ~91 hours of work, 3-week timeline
+   - Brings codebase to production-ready quality
 
-Ready to start Phase 7? 🚀
+2. **Complete Phase 7b** (CLI Improvements - Optional but recommended)
+   - 2 validated proposals ready for implementation
+   - ~51 hours of work, 1-week timeline
+   - Enhances user experience
+
+3. **Plan Future Phases** (Phase 8+)
+   - After Phase 7-7b complete, create proposals for MCP, hooks, and backends
+   - Each needs comprehensive audit and specification
+   - Will follow same OpenSpec-driven approach
+
+---
+
+## Ready to Start?
+
+- Review Phase 7-7b proposals: `openspec list` and `openspec show <name>`
+- Adjust execution order if needed
+- Approve proposals when ready to begin
+
+Questions? Check the detailed phase sections above or discuss specific proposals.
+
+Good luck! 🚀
