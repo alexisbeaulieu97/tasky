@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import re
 import sys
 import traceback
@@ -37,6 +38,8 @@ from tasky_tasks.service import TaskService
 task_app = typer.Typer(no_args_is_help=True)
 
 F = TypeVar("F", bound=Callable[..., object])
+
+logger = logging.getLogger(__name__)
 
 
 class Handler(Protocol):
@@ -535,8 +538,6 @@ def _update_project_last_accessed() -> None:
     except Exception as exc:  # noqa: BLE001
         # Silently ignore registry update failures to not disrupt task operations
         # The registry is a secondary feature and should not block core functionality
-        import logging  # noqa: PLC0415
-        logger = logging.getLogger(__name__)
         logger.debug("Failed to update project last_accessed timestamp: %s", exc)
 
 

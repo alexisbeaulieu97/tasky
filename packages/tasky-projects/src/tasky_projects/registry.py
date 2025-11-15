@@ -230,13 +230,15 @@ class ProjectRegistryService:
 
     def _iter_directory_children(self, current: Path) -> Iterator[Path]:
         """Iterate over child directories, handling errors and skip rules."""
+        if not current.is_dir():
+            return
         try:
             for item in current.iterdir():
                 if self._should_skip_directory(item):
                     continue
                 yield item
-        except PermissionError:
-            logger.warning("Permission denied: %s", current)
+        except OSError:
+            logger.warning("Unable to list directory: %s", current)
 
     def _should_skip_directory(self, item: Path) -> bool:
         """Return True if a directory should be skipped during traversal."""
@@ -246,7 +248,7 @@ class ProjectRegistryService:
             return True
         return item.name in self.SKIP_DIRS
 
-    def discover_projects(  # noqa: C901
+    def discover_projects(
         self,
         search_paths: list[Path],
         progress_callback: Callable[[int], None] | None = None,
@@ -282,10 +284,18 @@ class ProjectRegistryService:
                     # Found a project
                     project_path = directory.resolve()
                     if project_path not in discovered:
-                        metadata = ProjectMetadata(
-                            name=project_path.name,
-                            path=project_path,
-                        )
+                        try:
+                            metadata = ProjectMetadata(
+                                name=project_path.name,
+                                path=project_path,
+                            )
+                        except Exception as exc:  # noqa: BLE001
+                            logger.warning(
+                                "Skipping invalid project at %s: %s",
+                                project_path,
+                                exc,
+                            )
+                            continue
                         discovered[project_path] = metadata
                         logger.debug("Discovered project: %s", project_path)
 

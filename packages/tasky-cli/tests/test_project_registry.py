@@ -273,9 +273,9 @@ class TestUnregisterCommand:
         # The runner doesn't properly handle interactive prompts, so we expect an abort
         result = runner.invoke(project_app, ["unregister", "my-project"], input="n\n")
 
-        # Typer aborts with exit code 1 when confirmation is declined
-        assert result.exit_code == 1
-        assert "Cancelled" in result.stdout or "Aborted" in result.stdout
+        # User cancellation exits with code 0
+        assert result.exit_code == 0
+        assert "Cancelled" in result.stdout
 
     def test_unregister_nonexistent_project(
         self,

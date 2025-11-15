@@ -57,7 +57,7 @@ def init_command(  # noqa: C901
 
 
 @project_app.command(name="info")
-def info_command(  # noqa: C901
+def info_command(
     project_name: str | None = typer.Option(
         None,
         "--project-name",
@@ -92,6 +92,8 @@ def info_command(  # noqa: C901
             # Check if path still exists
             if not project.path.exists():
                 typer.echo("  Status: [MISSING]", err=True)
+        except typer.Exit:
+            raise
         except Exception as exc:
             typer.echo(f"Error accessing registry: {exc}", err=True)
             raise typer.Exit(code=1) from exc
@@ -110,6 +112,8 @@ def info_command(  # noqa: C901
         # Load settings to get validated configuration
         try:
             settings = get_settings()
+        except typer.Exit:
+            raise
         except Exception as exc:
             typer.echo(f"Error loading configuration: {exc}", err=True)
             raise typer.Exit(code=1) from exc
@@ -186,19 +190,19 @@ def register_command(
     The path must be a directory containing a .tasky subdirectory.
 
     """
+    # Resolve path to absolute
+    resolved_path = Path(path).resolve()
+
+    # Validate path exists
+    if not resolved_path.exists():
+        typer.echo(f"Error: Path does not exist: {resolved_path}", err=True)
+        raise typer.Exit(code=1)
+
+    if not resolved_path.is_dir():
+        typer.echo(f"Error: Path is not a directory: {resolved_path}", err=True)
+        raise typer.Exit(code=1)
+
     try:
-        # Resolve path to absolute
-        resolved_path = Path(path).resolve()
-
-        # Validate path exists
-        if not resolved_path.exists():
-            typer.echo(f"Error: Path does not exist: {resolved_path}", err=True)
-            raise typer.Exit(code=1)  # noqa: TRY301
-
-        if not resolved_path.is_dir():
-            typer.echo(f"Error: Path is not a directory: {resolved_path}", err=True)
-            raise typer.Exit(code=1)  # noqa: TRY301
-
         # Register the project
         registry_service = get_project_registry_service()
         project = registry_service.register_project(resolved_path)
@@ -206,6 +210,8 @@ def register_command(
         typer.echo(f"✓ Project registered: {project.name}")
         typer.echo(f"  Path: {project.path}")
 
+    except typer.Exit:
+        raise
     except ValueError as exc:
         typer.echo(f"Error: {exc}", err=True)
         raise typer.Exit(code=1) from exc
@@ -215,7 +221,7 @@ def register_command(
 
 
 @project_app.command(name="unregister")
-def unregister_command(  # noqa: C901
+def unregister_command(
     name: str = typer.Argument(..., help="Name of the project to unregister"),
     yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation prompt"),  # noqa: FBT001, FBT003
 ) -> None:
@@ -247,6 +253,8 @@ def unregister_command(  # noqa: C901
         registry_service.unregister_project(project.path)
         typer.echo(f"✓ Project unregistered: {name}")
 
+    except typer.Exit:
+        raise
     except ValueError as exc:
         typer.echo(f"Error: {exc}", err=True)
         raise typer.Exit(code=1) from exc
@@ -256,7 +264,7 @@ def unregister_command(  # noqa: C901
 
 
 @project_app.command(name="discover")
-def discover_command(  # noqa: C901
+def discover_command(
     paths: list[Path] | None = typer.Option(  # noqa: B008
         None,
         "--path",
@@ -311,6 +319,8 @@ def discover_command(  # noqa: C901
             if total > 0:
                 typer.echo(f"(Already tracking {total} project(s))")
 
+    except typer.Exit:
+        raise
     except Exception as exc:
         typer.echo(f"Error: {exc}", err=True)
         raise typer.Exit(code=1) from exc
