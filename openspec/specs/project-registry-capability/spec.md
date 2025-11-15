@@ -1,10 +1,8 @@
 # project-registry-capability Specification
 
 ## Purpose
-Enable global project registry for managing multiple tasky projects with discovery, registration, and listing capabilities.
-
+TBD - created by archiving change add-project-registry. Update Purpose after archive.
 ## Requirements
-
 ### Requirement: Project Registry Domain Models
 
 The system SHALL define domain models for project metadata and the global registry.
@@ -353,30 +351,3 @@ The registry SHALL perform efficiently for typical and large project counts.
 
 ---
 
-## Implementation Notes
-
-### File Locations
-- Domain models: `packages/tasky-projects/src/tasky_projects/models.py`
-- Registry service: `packages/tasky-projects/src/tasky_projects/registry.py`
-- CLI commands: `packages/tasky-cli/src/tasky_cli/commands/projects.py`
-- Registry file: `~/.tasky/registry.json`
-
-### Discovery Configuration
-```python
-EXCLUDED_DIRS = {
-    '.git', '.svn', '.hg',
-    'node_modules', 'bower_components',
-    'venv', '.venv', 'virtualenv',
-    '__pycache__', 'target', 'build', 'dist',
-}
-MAX_DEPTH = 3
-DEFAULT_DISCOVERY_PATHS = [
-    '~/projects', '~/workspace', '~/dev', '~/src', '~/code',
-]
-```
-
-### Error Message Format
-```
-Error: <problem description>
-<optional suggestion or next step>
-```
