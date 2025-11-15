@@ -248,7 +248,7 @@ class ProjectRegistryService:
             return True
         return item.name in self.SKIP_DIRS
 
-    def discover_projects(
+    def discover_projects(  # noqa: C901
         self,
         search_paths: list[Path],
         progress_callback: Callable[[int], None] | None = None,
