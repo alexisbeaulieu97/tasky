@@ -16,29 +16,15 @@
 - [ ] 2.6 Create `config.py` with `MCPServerSettings` model
 - [ ] 2.7 Write unit tests for server core (service caching, context)
 
-## 3. Task Tools Implementation
+## 3. Core Tool Implementation (4 tools total)
 
-- [ ] 3.1 Create `tasks.py` with task-related tool handlers
-- [ ] 3.2 Implement `create_task` tool (name, details)
-- [ ] 3.3 Implement `list_tasks` tool (status, search, date filters)
-- [ ] 3.4 Implement `get_task` tool (by UUID)
-- [ ] 3.5 Implement `update_task` tool (name, details, priority, due date)
-- [ ] 3.6 Implement `complete_task` tool (task_id)
-- [ ] 3.7 Implement `cancel_task` tool (task_id)
-- [ ] 3.8 Implement `reopen_task` tool (task_id)
-- [ ] 3.9 Implement `delete_task` tool (task_id)
-- [ ] 3.10 Implement `export_tasks` tool (format, filters)
-- [ ] 3.11 Implement `import_tasks` tool (file, strategy)
-- [ ] 3.12 Write unit tests for all task tools (40+ test cases)
-
-## 4. Project Tools Implementation
-
-- [ ] 4.1 Create `projects.py` with project-related tool handlers
-- [ ] 4.2 Implement `list_projects` tool (with pagination)
-- [ ] 4.3 Implement `get_current_project` tool
-- [ ] 4.4 Implement `switch_project` tool (by name or path)
-- [ ] 4.5 Implement `init_project` tool (path, backend choice)
-- [ ] 4.6 Write unit tests for project tools (20+ test cases)
+- [ ] 3.1 Create `tools.py` with unified tool handlers
+- [ ] 3.2 Implement `list_tasks` tool (status, search, date filters)
+- [ ] 3.3 Implement `modify_task` tool with actions (create, update, complete, cancel, reopen, delete)
+- [ ] 3.4 Implement `manage_tasks` tool (import, export operations)
+- [ ] 3.5 Implement `context_info` tool (current project, projects list, status options)
+- [ ] 3.6 Write unit tests for all 4 tools (30+ test cases covering all action paths)
+- [ ] 3.7 Add integration tests showing tool combinations (list → inspect → modify workflow)
 
 ## 5. Error Handling & Resilience
 

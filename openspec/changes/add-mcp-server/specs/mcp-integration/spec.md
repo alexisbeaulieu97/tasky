@@ -29,44 +29,57 @@ The system SHALL provide an MCP (Model Context Protocol) server that exposes Tas
 - **AND** if an error occurs, the request ID is included in the error response
 - **AND** developers can trace full request flow in logs
 
-### Requirement: Task Operation Tools
+### Requirement: Minimal Core Tools (4 tools total)
 
-The MCP server SHALL provide tools for all task operations: create, read, update, delete, list, filter, status transitions, import, export.
+The MCP server SHALL provide ONLY the essential tools Claude needs for practical task management. Tool selection prioritizes decision clarity over feature completeness.
 
-#### Scenario: All task CRUD operations work
-- **WHEN** Claude uses create_task, get_task, update_task, delete_task
-- **THEN** all operations work identically to CLI commands
-- **AND** error handling is consistent (same exception types)
-- **AND** validation rules are identical
-- **AND** state transitions are enforced (can't complete already-completed task)
+#### Tool 1: `list_tasks` - Unified read operation
+- **Parameters**: status (optional), search (optional), created_after (optional)
+- **Returns**: Array of task objects sorted by urgency
+- **Use case**: Claude reviews task state before acting
+- **Handles**: Lists, filters, and searches in one unified tool
 
-#### Scenario: Filtering works through MCP
-- **WHEN** Claude calls `list_tasks` with combined filters (status + search + date range)
-- **THEN** results are filtered correctly
-- **AND** filter behavior matches CLI implementation
-- **AND** large result sets are handled efficiently
+#### Tool 2: `modify_task` - Unified write operation
+- **Parameters**: task_id (UUID), action (one of: "create", "update", "complete", "cancel", "reopen", "delete")
+- **For create**: name, details parameters
+- **For update**: optional name, details, priority, due_date parameters
+- **For state changes**: only task_id and action parameters
+- **Returns**: Updated task object
+- **Use case**: Claude performs any task operation with single tool
+- **Handles**: CRUD + state transitions
 
-#### Scenario: Import/export work through MCP
-- **WHEN** Claude imports tasks via MCP with file content and strategy
-- **THEN** tasks are imported (merge, skip, or replace strategy)
-- **AND** import result includes count of imported/skipped tasks
-- **AND** error cases (malformed file, conflicts) are handled
+#### Tool 3: `manage_tasks` - Bulk operations
+- **Parameters**: action (one of: "import", "export"), format, strategy (for import)
+- **Returns**: Operation result with count summary
+- **Use case**: Claude manages task datasets
+- **Handles**: Import/export in single tool
 
-### Requirement: Project Management Tools
+#### Tool 4: `context_info` - Information retrieval (read-only)
+- **Parameters**: query_type (one of: "current_project", "projects", "status_options")
+- **Returns**: Metadata (current project, project list, valid statuses)
+- **Use case**: Claude understands available context before acting
+- **Handles**: Project discovery, enum values, configuration
 
-The MCP server SHALL provide tools for project discovery, switching, and initialization.
+#### Scenario: Claude manages tasks with 4 focused tools
+- **WHEN** Claude wants to create a task
+- **THEN** uses `modify_task` with action="create"
+- **AND** all CRUD operations use the same tool
 
-#### Scenario: Claude can list available projects
-- **WHEN** Claude calls `list_projects`
-- **THEN** all registered projects are returned with metadata
-- **AND** pagination is applied for large registries
-- **AND** current project is indicated
+#### Scenario: Claude inspects state before acting
+- **WHEN** Claude needs to understand what projects/tasks exist
+- **THEN** uses `context_info` to understand available options
+- **AND** then `list_tasks` to see current state
+- **AND** then `modify_task` to make changes
 
-#### Scenario: Claude can switch projects
-- **WHEN** Claude calls `switch_project` with project name or path
-- **THEN** the current project is switched
-- **AND** subsequent operations work in the new project context
-- **AND** error is returned if project doesn't exist
+#### Scenario: Claude filters with unified tool
+- **WHEN** Claude needs pending urgent tasks
+- **THEN** uses `list_tasks` with status="pending" and search="urgent"
+- **AND** single tool handles all filtering logic
+
+#### Scenario: Bulk operations are grouped
+- **WHEN** Claude imports or exports
+- **THEN** uses single `manage_tasks` tool
+- **AND** action parameter determines behavior
 
 ### Requirement: Error Handling & Reliability
 
