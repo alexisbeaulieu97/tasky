@@ -67,7 +67,7 @@ class TestRegistryPersistence:
     ) -> None:
         """Multiple service instances should handle concurrent access safely."""
         # Create multiple project directories
-        projects = []
+        projects: list[Path] = []
         for i in range(3):
             project_dir = tmp_path / f"project{i}"
             project_dir.mkdir()
@@ -345,7 +345,7 @@ class TestLargeRegistries:
     ) -> None:
         """Should handle registry with many projects."""
         # Create 50 projects (not 100 yet to keep test fast)
-        projects = []
+        projects: list[Path] = []
         for i in range(50):
             proj = tmp_path / f"project_{i:03d}"
             proj.mkdir()

@@ -644,7 +644,7 @@ class TestEdgeCases:
     ) -> None:
         """Test that list_projects returns consistent sort order."""
         # Create multiple projects
-        projects_to_create = []
+        projects_to_create: list[Path] = []
         for i in range(10):
             proj = tmp_path / f"project_{i:02d}"
             proj.mkdir()
