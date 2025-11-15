@@ -46,6 +46,11 @@ class TaskSnapshot(BaseModel):
     updated_at: datetime = Field(..., description="Last update timestamp")
 
 
+def _empty_snapshot_list() -> list[TaskSnapshot]:
+    """Provide a typed default factory for export snapshots."""
+    return []
+
+
 class ExportDocument(BaseModel):
     """Export file structure with versioning and metadata.
 
@@ -60,7 +65,10 @@ class ExportDocument(BaseModel):
     )
     source_project: str = Field("default", description="Source project identifier")
     task_count: int = Field(..., description="Number of tasks exported")
-    tasks: list[TaskSnapshot] = Field(default_factory=list, description="Task list")
+    tasks: list[TaskSnapshot] = Field(
+        default_factory=_empty_snapshot_list,
+        description="Task list",
+    )
 
 
 class ImportResult(BaseModel):

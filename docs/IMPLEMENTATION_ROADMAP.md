@@ -29,7 +29,7 @@ Tick off each change as you complete it (mirrors the execution order below).
 - [x] 4.2 `standardize-config-format`
 - [x] 4.3 `implement-project-list`
 - [x] 4.4 `align-tasky-projects-format`
-- [ ] 5.1 `add-project-registry`
+- [x] 5.1 `add-project-registry`
 - [ ] 6.1 `remove-json-config-support` (optional, flexible timeline)
 
 ---

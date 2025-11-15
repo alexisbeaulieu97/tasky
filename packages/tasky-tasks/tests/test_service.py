@@ -8,7 +8,7 @@ from uuid import UUID, uuid4
 
 import pytest
 from tasky_tasks.exceptions import InvalidStateTransitionError, TaskNotFoundError
-from tasky_tasks.models import TaskModel, TaskStatus
+from tasky_tasks.models import TaskFilter, TaskModel, TaskStatus
 from tasky_tasks.service import TaskService
 
 
@@ -41,6 +41,10 @@ class InMemoryTaskRepository:
     def get_tasks_by_status(self, status: TaskStatus) -> list[TaskModel]:
         """Return tasks filtered by status."""
         return [task for task in self.tasks.values() if task.status == status]
+
+    def find_tasks(self, task_filter: TaskFilter) -> list[TaskModel]:
+        """Return tasks matching the provided filter."""
+        return [task for task in self.tasks.values() if task_filter.matches(task)]
 
     def delete_task(self, task_id: UUID) -> bool:
         """Remove a stored task."""

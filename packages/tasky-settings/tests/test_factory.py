@@ -1,9 +1,16 @@
 """Tests for service factory."""
 
 from pathlib import Path
+from unittest.mock import Mock, patch
 
 import pytest
-from tasky_settings import ProjectNotFoundError, create_task_service, find_project_root, registry
+from tasky_settings import (
+    ProjectNotFoundError,
+    create_task_service,
+    find_project_root,
+    get_project_registry_service,
+    registry,
+)
 
 
 class MockRepository:
@@ -197,3 +204,35 @@ def test_create_task_service_calls_initialize(tmp_path: Path) -> None:
 
     # Check initialize was called
     assert service.repository.initialized  # type: ignore[attr-defined]
+
+
+def test_get_project_registry_service_validates_settings() -> None:
+    """Test that get_project_registry_service validates required settings."""
+    # Test with missing project_registry
+    mock_settings = Mock()
+    mock_settings.project_registry = None
+
+    with (
+        patch("tasky_settings.get_settings", return_value=mock_settings),
+        pytest.raises(ValueError, match="Project registry settings not configured"),
+    ):
+        get_project_registry_service()
+
+    # Test with missing registry_path
+    mock_settings.project_registry = Mock()
+    mock_settings.project_registry.registry_path = None
+
+    with (
+        patch("tasky_settings.get_settings", return_value=mock_settings),
+        pytest.raises(ValueError, match="Project registry path not configured"),
+    ):
+        get_project_registry_service()
+
+    # Test with empty registry_path
+    mock_settings.project_registry.registry_path = ""
+
+    with (
+        patch("tasky_settings.get_settings", return_value=mock_settings),
+        pytest.raises(ValueError, match="Project registry path not configured"),
+    ):
+        get_project_registry_service()

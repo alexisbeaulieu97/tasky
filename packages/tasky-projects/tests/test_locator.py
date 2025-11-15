@@ -2,6 +2,7 @@
 
 import json
 import os
+from collections.abc import Callable, Generator
 from pathlib import Path
 
 import pytest
@@ -11,6 +12,8 @@ from tasky_projects.locator import (
     find_projects_recursive,
     find_projects_upward,
 )
+
+StrPath = str | os.PathLike[str]
 
 
 @pytest.fixture
@@ -269,11 +272,22 @@ def test_find_projects_recursive_handles_permission_errors(
     # Mock os.walk to simulate permission error for one directory
     original_walk = os.walk
 
-    def mock_walk(top, onerror=None, **kwargs):  # noqa: ANN001, ANN003, ANN202
+    def mock_walk(
+        top: StrPath,
+        *,
+        topdown: bool = True,
+        onerror: Callable[[OSError], object] | None = None,
+        followlinks: bool = False,
+    ) -> Generator[tuple[str, list[str], list[str]]]:
         """Mock os.walk that simulates permission error."""
-        for root, dirs, files in original_walk(top, **kwargs):
+        for root, dirs, files in original_walk(
+            top,
+            topdown=topdown,
+            onerror=onerror,
+            followlinks=followlinks,
+        ):
             # Simulate permission error for specific directory
-            if "inaccessible" in root and onerror:
+            if "inaccessible" in str(root) and onerror:
                 onerror(PermissionError(f"Permission denied: {root}"))
                 continue
             yield root, dirs, files

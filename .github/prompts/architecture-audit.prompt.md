@@ -1,5 +1,5 @@
 ---
-mode: agent
+agent: agent
 ---
 
 Act as an expert software architect.

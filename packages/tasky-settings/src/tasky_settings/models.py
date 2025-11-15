@@ -1,5 +1,6 @@
 """Settings models for hierarchical configuration."""
 
+from pathlib import Path
 from typing import Literal
 
 from pydantic import BaseModel, Field
@@ -45,6 +46,27 @@ class StorageSettings(BaseModel):
     path: str = "tasks.json"
 
 
+class ProjectRegistrySettings(BaseModel):
+    """Project registry configuration settings.
+
+    Attributes:
+        registry_path: Path to the global project registry file
+        discovery_paths: Directories to search for projects during auto-discovery
+
+    """
+
+    registry_path: Path = Field(default=Path.home() / ".tasky" / "registry.json")
+    discovery_paths: list[Path] = Field(
+        default_factory=lambda: [
+            Path.home() / "projects",
+            Path.home() / "workspace",
+            Path.home() / "code",
+            Path.home() / "dev",
+            Path.home() / "src",
+        ],
+    )
+
+
 class AppSettings(BaseSettings):
     """Application-wide settings with hierarchical configuration.
 
@@ -59,6 +81,7 @@ class AppSettings(BaseSettings):
         logging: Logging configuration
         task_defaults: Default task creation settings
         storage: Storage backend configuration
+        project_registry: Project registry configuration
 
     """
 
@@ -71,3 +94,6 @@ class AppSettings(BaseSettings):
     logging: LoggingSettings = Field(default_factory=LoggingSettings)
     task_defaults: TaskDefaultsSettings = Field(default_factory=TaskDefaultsSettings)
     storage: StorageSettings = Field(default_factory=StorageSettings)
+    project_registry: ProjectRegistrySettings = Field(
+        default_factory=ProjectRegistrySettings,
+    )
