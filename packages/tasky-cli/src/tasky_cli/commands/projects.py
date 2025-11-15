@@ -57,7 +57,7 @@ def init_command(  # noqa: C901
 
 
 @project_app.command(name="info")
-def info_command(
+def info_command(  # noqa: C901
     project_name: str | None = typer.Option(
         None,
         "--project-name",
@@ -133,11 +133,23 @@ def list_command(  # noqa: C901
         "--no-discover",
         help="Skip auto-discovery of projects",
     ),
+    validate: bool = typer.Option(  # noqa: FBT001
+        False,  # noqa: FBT003
+        "--validate",
+        help="Check if all registered project paths still exist",
+    ),
+    clean: bool = typer.Option(  # noqa: FBT001
+        False,  # noqa: FBT003
+        "--clean",
+        help="Remove projects with missing paths from registry",
+    ),
 ) -> None:
     """List all registered tasky projects.
 
     On first use, automatically discovers and registers projects in common directories.
     Use --no-discover to skip automatic discovery.
+    Use --validate to check if all paths still exist.
+    Use --clean to remove projects with missing paths.
 
     """
     try:
@@ -162,6 +174,22 @@ def list_command(  # noqa: C901
             typer.echo("'tasky project discover' to search for existing projects.")
             return
 
+        # Find stale entries (paths that no longer exist)
+        stale_projects = [p for p in projects if not p.path.exists()]
+
+        # Clean stale entries if requested
+        if clean and stale_projects:
+            typer.echo(f"Removing {len(stale_projects)} stale project(s)...")
+            for project in stale_projects:
+                try:
+                    registry_service.unregister_project(project.path)
+                    typer.echo(f"  ✓ Removed: {project.name}")
+                except Exception as exc:  # noqa: BLE001
+                    typer.echo(f"  ✗ Failed to remove {project.name}: {exc}", err=True)
+
+            # Refresh project list
+            projects = [p for p in projects if p.path.exists()]
+
         # Display results with table format
         typer.echo("Projects:")
         for project in projects:
@@ -177,13 +205,27 @@ def list_command(  # noqa: C901
             )
             typer.echo(formatted_line)
 
+        # Show summary of stale entries
+        if stale_projects and not clean:
+            typer.echo("")
+            typer.echo(f"Note: {len(stale_projects)} project(s) have missing paths.")
+            typer.echo(
+                "Use 'tasky project list --clean' to remove them from the registry.",
+            )
+        elif validate:
+            typer.echo("")
+            if stale_projects:
+                typer.echo(f"✗ {len(stale_projects)} project(s) have missing paths")
+            else:
+                typer.echo("✓ All project paths are valid")
+
     except Exception as exc:
         typer.echo(f"Error: {exc}", err=True)
         raise typer.Exit(code=1) from exc
 
 
 @project_app.command(name="register")
-def register_command(
+def register_command(  # noqa: C901
     path: str = typer.Argument(..., help="Path to the project directory"),
 ) -> None:
     """Register a project in the global registry.
@@ -222,7 +264,7 @@ def register_command(
 
 
 @project_app.command(name="unregister")
-def unregister_command(
+def unregister_command(  # noqa: C901
     name: str = typer.Argument(..., help="Name of the project to unregister"),
     yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation prompt"),  # noqa: FBT001, FBT003
 ) -> None:
@@ -265,7 +307,7 @@ def unregister_command(
 
 
 @project_app.command(name="discover")
-def discover_command(
+def discover_command(  # noqa: C901
     paths: list[Path] | None = typer.Option(  # noqa: B008
         None,
         "--path",

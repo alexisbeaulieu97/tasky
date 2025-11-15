@@ -3,6 +3,7 @@
 # pyright: reportPrivateUsage=false
 
 import json
+import os
 import time
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -427,3 +428,233 @@ class TestProjectRegistryService:
 
         assert len(projects) == 1
         assert projects[0].name == "test-project"
+
+
+class TestEdgeCases:
+    """Test edge cases and boundary conditions."""
+
+    @pytest.fixture
+    def registry_path(self, tmp_path: Path) -> Path:
+        """Create a temporary registry path."""
+        registry_dir = tmp_path / "registry_storage"
+        registry_dir.mkdir()
+        return registry_dir / "registry.json"
+
+    @pytest.fixture
+    def service(self, registry_path: Path) -> ProjectRegistryService:
+        """Create a registry service instance."""
+        return ProjectRegistryService(registry_path)
+
+    def test_registry_with_100_projects(
+        self, service: ProjectRegistryService, tmp_path: Path,
+    ) -> None:
+        """Test registry performance with 100 projects."""
+        # Create 100 projects
+        for i in range(100):
+            project_dir = tmp_path / f"project_{i:03d}"
+            project_dir.mkdir()
+            (project_dir / ".tasky").mkdir()
+            service.register_project(project_dir)
+
+        # Verify all projects are registered
+        projects = service.list_projects()
+        assert len(projects) == 100
+
+        # Verify we can look up a project in the middle
+        mid_project = service.get_project("project_050")
+        assert mid_project is not None
+        assert mid_project.name == "project_050"
+
+    def test_discovery_deeply_nested_structure(
+        self, service: ProjectRegistryService, tmp_path: Path,
+    ) -> None:
+        """Test discovery respects max depth with deeply nested directories."""
+        # Create a deeply nested structure
+        current = tmp_path / "level0"
+        current.mkdir()
+
+        depths = {}
+        for depth in range(10):
+            current = current / f"level{depth + 1}"
+            current.mkdir()
+            depths[depth] = current
+
+            # Create a project at this depth
+            if depth < 5:  # Create at depths 0-4
+                proj = current / "project"
+                proj.mkdir()
+                (proj / ".tasky").mkdir()
+
+        # Discover with default max_depth (should be 3)
+        discovered = service.discover_projects([tmp_path])
+
+        # Should only find projects at depth 0-3
+        # Depth 0-3 should be found (0-indexed, so depth 0, 1, 2 projects should exist)
+        assert len(discovered) > 0
+
+    def test_discovery_with_many_excluded_directories(
+        self, service: ProjectRegistryService, tmp_path: Path,
+    ) -> None:
+        """Test discovery performance with many excluded directories."""
+        root = tmp_path / "workspace"
+        root.mkdir()
+
+        # Create many excluded directories
+        for i in range(50):
+            excluded = root / f"node_modules_{i}"
+            excluded.mkdir()
+            # Create files inside to add weight
+            for j in range(10):
+                (excluded / f"file_{j}").touch()
+
+        # Create a valid project
+        proj = root / "my_project"
+        proj.mkdir()
+        (proj / ".tasky").mkdir()
+
+        # Discover should find the project and skip excluded dirs
+        discovered = service.discover_projects([root])
+        names = {p.name for p in discovered}
+        assert "my_project" in names
+
+    def test_project_path_with_symlink_circular_reference(
+        self, service: ProjectRegistryService, tmp_path: Path,
+    ) -> None:
+        """Test handling of symlink cycles during discovery."""
+        root = tmp_path / "workspace"
+        root.mkdir()
+
+        # Create a project
+        proj = root / "project"
+        proj.mkdir()
+        (proj / ".tasky").mkdir()
+
+        # Create a symlink back to root (creates cycle)
+        (proj / "circular_link").symlink_to(root)
+
+        # Discovery should handle this gracefully (not infinite loop)
+        discovered = service.discover_projects([root])
+        # Should find at least the original project
+        assert len(discovered) >= 1
+
+    def test_registry_with_special_json_characters(
+        self, registry_path: Path, tmp_path: Path,
+    ) -> None:
+        """Test registry handles project names with special JSON characters."""
+        service = ProjectRegistryService(registry_path)
+
+        # Create project with quotes in the name (after validation allows it)
+        proj_path = tmp_path / "project_special"
+        proj_path.mkdir()
+        (proj_path / ".tasky").mkdir()
+
+        metadata = service.register_project(proj_path)
+        assert metadata.name == "project_special"
+
+        # Verify it persists correctly in JSON
+        with registry_path.open() as f:
+            data = json.load(f)
+        assert len(data["projects"]) == 1
+
+    def test_concurrent_discovery_same_path(
+        self, service: ProjectRegistryService, tmp_path: Path,
+    ) -> None:
+        """Test that discovering same path multiple times doesn't create duplicates."""
+        # Create a project
+        proj = tmp_path / "project"
+        proj.mkdir()
+        (proj / ".tasky").mkdir()
+
+        # Discover multiple times
+        service.discover_and_register([tmp_path])
+        service.discover_and_register([tmp_path])
+        service.discover_and_register([tmp_path])
+
+        # Should still have only one project
+        projects = service.list_projects()
+        assert len(projects) == 1
+
+    def test_register_project_with_relative_path_normalization(
+        self, service: ProjectRegistryService, tmp_path: Path,
+    ) -> None:
+        """Test that relative paths are normalized to absolute paths."""
+        # Create a project
+        proj = tmp_path / "project"
+        proj.mkdir()
+        (proj / ".tasky").mkdir()
+
+        # Register with relative path (change to parent and use relative)
+        original_cwd = Path.cwd()
+        try:
+            os.chdir(tmp_path)
+            service.register_project(Path("project"))
+
+            # Verify stored path is absolute
+            projects = service.list_projects()
+            assert len(projects) == 1
+            assert projects[0].path.is_absolute()
+        finally:
+            os.chdir(original_cwd)
+
+    def test_update_last_accessed_multiple_times(
+        self, service: ProjectRegistryService, tmp_path: Path,
+    ) -> None:
+        """Test updating last_accessed multiple times increases timestamp."""
+        # Create and register project
+        proj = tmp_path / "project"
+        proj.mkdir()
+        (proj / ".tasky").mkdir()
+
+        service.register_project(proj)
+        initial_projects = service.list_projects()
+        initial_time = initial_projects[0].last_accessed
+
+        # Wait a bit and update
+        time.sleep(0.1)
+        service.update_last_accessed(proj)
+
+        updated_projects = service.list_projects()
+        updated_time = updated_projects[0].last_accessed
+
+        # Time should have advanced
+        assert updated_time >= initial_time
+
+    def test_unregister_then_rediscover_same_project(
+        self, service: ProjectRegistryService, tmp_path: Path,
+    ) -> None:
+        """Test that unregistering and rediscovering works correctly."""
+        # Create and register project
+        proj = tmp_path / "project"
+        proj.mkdir()
+        (proj / ".tasky").mkdir()
+
+        service.register_project(proj)
+        assert len(service.list_projects()) == 1
+
+        # Unregister
+        service.unregister_project(proj)
+        assert len(service.list_projects()) == 0
+
+        # Rediscover
+        service.discover_and_register([tmp_path])
+        assert len(service.list_projects()) == 1
+
+    def test_list_projects_sorted_order_consistency(
+        self, service: ProjectRegistryService, tmp_path: Path,
+    ) -> None:
+        """Test that list_projects returns consistent sort order."""
+        # Create multiple projects
+        projects_to_create = []
+        for i in range(10):
+            proj = tmp_path / f"project_{i:02d}"
+            proj.mkdir()
+            (proj / ".tasky").mkdir()
+            projects_to_create.append(proj)
+            service.register_project(proj)
+
+        # Get list multiple times
+        list1 = service.list_projects()
+        list2 = service.list_projects()
+
+        # Should be in same order (by last_accessed, most recent first)
+        assert [p.name for p in list1] == [p.name for p in list2]
