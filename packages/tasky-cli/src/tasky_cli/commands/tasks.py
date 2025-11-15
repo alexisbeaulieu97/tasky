@@ -15,7 +15,8 @@ from uuid import UUID
 import click
 import typer
 from pydantic import ValidationError as PydanticValidationError
-from tasky_settings import ProjectNotFoundError, create_task_service
+from tasky_settings import ProjectNotFoundError, create_task_service, get_project_registry_service
+from tasky_settings.factory import find_project_root
 from tasky_storage.errors import StorageError
 from tasky_tasks import (
     ExportError,
@@ -443,6 +444,9 @@ def create_command(
     typer.echo(f"Status: {task.status.value.upper()}")
     typer.echo(f"Created: {task.created_at.strftime('%Y-%m-%d %H:%M:%S')}")
 
+    # Update project last accessed timestamp
+    _update_project_last_accessed()
+
 
 @task_app.command(name="update")
 @with_task_error_handling
@@ -499,6 +503,9 @@ def update_command(
     typer.echo(f"Status: {task.status.value.upper()}")
     typer.echo(f"Modified: {task.updated_at.strftime('%Y-%m-%d %H:%M:%S')}")
 
+    # Update project last accessed timestamp
+    _update_project_last_accessed()
+
 
 def _get_service() -> TaskService:
     """Get or create a task service for the current project.
@@ -512,6 +519,25 @@ def _get_service() -> TaskService:
 
     """
     return create_task_service()
+
+
+def _update_project_last_accessed() -> None:
+    """Update the last accessed timestamp for the current project in the registry.
+
+    This is called after any task operation to keep the registry's
+    last_accessed timestamp current.
+
+    """
+    try:
+        project_root = find_project_root()
+        registry_service = get_project_registry_service()
+        registry_service.update_last_accessed(project_root)
+    except Exception as exc:  # noqa: BLE001
+        # Silently ignore registry update failures to not disrupt task operations
+        # The registry is a secondary feature and should not block core functionality
+        import logging  # noqa: PLC0415
+        logger = logging.getLogger(__name__)
+        logger.debug("Failed to update project last_accessed timestamp: %s", exc)
 
 
 def _convert_context(ctx: click.Context | None) -> typer.Context | None:
@@ -817,6 +843,9 @@ def complete_command(task_id: str) -> None:
     typer.echo(f"✓ Task completed: {task.name}")
     typer.echo(f"  Completed at: {task.updated_at.strftime('%Y-%m-%d %H:%M:%S')}")
 
+    # Update project last accessed timestamp
+    _update_project_last_accessed()
+
 
 @task_app.command(name="cancel")
 @with_task_error_handling
@@ -831,6 +860,9 @@ def cancel_command(task_id: str) -> None:
     task = service.cancel_task(uuid)
     typer.echo(f"✗ Task cancelled: {task.name}")
 
+    # Update project last accessed timestamp
+    _update_project_last_accessed()
+
 
 @task_app.command(name="reopen")
 @with_task_error_handling
@@ -844,6 +876,9 @@ def reopen_command(task_id: str) -> None:
     service, uuid = _parse_task_id_and_get_service(task_id)
     task = service.reopen_task(uuid)
     typer.echo(f"↻ Task reopened: {task.name}")
+
+    # Update project last accessed timestamp
+    _update_project_last_accessed()
 
 
 @task_app.command(name="export")

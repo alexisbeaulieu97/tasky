@@ -87,7 +87,7 @@ class TestListCommand:
         assert result.exit_code == 0
         assert "Discovering projects" in result.stdout
         assert "Discovered and registered 1 project(s)" in result.stdout
-        assert "Found 1 registered project:" in result.stdout
+        assert "Projects:" in result.stdout
         assert "test-project" in result.stdout
 
     def test_list_shows_registered_projects(
@@ -109,7 +109,7 @@ class TestListCommand:
         result = runner.invoke(project_app, ["list", "--no-discover"])
 
         assert result.exit_code == 0
-        assert "Found 2 registered projects:" in result.stdout
+        assert "Projects:" in result.stdout
         assert "project1" in result.stdout
         assert "project2" in result.stdout
         assert "Last accessed:" in result.stdout
@@ -132,7 +132,8 @@ class TestListCommand:
         result = runner.invoke(project_app, ["list", "--no-discover"])
 
         assert result.exit_code == 0
-        assert "project [MISSING]" in result.stdout
+        assert "[MISSING]" in result.stdout
+        assert "project" in result.stdout
 
 
 class TestRegisterCommand:
@@ -286,7 +287,7 @@ class TestUnregisterCommand:
 
         assert result.exit_code == 1
         output = result.stdout + result.stderr
-        assert "Error: Project 'nonexistent' not found" in output
+        assert "Error: Project not found: nonexistent" in output
         assert "tasky project list" in output
 
 

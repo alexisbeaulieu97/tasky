@@ -2,7 +2,7 @@
 
 import json
 import logging
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import ClassVar
@@ -249,17 +249,21 @@ class ProjectRegistryService:
     def discover_projects(  # noqa: C901
         self,
         search_paths: list[Path],
+        progress_callback: Callable[[int], None] | None = None,
     ) -> list[ProjectMetadata]:
         """Discover projects in the given search paths.
 
         Args:
             search_paths: List of paths to search for projects
+            progress_callback: Optional callable that receives directories_checked
+                for progress updates
 
         Returns:
             List of discovered project metadata (deduplicated)
 
         """
         discovered: dict[Path, ProjectMetadata] = {}
+        directories_checked = 0
 
         for search_path in search_paths:
             if not search_path.exists():
@@ -269,6 +273,10 @@ class ProjectRegistryService:
             logger.info("Discovering projects in: %s", search_path)
 
             for directory in self._walk_directories(search_path):
+                directories_checked += 1
+                if progress_callback:
+                    progress_callback(directories_checked)
+
                 tasky_dir = directory / ".tasky"
                 if tasky_dir.exists() and tasky_dir.is_dir():
                     # Found a project
@@ -286,17 +294,20 @@ class ProjectRegistryService:
     def discover_and_register(
         self,
         search_paths: list[Path],
+        progress_callback: Callable[[int], None] | None = None,
     ) -> int:
         """Discover and register projects in the given paths.
 
         Args:
             search_paths: List of paths to search for projects
+            progress_callback: Optional callable that receives directories_checked
+                for progress updates
 
         Returns:
             Number of newly registered projects
 
         """
-        discovered = self.discover_projects(search_paths)
+        discovered = self.discover_projects(search_paths, progress_callback)
         registry = self.registry
         new_count = 0
 

@@ -157,18 +157,20 @@ def list_command(  # noqa: C901
             typer.echo("'tasky project discover' to search for existing projects.")
             return
 
-        # Display results
-        count = len(projects)
-        plural = "project" if count == 1 else "projects"
-        typer.echo(f"Found {count} registered {plural}:\n")
-
+        # Display results with table format
+        typer.echo("Projects:")
         for project in projects:
             # Check if path still exists
             status = "" if project.path.exists() else " [MISSING]"
-            typer.echo(f"  {project.name}{status}")
-            typer.echo(f"    Path: {project.path}")
-            typer.echo(f"    Last accessed: {project.last_accessed.strftime('%Y-%m-%d %H:%M')}")
-            typer.echo()  # Blank line between projects
+            # Shorten path to use ~ for home directory
+            path_display = str(project.path).replace(str(Path.home()), "~")
+            last_accessed_str = project.last_accessed.strftime("%Y-%m-%d %H:%M")
+            # Format as: name  path  Last accessed: timestamp
+            formatted_line = (
+                f"  {project.name:<20} {path_display:<30} "
+                f"Last accessed: {last_accessed_str}{status}"
+            )
+            typer.echo(formatted_line)
 
     except Exception as exc:
         typer.echo(f"Error: {exc}", err=True)
@@ -228,8 +230,8 @@ def unregister_command(  # noqa: C901
         # Get project to confirm it exists
         project = registry_service.get_project(name)
         if not project:
-            typer.echo(f"Error: Project '{name}' not found in registry.", err=True)
-            typer.echo("Run 'tasky project list' to see all registered projects.", err=True)
+            typer.echo(f"Error: Project not found: {name}", err=True)
+            typer.echo("Run 'tasky project list' to see registered projects.", err=True)
             raise typer.Exit(code=1)  # noqa: TRY301
 
         # Confirm deletion
@@ -281,8 +283,20 @@ def discover_command(  # noqa: C901
             typer.echo(f"  - {path}")
         typer.echo()
 
-        # Discover and register
-        new_count = registry_service.discover_and_register(search_paths)
+        # Progress callback to show directory count during discovery
+        def show_progress(directories_checked: int) -> None:
+            # Use \r to overwrite the line (carriage return)
+            typer.echo(f"Scanning... ({directories_checked} directories checked)", nl=False)
+            typer.echo("\r", nl=False)
+
+        # Discover and register with progress
+        new_count = registry_service.discover_and_register(
+            search_paths,
+            progress_callback=show_progress,
+        )
+
+        # Clear the progress line
+        typer.echo()
 
         if new_count > 0:
             typer.echo(f"✓ Discovered and registered {new_count} new project(s)")
