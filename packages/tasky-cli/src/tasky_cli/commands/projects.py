@@ -119,8 +119,9 @@ def info_command(
             raise typer.Exit(code=1) from exc
 
         # Display project information
+        project_root = tasky_dir.parent.resolve()
         typer.echo("Project Information:")
-        typer.echo(f"  Location: {tasky_dir.absolute()}")
+        typer.echo(f"  Location: {project_root}")
         typer.echo(f"  Backend: {settings.storage.backend}")
         typer.echo(f"  Storage: {settings.storage.path}")
 
