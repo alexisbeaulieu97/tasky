@@ -36,7 +36,7 @@ Tick off each change as you complete it (mirrors the execution order below).
 
 ### 🚀 Phase 7: Code Quality & Testing (224 tasks, ~91 hours)
 - [x] 7.1 `improve-storage-backend-testing` (35 tasks, ~26h)
-- [ ] 7.2 `improve-cli-test-coverage` (47 tasks, ~22h)
+- [x] 7.2 `improve-cli-test-coverage` (47 tasks, ~22h)
 - [ ] 7.3 `refactor-storage-duplication` (30 tasks, ~7h)
 - [ ] 7.4 `improve-performance-and-safety` (42 tasks, ~21h)
 - [ ] 7.5 `improve-architecture-and-documentation` (44 tasks, ~15h)
