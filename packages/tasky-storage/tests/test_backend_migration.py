@@ -131,8 +131,8 @@ class TestBackendMigration:
         assert json_completed == sqlite_completed
         assert json_cancelled == sqlite_cancelled
 
-    def test_migration_with_error_rollback(self, tmp_path: Path) -> None:  # noqa: C901
-        """Test that migration failures can be rolled back."""
+    def test_migration_partial_state_after_error(self, tmp_path: Path) -> None:  # noqa: C901
+        """Test that migration errors leave detectable partial state."""
         json_path = tmp_path / "tasks.json"
         sqlite_path = tmp_path / "tasks.db"
 
@@ -146,7 +146,7 @@ class TestBackendMigration:
         sqlite_repo = SqliteTaskRepository.from_path(sqlite_path)
 
         # Simulate partial migration with error
-        def _migrate_with_simulated_error() -> tuple[int, bool]:
+        def _migrate_with_simulated_error() -> int:
             """Simulate migration error after 5 tasks."""
             count = 0
             for i, task in enumerate(json_repo.get_all_tasks()):
@@ -156,12 +156,12 @@ class TestBackendMigration:
                     raise ValueError(msg)
                 sqlite_repo.save_task(task)
                 count += 1
-            return count, False
+            return count
 
         migration_error_occurred = False
         migrated_count = 0
         try:
-            migrated_count, _ = _migrate_with_simulated_error()
+            migrated_count = _migrate_with_simulated_error()
         except ValueError:
             migration_error_occurred = True
 
@@ -170,8 +170,7 @@ class TestBackendMigration:
         assert migrated_count == 0  # Count not updated before exception
         assert len(sqlite_repo.get_all_tasks()) == 5
 
-        # In a real scenario, we'd implement rollback here
-        # For now, verify we can detect partial state
+        # Verify we can detect partial state for recovery/cleanup
 
     def test_filtering_behavior_identical_after_migration(self, tmp_path: Path) -> None:
         """Test that filtering produces identical results after migration."""
@@ -302,11 +301,13 @@ class TestCrossBackendBehavioralIdentity:
         sqlite_repo: SqliteTaskRepository,
     ) -> None:
         """Test that filtering produces identical results."""
-        # Create identical dataset in both
+        # Create identical dataset in both using same task instances
+        tasks: list[TaskModel] = []
         for i in range(50):
             task = TaskModel(name=f"Task-{i}", details=f"Details {i}")
             if i % 3 == 0:
                 task.complete()
+            tasks.append(task)
             json_repo.save_task(task)
             sqlite_repo.save_task(task)
 
@@ -314,8 +315,11 @@ class TestCrossBackendBehavioralIdentity:
         json_completed = json_repo.get_tasks_by_status(TaskStatus.COMPLETED)
         sqlite_completed = sqlite_repo.get_tasks_by_status(TaskStatus.COMPLETED)
 
-        # Verify counts match
+        # Verify counts and IDs match
         assert len(json_completed) == len(sqlite_completed)
+        json_ids = {t.task_id for t in json_completed}
+        sqlite_ids = {t.task_id for t in sqlite_completed}
+        assert json_ids == sqlite_ids
 
     def test_edge_case_empty_database(
         self,

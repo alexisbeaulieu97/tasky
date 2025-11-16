@@ -536,6 +536,22 @@ class TestSqliteErrorPaths:
         task = TaskModel(name="Original", details="Original details")
         repo.save_task(task)
 
+        errors = self._run_concurrent_updates(repo, task)
+
+        # Should complete without errors (last write wins)
+        assert len(errors) == 0
+
+        # Verify task exists and has one of the updated names
+        final_task = repo.get_task(task.task_id)
+        assert final_task is not None
+        assert final_task.name.startswith("Name-")
+
+    def _run_concurrent_updates(  # noqa: C901
+        self,
+        repo: SqliteTaskRepository,
+        task: TaskModel,
+    ) -> list[Exception]:  # type: ignore[type-arg]
+        """Run concurrent updates on a task."""
         errors: list[Exception] = []
         lock = threading.Lock()
 
@@ -560,13 +576,7 @@ class TestSqliteErrorPaths:
         for thread in threads:
             thread.join()
 
-        # Should complete without errors (last write wins)
-        assert len(errors) == 0
-
-        # Verify task exists and has one of the updated names
-        final_task = repo.get_task(task.task_id)
-        assert final_task is not None
-        assert final_task.name.startswith("Name-")
+        return errors
 
 
 class TestSqliteConcurrencyAndStress:
@@ -578,13 +588,32 @@ class TestSqliteConcurrencyAndStress:
         repo = SqliteTaskRepository(path=db_path)
         repo.initialize()
 
+        errors, created_count = self._bulk_create_tasks(repo, threads=10, tasks_per_thread=50)
+
+        # Verify no errors
+        assert len(errors) == 0, f"Errors during bulk writes: {errors}"
+
+        # Verify all tasks were created
+        assert created_count[0] == 500
+
+        # Verify database has all tasks
+        all_tasks = repo.get_all_tasks()
+        assert len(all_tasks) == 500
+
+    def _bulk_create_tasks(  # noqa: C901
+        self,
+        repo: SqliteTaskRepository,
+        threads: int,
+        tasks_per_thread: int,
+    ) -> tuple[list[Exception], list[int]]:  # type: ignore[type-arg]
+        """Bulk create tasks concurrently."""
         errors: list[Exception] = []
         created_count = [0]
         lock = threading.Lock()
 
         def bulk_create(thread_id: int) -> None:
             try:
-                for i in range(50):
+                for i in range(tasks_per_thread):
                     task = TaskModel(
                         name=f"Task-T{thread_id}-{i}",
                         details=f"Bulk create test {i}",
@@ -596,24 +625,15 @@ class TestSqliteConcurrencyAndStress:
                 with lock:
                     errors.append(e)
 
-        # 10 threads x 50 tasks = 500 tasks
-        threads = [threading.Thread(target=bulk_create, args=(i,)) for i in range(10)]
+        thread_list = [threading.Thread(target=bulk_create, args=(i,)) for i in range(threads)]
 
-        for thread in threads:
+        for thread in thread_list:
             thread.start()
 
-        for thread in threads:
+        for thread in thread_list:
             thread.join()
 
-        # Verify no errors
-        assert len(errors) == 0, f"Errors during bulk writes: {errors}"
-
-        # Verify all tasks were created
-        assert created_count[0] == 500
-
-        # Verify database has all tasks
-        all_tasks = repo.get_all_tasks()
-        assert len(all_tasks) == 500
+        return errors, created_count
 
     def test_concurrent_read_heavy_workload(self, tmp_path: Path) -> None:
         """Test many concurrent readers with occasional writers."""
@@ -626,6 +646,26 @@ class TestSqliteConcurrencyAndStress:
             task = TaskModel(name=f"Initial-{i}", details=f"Task {i}")
             repo.save_task(task)
 
+        errors, read_count, write_count = self._run_read_heavy_workload(repo)
+
+        # Verify no errors
+        assert len(errors) == 0, f"Errors during read-heavy workload: {errors}"
+
+        # Verify all reads completed
+        assert read_count[0] == 2000  # 20 readers x 100 reads
+
+        # Verify all writes completed
+        assert write_count[0] == 20  # 2 writers x 10 writes
+
+        # Verify final database state
+        all_tasks = repo.get_all_tasks()
+        assert len(all_tasks) == 120  # 100 initial + 20 new
+
+    def _run_read_heavy_workload(  # noqa: C901
+        self,
+        repo: SqliteTaskRepository,
+    ) -> tuple[list[Exception], list[int], list[int]]:  # type: ignore[type-arg]
+        """Run read-heavy workload with concurrent readers and writers."""
         errors: list[Exception] = []
         read_count = [0]
         write_count = [0]
@@ -665,18 +705,7 @@ class TestSqliteConcurrencyAndStress:
         for thread in all_threads:
             thread.join()
 
-        # Verify no errors
-        assert len(errors) == 0, f"Errors during read-heavy workload: {errors}"
-
-        # Verify all reads completed
-        assert read_count[0] == 2000  # 20 readers x 100 reads
-
-        # Verify all writes completed
-        assert write_count[0] == 20  # 2 writers x 10 writes
-
-        # Verify final database state
-        all_tasks = repo.get_all_tasks()
-        assert len(all_tasks) == 120  # 100 initial + 20 new
+        return errors, read_count, write_count
 
     def test_large_dataset_filtering_performance(self, tmp_path: Path) -> None:
         """Test filtering operations on a large dataset."""
@@ -787,6 +816,22 @@ class TestSqliteConcurrencyAndStress:
             repo.save_task(task)
             initial_tasks.append(task)
 
+        errors = self._run_mixed_operations(repo, initial_tasks)
+
+        # Verify no errors
+        assert len(errors) == 0, f"Errors during mixed operations: {errors}"
+
+        # Verify final state is consistent
+        all_tasks = repo.get_all_tasks()
+        # 50 initial - 10 deleted + 40 created = 80 tasks
+        assert len(all_tasks) == 80
+
+    def _run_mixed_operations(  # noqa: C901
+        self,
+        repo: SqliteTaskRepository,
+        initial_tasks: list[TaskModel],
+    ) -> list[Exception]:  # type: ignore[type-arg]
+        """Run mixed concurrent operations."""
         errors: list[Exception] = []
         lock = threading.Lock()
 
@@ -843,10 +888,4 @@ class TestSqliteConcurrencyAndStress:
         for thread in threads:
             thread.join()
 
-        # Verify no errors
-        assert len(errors) == 0, f"Errors during mixed operations: {errors}"
-
-        # Verify final state is consistent
-        all_tasks = repo.get_all_tasks()
-        # 50 initial - 10 deleted + 40 created = 80 tasks
-        assert len(all_tasks) == 80
+        return errors
