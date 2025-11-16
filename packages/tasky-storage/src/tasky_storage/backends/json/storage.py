@@ -3,29 +3,12 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime
-from enum import Enum
 from pathlib import Path
 from typing import Any
-from uuid import UUID
 
 from pydantic import BaseModel
 
 from tasky_storage.errors import StorageDataError
-
-
-class TaskyJSONEncoder(json.JSONEncoder):
-    """JSON encoder that handles datetime, UUID, and enum objects."""
-
-    def default(self, o: Any) -> Any:  # noqa: ANN401
-        """Encode datetime, UUID, and enum objects to JSON-serializable strings."""
-        if isinstance(o, datetime):
-            return o.isoformat()
-        if isinstance(o, UUID):
-            return str(o)
-        if isinstance(o, Enum):
-            return o.value
-        return super().default(o)
 
 
 class JsonStorage(BaseModel):
@@ -34,12 +17,16 @@ class JsonStorage(BaseModel):
     path: Path
 
     def initialize(self, template: dict[str, Any]) -> None:
-        """Create the storage file with a template if it does not already exist."""
+        """Create the storage file with a template if it does not already exist.
+
+        The template should already be JSON-serializable (e.g., from Pydantic's
+        model_dump(mode='json')).
+        """
         if not self.path.exists():
             try:
                 self.path.parent.mkdir(parents=True, exist_ok=True)
                 self.path.write_text(
-                    json.dumps(template, indent=2, cls=TaskyJSONEncoder),
+                    json.dumps(template, indent=2),
                     encoding="utf-8",
                 )
             except (OSError, ValueError, TypeError) as exc:
@@ -56,11 +43,15 @@ class JsonStorage(BaseModel):
             raise StorageDataError(msg) from exc
 
     def save(self, data: dict[str, Any]) -> None:
-        """Serialize and persist the provided document."""
+        """Serialize and persist the provided document.
+
+        The data should already be JSON-serializable (e.g., from Pydantic's
+        model_dump(mode='json')).
+        """
         try:
             self.path.parent.mkdir(parents=True, exist_ok=True)
             self.path.write_text(
-                json.dumps(data, indent=2, cls=TaskyJSONEncoder),
+                json.dumps(data, indent=2),
                 encoding="utf-8",
             )
         except (OSError, ValueError, TypeError) as exc:

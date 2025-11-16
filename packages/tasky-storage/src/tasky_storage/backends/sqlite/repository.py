@@ -7,7 +7,6 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
-from pydantic import ValidationError
 from tasky_logging import get_logger
 
 from tasky_storage.backends.sqlite.connection import get_connection
@@ -138,9 +137,9 @@ class SqliteTaskRepository:
                     return None
 
                 # Note: row_to_snapshot returns dict with ISO string datetimes,
-                # _snapshot_to_task converts them back to datetime objects
+                # snapshot_to_task_model converts them back to datetime objects
                 snapshot = row_to_snapshot(row)
-                return self._snapshot_to_task(snapshot)
+                return snapshot_to_task_model(snapshot)
         except sqlite3.Error as exc:
             msg = f"Database error retrieving task {task_id}: {exc}"
             raise StorageError(msg) from exc
@@ -167,7 +166,7 @@ class SqliteTaskRepository:
                 cursor.execute("SELECT * FROM tasks ORDER BY created_at DESC")
                 rows = cursor.fetchall()
 
-                tasks = [self._snapshot_to_task(row_to_snapshot(row)) for row in rows]
+                tasks = [snapshot_to_task_model(row_to_snapshot(row)) for row in rows]
                 logger.debug("Retrieved all tasks: count=%d", len(tasks))
                 return tasks
         except sqlite3.Error as exc:
@@ -204,7 +203,7 @@ class SqliteTaskRepository:
                 )
                 rows = cursor.fetchall()
 
-                tasks = [self._snapshot_to_task(row_to_snapshot(row)) for row in rows]
+                tasks = [snapshot_to_task_model(row_to_snapshot(row)) for row in rows]
                 logger.debug(
                     "Retrieved tasks by status: status=%s, count=%d",
                     status.value,
@@ -323,7 +322,7 @@ class SqliteTaskRepository:
                 cursor.execute(query, params)
                 rows = cursor.fetchall()
 
-                tasks = [self._snapshot_to_task(row_to_snapshot(row)) for row in rows]
+                tasks = [snapshot_to_task_model(row_to_snapshot(row)) for row in rows]
                 logger.debug("Found tasks: count=%d", len(tasks))
                 return tasks
         except sqlite3.Error as exc:
@@ -414,28 +413,3 @@ class SqliteTaskRepository:
         repository = cls(path=path)
         repository.initialize()
         return repository
-
-    @staticmethod
-    def _snapshot_to_task(snapshot: dict[str, Any]) -> TaskModel:
-        """Convert a snapshot to a TaskModel, handling validation errors.
-
-        Parameters
-        ----------
-        snapshot:
-            Dictionary representation of a task
-
-        Returns
-        -------
-        TaskModel:
-            Validated task model
-
-        Raises
-        ------
-        StorageDataError:
-            If validation fails
-
-        """
-        try:
-            return snapshot_to_task_model(snapshot)
-        except ValidationError as exc:
-            raise StorageDataError(exc) from exc

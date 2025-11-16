@@ -7,7 +7,7 @@ TaskModel instances through a JsonStorage backend and TaskDocument structure.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from pydantic import BaseModel, ValidationError
 from tasky_logging import get_logger
@@ -37,7 +37,7 @@ class JsonTaskRepository(BaseModel):
 
     def initialize(self) -> None:
         """Initialize storage with empty task document if needed."""
-        template = TaskDocument.create_empty().model_dump()
+        template = TaskDocument.create_empty().model_dump(mode="json")
         self.storage.initialize(template)
 
     def save_task(self, task: TaskModel) -> None:
@@ -50,7 +50,7 @@ class JsonTaskRepository(BaseModel):
 
         snapshot = task_model_to_snapshot(task)
         document.add_task(str(task.task_id), snapshot)
-        self.storage.save(document.model_dump())
+        self.storage.save(document.model_dump(mode="json"))
 
     def get_task(self, task_id: UUID) -> TaskModel | None:
         """Retrieve a task by ID."""
@@ -63,7 +63,7 @@ class JsonTaskRepository(BaseModel):
         if snapshot is None:
             return None
 
-        return self._snapshot_to_task(snapshot)
+        return snapshot_to_task_model(snapshot)
 
     def get_all_tasks(self) -> list[TaskModel]:
         """Retrieve all tasks."""
@@ -72,7 +72,7 @@ class JsonTaskRepository(BaseModel):
         if document is None:
             return []
 
-        tasks = [self._snapshot_to_task(snapshot) for snapshot in document.list_tasks()]
+        tasks = [snapshot_to_task_model(snapshot) for snapshot in document.list_tasks()]
         logger.debug("Retrieved all tasks: count=%d", len(tasks))
         return tasks
 
@@ -96,7 +96,7 @@ class JsonTaskRepository(BaseModel):
             return []
 
         tasks = [
-            self._snapshot_to_task(snapshot)
+            snapshot_to_task_model(snapshot)
             for snapshot in document.list_tasks()
             if snapshot.get("status") == status.value
         ]
@@ -130,7 +130,7 @@ class JsonTaskRepository(BaseModel):
         tasks = [
             task
             for snapshot in document.list_tasks()
-            if (task := self._snapshot_to_task(snapshot)) and task_filter.matches(task)
+            if (task := snapshot_to_task_model(snapshot)) and task_filter.matches(task)
         ]
         logger.debug("Found tasks: count=%d", len(tasks))
         return tasks
@@ -144,7 +144,7 @@ class JsonTaskRepository(BaseModel):
 
         removed = document.remove_task(str(task_id))
         if removed:
-            self.storage.save(document.model_dump())
+            self.storage.save(document.model_dump(mode="json"))
             logger.debug("Task deleted: id=%s", task_id)
 
         return removed
@@ -176,13 +176,6 @@ class JsonTaskRepository(BaseModel):
         data = self.storage.load()
         try:
             return TaskDocument.model_validate(data)
-        except ValidationError as exc:
-            raise StorageDataError(exc) from exc
-
-    @staticmethod
-    def _snapshot_to_task(snapshot: dict[str, Any]) -> TaskModel:
-        try:
-            return snapshot_to_task_model(snapshot)
         except ValidationError as exc:
             raise StorageDataError(exc) from exc
 
