@@ -265,6 +265,95 @@ class TestTaskCreateErrors:
         assert "Examples:" in result.stdout
 
 
+class TestTaskCreateErrorCases:
+    """Test error handling for task create command."""
+
+    def test_create_task_missing_name(
+        self,
+        runner: CliRunner,
+        initialized_project: Path,  # noqa: ARG002
+    ) -> None:
+        """Test that creating task without name fails."""
+        result = runner.invoke(task_app, ["create"])
+
+        assert result.exit_code != 0
+        assert "Missing argument" in result.stderr or "required" in result.stderr.lower()
+
+    def test_create_task_empty_name_string(
+        self,
+        runner: CliRunner,
+        initialized_project: Path,  # noqa: ARG002
+    ) -> None:
+        """Test that creating task with empty name fails validation."""
+        result = runner.invoke(task_app, ["create", "", "Details"])
+
+        # Empty string should be caught as validation error
+        assert result.exit_code != 0
+
+    def test_create_task_missing_details(
+        self,
+        runner: CliRunner,
+        initialized_project: Path,  # noqa: ARG002
+    ) -> None:
+        """Test that creating task without details fails."""
+        result = runner.invoke(task_app, ["create", "Task Name"])
+
+        assert result.exit_code != 0
+        assert "Missing argument" in result.stderr or "required" in result.stderr.lower()
+
+    def test_create_task_with_very_long_name(
+        self,
+        runner: CliRunner,
+        initialized_project: Path,  # noqa: ARG002
+    ) -> None:
+        """Test creating task with extremely long name."""
+        # Test with 1000+ character name
+        very_long_name = "A" * 1500
+        result = runner.invoke(task_app, ["create", very_long_name, "Details"])
+
+        # Should either succeed or fail gracefully
+        if result.exit_code != 0:
+            assert "Error" in result.stderr
+        else:
+            # If it succeeds, verify the task was created
+            assert "Task created successfully" in result.stdout
+
+    def test_create_task_storage_write_fails(
+        self,
+        runner: CliRunner,
+        initialized_project: Path,  # noqa: ARG002
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Test handling when storage write fails."""
+        from tasky_cli.commands import tasks as tasks_module  # noqa: PLC0415
+        from tasky_storage.errors import StorageError  # noqa: PLC0415
+
+        class _FailingTaskService:
+            def create_task(self, *args: object, **kwargs: object) -> None:  # noqa: ARG002
+                raise StorageError("Disk full")  # noqa: EM101, TRY003
+
+        def _factory() -> _FailingTaskService:
+            return _FailingTaskService()
+
+        monkeypatch.setattr(tasks_module, "_get_service", _factory)
+
+        result = runner.invoke(task_app, ["create", "Task", "Details"])
+
+        assert result.exit_code == 3  # Storage error exit code
+        assert "Storage failure" in result.stderr
+
+    def test_create_task_project_not_found(
+        self,
+        runner: CliRunner,
+    ) -> None:
+        """Test that creating task without initialized project fails."""
+        with runner.isolated_filesystem():
+            result = runner.invoke(task_app, ["create", "Task", "Details"])
+
+            assert result.exit_code != 0
+            assert "No project found" in result.stderr or "project init" in result.stderr.lower()
+
+
 class TestTaskCreateIntegration:
     """Integration tests for task create with other commands."""
 
