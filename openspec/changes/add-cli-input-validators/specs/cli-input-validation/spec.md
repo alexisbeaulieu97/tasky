@@ -1,8 +1,34 @@
 ## ADDED Requirements
 
+### Conventions (Required)
+
+This change MUST follow project patterns:
+- **Model-driven validation**: Validation happens by attempting to create/parse Pydantic models. CLI catches `ValidationError` and displays user-friendly messages.
+- **No separate Validator protocol**: Don't create a standalone validation system. Use Pydantic `@field_validator` on models.
+- **ValidationResult usage**: Only as a light wrapper if needed for CLI-specific validation beyond model creation. Prefer raising Pydantic `ValidationError`.
+- **Typer integration**: Use `typer.Option()` with type hints; Typer and Pydantic handle validation together.
+
 ### Requirement: Input Validation Framework
 
 The CLI SHALL provide a `Validator` protocol and concrete implementations for validating user input before service invocation. Each validator SHALL return a `ValidationResult[T]` containing either a valid typed value or a user-friendly error message.
+
+#### ValidationResult[T] Structure
+
+The `ValidationResult[T]` MUST be implemented as a generic dataclass-like object (using `@dataclass` or Pydantic) with the following contract:
+
+**Fields:**
+- `is_valid: bool` — True if validation succeeded, False otherwise
+- `value: T | None` — The validated value (only set if `is_valid=True`)
+- `error_message: str | None` — User-friendly error message (only set if `is_valid=False`)
+
+**Factory Methods (classmethods):**
+- `ValidationResult.success(value: T) → ValidationResult[T]` — Construct a successful result with a value
+- `ValidationResult.failure(message: str) → ValidationResult[T]` — Construct a failed result with an error message
+
+**Validation Constraint:**
+- Validators MUST NOT raise exceptions; they MUST always return a `ValidationResult` object
+- Callers MUST check `result.is_valid` before accessing `result.value`
+- If `is_valid=False`, callers MUST read `result.error_message` for display/logging
 
 #### Scenario: Validator accepts valid input
 - **WHEN** a validator receives input matching its format (e.g., valid UUID, ISO date)

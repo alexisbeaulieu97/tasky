@@ -27,6 +27,18 @@
 - [ ] 3.7 Write unit tests for all 5 tools (40+ test cases covering all operations and bulk paths)
 - [ ] 3.8 Add integration tests showing workflow (search → get_tasks → edit_tasks workflow)
 
+## 4. Authentication & Authorization (OAuth 2.1 / RFC 8707)
+
+- [ ] 4.1 Create `auth.py` with OAuth token validation and scope checking
+- [ ] 4.2 Implement OAuth 2.1 JWKS fetching and token signature validation
+- [ ] 4.3 Implement RFC 8707 Resource Indicator validation (resource_aud claim binding)
+- [ ] 4.4 Add scope enforcement (tasks:read, tasks:write, projects:read scopes)
+- [ ] 4.5 Implement token expiry and claim validation (sub, aud, exp)
+- [ ] 4.6 Add configuration for OAuth provider (issuer URL, audience, JWKS caching)
+- [ ] 4.7 Add 401/403 error responses for auth failures
+- [ ] 4.8 Write unit tests for token validation, scope enforcement, and error cases (15+ tests)
+- [ ] 4.9 Add configuration documentation for OAuth setup
+
 ## 5. Error Handling & Resilience
 
 - [ ] 5.1 Create `errors.py` with MCP-specific error types

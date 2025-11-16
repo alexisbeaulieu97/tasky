@@ -41,7 +41,7 @@ Import and export operations SHALL handle edge cases robustly without data loss.
 
 #### Scenario: Import with duplicate task IDs using merge strategy
 - **WHEN** importing tasks with IDs that already exist, using merge strategy
-- **THEN** system detifies conflicts and resolves them
+- **THEN** system identifies conflicts and resolves them
 - **AND** user is informed how many conflicts were resolved
 - **AND** original task values are preserved (or explicitly overwritten if user chose replace strategy)
 

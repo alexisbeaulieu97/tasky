@@ -1,5 +1,13 @@
 ## ADDED Requirements
 
+### Conventions (Required)
+
+This change MUST follow project patterns:
+- **Configuration**: MCP server settings MUST be added as a nested `MCPServerSettings` model in `tasky_settings.AppSettings`. Use `BaseSettings` with `TASKY_MCP_*` env var prefixes.
+- **Error hierarchy**: All MCP server errors MUST inherit from `TaskDomainError` (from `tasky_tasks.exceptions`). MCP infrastructure errors inherit from `StorageError`.
+- **Models**: Use Pydantic `BaseModel` for all data structures (requests, responses, config). Use `.model_dump(mode="json")` for serialization.
+- **Dependency injection**: Accept settings and service instances via constructor, don't use singletons.
+
 ### Requirement: MCP Server Implementation
 
 The system SHALL provide an MCP (Model Context Protocol) server that exposes Tasky functionality for use by Claude and other AI assistants. The server SHALL be stateless, request-based, and thread-safe.
@@ -51,13 +59,20 @@ The MCP server SHALL provide ONLY the essential tools Claude needs for practical
 #### Tool 3: `edit_tasks` - Bulk task editing (unified write)
 - **Purpose**: Update, delete, or transition tasks in a single operation
 - **Parameters**: Array of edit operations (each with task_id, action, optional updates)
-- **Actions**: "update" (modify fields), "delete" (remove task), "complete" (mark done), "cancel" (cancel), "reopen" (reopen completed)
+- **Actions**: "update" (modify fields), "delete" (hard-delete permanent removal), "complete" (mark done), "cancel" (cancel), "reopen" (reopen completed)
 - **For update action**: optional name, details, priority, due_date, status
 - **For state actions**: only task_id and action required
 - **Returns**: Array of updated TaskModel objects
 - **Bulk semantics**: All edits applied atomically; partial failure returns error with details
 - **Use case**: Claude modifies multiple tasks or single task (wrapped in array)
 - **Design**: Unified write operation like database transaction
+- **Delete semantics (hard-delete)**:
+  - Deletion is permanent and irreversible (no recovery mechanism)
+  - Deleted tasks are immediately removed from all queries/listings
+  - Deletion events are recorded in audit logs (if enabled via Phase 10 advanced backends)
+  - Audit trail records: actor=mcp_server, timestamp=operation_time, action=delete, task_id, reason=provided_by_client
+  - Soft-delete (archival/hidden status) is not supported in Phase 8; if non-destructive deletion is needed, use status="archived" or similar via update action
+  - Return value on delete: TaskModel with deletion_confirmed=true flag, or error if task not found
 
 #### Tool 4: `search_tasks` - Find tasks with compact results
 - **Purpose**: Fast filtered search to identify relevant tasks
@@ -128,6 +143,53 @@ The MCP server SHALL handle errors gracefully, provide clear error messages, and
 - **AND** JSON backend operations are serialized (thread-safe)
 - **AND** SQLite operations use connection pooling
 - **AND** no deadlocks occur
+
+### Requirement: Authentication & Authorization (OAuth 2.1 / RFC 8707)
+
+The MCP server SHALL implement OAuth 2.1 authentication for HTTP-based deployments, following MCP June 2025 specification updates and RFC 8707 Resource Indicators.
+
+#### Scenario: Server implements OAuth 2.1 compliance
+- **GIVEN** MCP server configured with HTTP transport (host="0.0.0.0", port=9000)
+- **WHEN** clients establish MCP connections
+- **THEN** server requires OAuth 2.1 authorization
+- **AND** clients MUST present valid access tokens
+- **AND** server validates token scope and resource binding
+
+#### Scenario: Resource Indicators (RFC 8707) bind tokens to server URI
+- **GIVEN** a client requests authorization from OAuth 2.1 provider
+- **WHEN** client includes Resource Indicator in token request (e.g., `resource=https://localhost:9000/mcp`)
+- **THEN** issued token is bound to the MCP server resource
+- **AND** token cannot be used against other MCP servers or resources (prevents token misuse)
+- **AND** server validates resource_aud claim in token matches expected URI
+
+#### Scenario: Client authentication validation
+- **GIVEN** incoming MCP request
+- **WHEN** request includes Authorization header with Bearer token
+- **THEN** server extracts and validates token signature and expiry
+- **AND** server verifies token claims (sub, aud, resource_aud, scopes)
+- **AND** invalid/expired tokens are rejected with 401 Unauthorized
+
+#### Scenario: Token scope enforcement
+- **GIVEN** validated OAuth token with scopes (e.g., "tasks:read tasks:write projects:read")
+- **WHEN** client attempts operation (create_tasks, edit_tasks, search_tasks)
+- **THEN** server checks if token has required scope for operation
+- **AND** operations requiring write access require "tasks:write" scope
+- **AND** operations requiring project access require "projects:read" scope
+- **AND** insufficient scope returns 403 Forbidden with "insufficient_scope" error
+
+#### Scenario: Access control per project/task (future authorization model)
+- **GIVEN** multi-project or multi-user scenario (Phase 10+)
+- **WHEN** client token includes project_id claims
+- **THEN** server limits operations to authorized projects only
+- **AND** token may specify read-only vs read-write access per project
+- **AND** cross-project operations are blocked if not authorized
+
+#### Scenario: Configuration for OAuth provider
+- **GIVEN** MCP server startup
+- **WHEN** environment variables specify `OAUTH_ISSUER_URL`, `OAUTH_CLIENT_ID`, `OAUTH_AUDIENCE`
+- **THEN** server fetches JWKS from OAuth provider
+- **AND** validates incoming tokens against provider's public keys
+- **AND** caches JWKS with TTL to reduce provider calls
 
 ### Requirement: MCP Server Configuration
 
