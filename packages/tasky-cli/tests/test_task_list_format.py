@@ -3,25 +3,9 @@
 from pathlib import Path
 
 import pytest
-from tasky_cli.commands.projects import project_app
 from tasky_cli.commands.tasks import task_app
 from tasky_settings import create_task_service
 from typer.testing import CliRunner
-
-
-@pytest.fixture
-def initialized_project(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
-    """Create an initialized project directory."""
-    project_path = tmp_path / "test_project"
-    project_path.mkdir()
-    monkeypatch.chdir(project_path)
-
-    # Initialize project
-    runner = CliRunner()
-    result = runner.invoke(project_app, ["init"])
-    assert result.exit_code == 0
-
-    return project_path
 
 
 class TestTaskListFormatting:

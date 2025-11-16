@@ -38,7 +38,7 @@ Tick off each change as you complete it (mirrors the execution order below).
 - [x] 7.1 `improve-storage-backend-testing` (35 tasks, ~26h)
 - [x] 7.2 `improve-cli-test-coverage` (47 tasks, ~22h)
 - [x] 7.3 `refactor-storage-duplication` (30 tasks, ~7h)
-- [ ] 7.4 `consolidate-test-fixtures` (24 tasks, ~2h)
+- [x] 7.4 `consolidate-test-fixtures` (24 tasks, ~2h)
 - [ ] 7.5 `extract-list-command-helpers` (33 tasks, ~3h)
 - [ ] 7.6 `consolidate-repository-fakes` (24 tasks, ~2h)
 - [ ] 7.7 `improve-performance-and-safety` (42 tasks, ~21h)
