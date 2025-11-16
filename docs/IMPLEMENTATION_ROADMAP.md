@@ -8,7 +8,7 @@ This roadmap organizes all 18 OpenSpec changes across Phases 1-8 in optimal impl
 ## Overview
 
 **Total Effort (Phases 1-6)**: ~56-62 hours (COMPLETE ✅)
-**Total Effort (Phases 7-7b)**: ~174 hours of code quality + CLI improvements
+**Total Effort (Phases 7-7b)**: ~149 hours of code quality + CLI improvements
 **Total Effort (Phases 8+)**: TBD (MCP servers, hooks, advanced features)
 **Phases**: 6 completed (1, 1.5, 2, 3, 4, 4.4, 5, 6) + 2 in progress (7-7b) + future phases
 **Test Gate**: After each phase, run `uv run pytest` to ensure all tests still pass
@@ -34,12 +34,15 @@ Tick off each change as you complete it (mirrors the execution order below).
 - [x] 5.1 `add-project-registry`
 - [x] 6.1 `remove-json-config-support`
 
-### 🚀 Phase 7: Code Quality & Testing (224 tasks, ~91 hours)
+### 🚀 Phase 7: Code Quality & Testing (279 tasks, ~98 hours)
 - [x] 7.1 `improve-storage-backend-testing` (35 tasks, ~26h)
 - [x] 7.2 `improve-cli-test-coverage` (47 tasks, ~22h)
-- [ ] 7.3 `refactor-storage-duplication` (30 tasks, ~7h)
-- [ ] 7.4 `improve-performance-and-safety` (42 tasks, ~21h)
-- [ ] 7.5 `improve-architecture-and-documentation` (44 tasks, ~15h)
+- [x] 7.3 `refactor-storage-duplication` (30 tasks, ~7h)
+- [ ] 7.4 `consolidate-test-fixtures` (24 tasks, ~2h)
+- [ ] 7.5 `extract-list-command-helpers` (33 tasks, ~3h)
+- [ ] 7.6 `consolidate-repository-fakes` (24 tasks, ~2h)
+- [ ] 7.7 `improve-performance-and-safety` (42 tasks, ~21h)
+- [ ] 7.8 `improve-architecture-and-documentation` (44 tasks, ~15h)
 
 ### 🎯 Phase 7b: CLI Improvements (51 tasks, ~51 hours)
 - [ ] 7b.1 `add-cli-input-validators` (25 tasks, ~3h)
@@ -747,7 +750,7 @@ This moves completed changes to `openspec/changes/archive/YYYY-MM-DD-<name>/` an
 
 ---
 
-## Phase 7: Code Quality & Testing (224 tasks, ~91 hours)
+## Phase 7: Code Quality & Testing (279 tasks, ~98 hours)
 **Goal**: Bring codebase to production-ready quality with comprehensive test coverage and clean architecture
 
 ### Context
@@ -789,22 +792,88 @@ After completing all core features (Phases 1-6), comprehensive audit identified 
 /openspec:apply refactor-storage-duplication
 ```
 
-### 7.4 `improve-performance-and-safety`
-**Why Fourth in Phase 7**: After duplicate code removed, optimize performance patterns
+### 7.4 `consolidate-test-fixtures`
+**Why Fourth in Phase 7**: After storage backend refactoring, consolidate test infrastructure for maintainability
+**What**: Move 5 duplicate `initialized_project` fixtures from individual test files to shared `conftest.py`
+**Tasks**: 24 | Hours: ~2 | Impact: Removes 52 lines of duplicate test code
+**Depends on**: 7.3 complete (storage code is clean)
+**Enables**: 7.5, 7.6 (clean test foundation for further refactoring)
+
+**Evidence**:
+- grep confirmed `initialized_project` fixture in 5 test files
+- Each fixture is 10-11 lines of identical setup code
+- pytest automatically discovers fixtures in `conftest.py`
+- Standard pytest pattern for shared fixtures
+
+**Score**: Benefit=4, Cost=1, Total=3/5 (clear win)
+
+```bash
+/openspec:apply consolidate-test-fixtures
+```
+
+### 7.5 `extract-list-command-helpers`
+**Why Fifth in Phase 7**: Targeted fix for the ONE C901 complexity warning in tasks.py
+**What**: Extract 3 focused helper functions from `list_command()` to eliminate complexity warning
+**Tasks**: 33 | Hours: ~3 | Impact: Reduces list_command from 191 lines to ~80 lines, removes noqa suppressions
+**Depends on**: 7.4 complete (test infrastructure is solid)
+**Enables**: 7.6 (cleaner command structure)
+
+**Evidence**:
+- tasks.py has exactly 1 C901 warning in `list_command()` (lines 132-323)
+- Duplicate date parsing logic for created_after/created_before (40 lines each)
+- Function does too many things (parse dates, build filters, fetch data, render, summarize)
+
+**Helpers to extract**:
+1. `_parse_date_filter(date_str, *, inclusive_end)` - consolidates duplicate date parsing (60 lines → 4 lines)
+2. `_build_task_list_filter(...)` - isolates filter construction
+3. `_render_task_list_summary(tasks, has_filters)` - isolates summary rendering
+
+**Score**: Benefit=3, Cost=2, Total=1/5 (marginal yes, but eliminates real complexity warning)
+
+```bash
+/openspec:apply extract-list-command-helpers
+```
+
+### 7.6 `consolidate-repository-fakes`
+**Why Sixth in Phase 7**: After command refactoring, unify duplicate test repository implementations
+**What**: Consolidate `InMemoryTaskRepository` (57 lines) and `MockTaskRepository` (38 lines) into unified implementation in `conftest.py`
+**Tasks**: 24 | Hours: ~2 | Impact: Removes 95 lines of duplicate test infrastructure
+**Depends on**: 7.5 complete (command structure is clean)
+**Enables**: 7.7 (cleaner test foundation for performance testing)
+
+**Evidence**:
+- InMemoryTaskRepository in test_service.py: 57 lines (mutable use case)
+- MockTaskRepository in test_service_filtering.py: 38 lines (pre-populated use case)
+- Both implement same TaskRepository protocol with duplicate logic
+
+**Solution**:
+- Unified `InMemoryTaskRepository` with two initialization modes:
+  - `InMemoryTaskRepository()` - empty, mutable (test_service.py use case)
+  - `InMemoryTaskRepository.from_tasks([...])` - pre-populated (test_service_filtering.py use case)
+- Place in conftest.py for automatic pytest discovery
+
+**Score**: Benefit=3, Cost=1, Total=2/5 (marginal yes)
+
+```bash
+/openspec:apply consolidate-repository-fakes
+```
+
+### 7.7 `improve-performance-and-safety`
+**Why Seventh in Phase 7**: After duplicate code removed, optimize performance patterns
 **What**: Filter-first strategy (10x faster filtering), atomic writes (data safety), registry pagination
 **Tasks**: 42 | Hours: ~21 | Impact: Critical performance + reliability improvements
-**Depends on**: 7.3 complete (cleaner code structure for optimization)
+**Depends on**: 7.6 complete (cleaner code structure and test infrastructure for optimization)
 **Enables**: Confident in handling 100k+ projects, large task datasets
 
 ```bash
 /openspec:apply improve-performance-and-safety
 ```
 
-### 7.5 `improve-architecture-and-documentation`
+### 7.8 `improve-architecture-and-documentation`
 **Why Last in Phase 7**: After code is clean and tested, polish architecture
 **What**: Error protocol decoupling, circular import resolution, complexity reduction, ADR creation
 **Tasks**: 44 | Hours: ~15 | Impact: Cleaner architecture, better onboarding
-**Depends on**: 7.1-7.4 complete (improves overall codebase quality)
+**Depends on**: 7.1-7.7 complete (improves overall codebase quality)
 **Enables**: Phase 7b (clean foundation for CLI improvements)
 
 ```bash
@@ -816,7 +885,9 @@ After Phase 7 completion:
 - Test coverage: 82.79% → 85%+ ✅
 - SQLite coverage: 54% → 80%+ ✅
 - CLI coverage: 69% → 80%+ ✅
-- No cyclomatic complexity violations (0 C901 noqa comments) ✅
+- No duplicate test fixtures (5 duplicate fixtures removed) ✅
+- No cyclomatic complexity violations in list_command (C901 warning eliminated) ✅
+- No duplicate repository fakes (unified InMemoryTaskRepository) ✅
 - No circular imports ✅
 - No duplicate snapshot code ✅
 - All docstrings present, 4+ ADRs documented ✅
@@ -888,19 +959,22 @@ Week 1: Storage Foundation
   Wed-Thu: improve-cli-test-coverage (parallel)
   Fri:     Validation gate (80% coverage, all tests pass)
 
-Week 2: Optimization & Cleanup
-  Mon-Tue: refactor-storage-duplication (parallel with next)
-  Wed-Thu: improve-performance-and-safety
+Week 2: Refactoring & Cleanup
+  Mon:     refactor-storage-duplication (~7h)
+  Tue AM:  consolidate-test-fixtures (~2h)
+  Tue PM:  extract-list-command-helpers (~3h)
+  Wed:     consolidate-repository-fakes (~2h)
+  Thu-Fri: improve-performance-and-safety (~21h)
   Fri:     Validation gate (benchmarks pass, no performance regression)
 
 Week 3: Architecture Polish
-  Mon-Wed: improve-architecture-and-documentation
+  Mon-Wed: improve-architecture-and-documentation (~15h)
   Thu:     Validation gate (no C901 violations, ADRs written)
   Fri:     Final PR review → merge Phase 7
 
 Week 4: CLI Improvements (Optional but recommended)
-  Mon-Tue: add-cli-input-validators
-  Wed:     add-cli-error-handling (refactor)
+  Mon-Tue: add-cli-input-validators (~3h)
+  Wed:     refactor-cli-error-handling (~2h)
   Thu:     Validation gate (CLI tests pass, error handling integrated)
   Fri:     PR review → merge Phase 7b
 ```
