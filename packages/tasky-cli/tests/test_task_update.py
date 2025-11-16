@@ -396,3 +396,102 @@ class TestTaskUpdateOutputFormat:
         assert f"ID: {task_id}" in result.stdout
         assert "Name: Updated Name" in result.stdout
         assert "Details: Updated Details" in result.stdout
+
+
+class TestTaskUpdateErrorCases:
+    """Test error handling for task update command."""
+
+    def test_update_task_not_found(
+        self,
+        runner: CliRunner,
+        initialized_project: Path,  # noqa: ARG002
+    ) -> None:
+        """Test updating a task that doesn't exist."""
+        fake_id = "12345678-1234-1234-1234-123456789012"
+        result = runner.invoke(task_app, ["update", fake_id, "--name", "New Name"])
+
+        assert result.exit_code == 1
+        assert "not found" in result.stderr.lower()
+
+    def test_update_invalid_task_id_format(
+        self,
+        runner: CliRunner,
+        initialized_project: Path,  # noqa: ARG002
+    ) -> None:
+        """Test updating with an invalid UUID format."""
+        result = runner.invoke(task_app, ["update", "not-a-uuid", "--name", "New Name"])
+
+        assert result.exit_code == 1
+        assert "Invalid UUID format" in result.stderr or "uuid" in result.stderr.lower()
+
+    def test_update_with_no_fields_specified(
+        self,
+        runner: CliRunner,
+        task_id: str,
+    ) -> None:
+        """Test updating without specifying any fields."""
+        result = runner.invoke(task_app, ["update", task_id])
+
+        # Should fail with helpful message
+        assert result.exit_code == 1
+        lower_stderr = result.stderr.lower()
+        assert "provided" in lower_stderr or "specify" in lower_stderr or "option" in lower_stderr
+
+    def test_update_with_empty_name(
+        self,
+        runner: CliRunner,
+        task_id: str,
+    ) -> None:
+        """Test updating with an empty name string."""
+        result = runner.invoke(task_app, ["update", task_id, "--name", ""])
+
+        # Empty name should be rejected
+        assert result.exit_code != 0
+
+    def test_update_concurrent_modification(
+        self,
+        runner: CliRunner,
+        initialized_project: Path,  # noqa: ARG002
+    ) -> None:
+        """Test that concurrent modifications are handled gracefully."""
+        # Create a task
+        create_result = runner.invoke(task_app, ["create", "Task", "Details"])
+        task_id = None
+        for line in create_result.stdout.split("\n"):
+            if line.startswith("ID:"):
+                task_id = line.split("ID:")[1].strip()
+                break
+
+        assert task_id is not None
+
+        # Update twice quickly (simulating potential concurrent modification)
+        result1 = runner.invoke(task_app, ["update", task_id, "--name", "Name1"])
+        result2 = runner.invoke(task_app, ["update", task_id, "--name", "Name2"])
+
+        # Both should succeed (no optimistic locking currently)
+        assert result1.exit_code == 0
+        assert result2.exit_code == 0
+
+        # The second update should be the final value
+        service = create_task_service()
+        task = service.get_task(UUID(task_id))
+        assert task.name == "Name2"
+
+
+class TestTaskLifecycleErrorCases:
+    """Test error handling for task lifecycle transitions."""
+
+    def test_cancel_completed_task_invalid_transition(
+        self,
+        runner: CliRunner,
+        task_id: str,
+    ) -> None:
+        """Test that canceling a completed task is rejected as invalid transition."""
+        # First complete the task
+        runner.invoke(task_app, ["complete", task_id])
+
+        # Now try to cancel it (invalid transition from completed to cancelled)
+        result = runner.invoke(task_app, ["cancel", task_id])
+
+        assert result.exit_code == 1
+        assert "Cannot transition" in result.stderr or "invalid" in result.stderr.lower()

@@ -397,3 +397,105 @@ class TestTaskListIntegration:
         # Verify summary
         assert "Showing 10 tasks" in result.stdout
         assert "10 pending" in result.stdout
+
+
+class TestTaskListEdgeCases:
+    """Test edge cases for task list command."""
+
+    def test_list_with_no_tasks_shows_empty_message(
+        self,
+        runner: CliRunner,
+        initialized_project: Path,  # noqa: ARG002
+    ) -> None:
+        """Test listing when there are no tasks in project."""
+        result = runner.invoke(task_app, ["list"])
+
+        assert result.exit_code == 0
+        assert "No tasks" in result.stdout
+        assert "display" in result.stdout or "found" in result.stdout
+
+    def test_list_with_many_tasks_performance(
+        self,
+        runner: CliRunner,
+        initialized_project: Path,  # noqa: ARG002
+    ) -> None:
+        """Test listing with 100+ tasks (performance check)."""
+        service = create_task_service()
+
+        # Create 100 tasks
+        for i in range(100):
+            service.create_task(f"Task {i:03d}", f"Details for task {i}")
+
+        result = runner.invoke(task_app, ["list"])
+
+        assert result.exit_code == 0
+        assert "Showing 100 tasks" in result.stdout
+        # Verify some tasks appear
+        assert "Task 000" in result.stdout
+        assert "Task 050" in result.stdout
+        assert "Task 099" in result.stdout
+
+    def test_list_with_combined_filters(
+        self,
+        runner: CliRunner,
+        initialized_project: Path,  # noqa: ARG002
+    ) -> None:
+        """Test listing with multiple filters combined."""
+        service = create_task_service()
+
+        # Create various tasks
+        task1 = service.create_task("Urgent Bug Fix", "Fix the authentication bug")
+        service.create_task("Regular Task", "Normal work item")
+        service.create_task("Important Bug", "Another bug to fix")
+
+        # Complete one task
+        service.complete_task(task1.task_id)
+
+        # Filter by status + search
+        result = runner.invoke(
+            task_app,
+            ["list", "--status", "pending", "--search", "bug"],
+        )
+
+        assert result.exit_code == 0
+        # Should show the pending bug task, not the completed one
+        assert "Important Bug" in result.stdout
+        assert "Urgent Bug Fix" not in result.stdout
+        assert "Regular Task" not in result.stdout
+
+    def test_list_with_very_long_task_names(
+        self,
+        runner: CliRunner,
+        initialized_project: Path,  # noqa: ARG002
+    ) -> None:
+        """Test listing tasks with very long names (>100 chars)."""
+        service = create_task_service()
+
+        long_name = "A" * 150
+        service.create_task(long_name, "Details")
+
+        result = runner.invoke(task_app, ["list"])
+
+        assert result.exit_code == 0
+        # Should either truncate or handle gracefully
+        assert "A" * 50 in result.stdout  # At least first 50 chars should appear
+
+    def test_list_with_special_characters_in_details(
+        self,
+        runner: CliRunner,
+        initialized_project: Path,  # noqa: ARG002
+    ) -> None:
+        """Test listing tasks with special characters in details."""
+        service = create_task_service()
+
+        # Create tasks with various special characters
+        service.create_task("Task 1", "Details with 'quotes' & symbols")
+        service.create_task("Task 2", "Details: $100 @ 50% #hashtag")
+        service.create_task("Task 3", "Unicode: 你好 🎉 ñ")
+
+        result = runner.invoke(task_app, ["list"])
+
+        assert result.exit_code == 0
+        assert "Task 1" in result.stdout
+        assert "Task 2" in result.stdout
+        assert "Task 3" in result.stdout
