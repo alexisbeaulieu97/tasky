@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from tasky_storage import JsonStorage, StorageDataError
+from tasky_storage import JsonStorage, StorageDataError, StorageIOError
 
 
 @pytest.fixture
@@ -81,11 +81,11 @@ class TestJsonStorage:
         assert self._read_json_file(storage_path) == test_data
 
     def test_load_nonexistent_file_raises_error(self, temp_dir: Path) -> None:
-        """Test that loading a nonexistent file raises StorageDataError."""
+        """Test that loading a nonexistent file raises StorageIOError."""
         storage_path = temp_dir / "nonexistent.json"
         store = JsonStorage(path=storage_path)
 
-        with pytest.raises(StorageDataError):
+        with pytest.raises(StorageIOError):
             store.load()
 
     def test_save_invalid_data_raises_error(self, store: JsonStorage) -> None:

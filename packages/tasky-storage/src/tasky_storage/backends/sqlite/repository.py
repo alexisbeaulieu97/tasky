@@ -16,7 +16,7 @@ from tasky_storage.backends.sqlite.mappers import (
     task_model_to_snapshot,
 )
 from tasky_storage.backends.sqlite.schema import create_schema, validate_schema
-from tasky_storage.errors import StorageDataError, StorageError
+from tasky_storage.errors import StorageDataError, StorageIOError
 
 if TYPE_CHECKING:
     from tasky_tasks.models import TaskFilter, TaskModel, TaskStatus
@@ -98,13 +98,13 @@ class SqliteTaskRepository:
                 )
         except sqlite3.IntegrityError as exc:
             msg = f"Database integrity error saving task {task.task_id}: {exc}"
-            raise StorageDataError(msg) from exc
+            raise StorageDataError(msg, cause=exc) from exc
         except sqlite3.OperationalError as exc:
             msg = f"Database locked or inaccessible: {exc}"
-            raise StorageError(msg) from exc
+            raise StorageIOError(msg, cause=exc) from exc
         except sqlite3.Error as exc:
             msg = f"Database error saving task {task.task_id}: {exc}"
-            raise StorageError(msg) from exc
+            raise StorageIOError(msg, cause=exc) from exc
 
     def get_task(self, task_id: UUID) -> TaskModel | None:
         """Retrieve a task by ID.
@@ -142,7 +142,7 @@ class SqliteTaskRepository:
                 return snapshot_to_task_model(snapshot)
         except sqlite3.Error as exc:
             msg = f"Database error retrieving task {task_id}: {exc}"
-            raise StorageError(msg) from exc
+            raise StorageIOError(msg, cause=exc) from exc
 
     def get_all_tasks(self) -> list[TaskModel]:
         """Retrieve all tasks.
@@ -171,7 +171,7 @@ class SqliteTaskRepository:
                 return tasks
         except sqlite3.Error as exc:
             msg = f"Database error retrieving all tasks: {exc}"
-            raise StorageError(msg) from exc
+            raise StorageIOError(msg, cause=exc) from exc
 
     def get_tasks_by_status(self, status: TaskStatus) -> list[TaskModel]:
         """Retrieve tasks filtered by status.
@@ -212,7 +212,7 @@ class SqliteTaskRepository:
                 return tasks
         except sqlite3.Error as exc:
             msg = f"Database error filtering tasks by status {status.value}: {exc}"
-            raise StorageError(msg) from exc
+            raise StorageIOError(msg, cause=exc) from exc
 
     def find_tasks(self, task_filter: TaskFilter) -> list[TaskModel]:
         """Retrieve tasks matching the specified filter criteria.
@@ -327,7 +327,7 @@ class SqliteTaskRepository:
                 return tasks
         except sqlite3.Error as exc:
             msg = f"Database error finding tasks: {exc}"
-            raise StorageError(msg) from exc
+            raise StorageIOError(msg, cause=exc) from exc
 
     def delete_task(self, task_id: UUID) -> bool:
         """Delete a task by ID.
@@ -363,7 +363,7 @@ class SqliteTaskRepository:
                 return removed
         except sqlite3.Error as exc:
             msg = f"Database error deleting task {task_id}: {exc}"
-            raise StorageError(msg) from exc
+            raise StorageIOError(msg, cause=exc) from exc
 
     def task_exists(self, task_id: UUID) -> bool:
         """Determine whether a task exists in storage.
@@ -391,7 +391,7 @@ class SqliteTaskRepository:
                 return cursor.fetchone() is not None
         except sqlite3.Error as exc:
             msg = f"Database error checking if task {task_id} exists: {exc}"
-            raise StorageError(msg) from exc
+            raise StorageIOError(msg, cause=exc) from exc
 
     @classmethod
     def from_path(cls, path: Path) -> SqliteTaskRepository:

@@ -9,7 +9,7 @@ from uuid import uuid4
 
 import pytest
 from tasky_storage.backends.sqlite import SqliteTaskRepository
-from tasky_storage.errors import StorageDataError, StorageError
+from tasky_storage.errors import SnapshotConversionError, StorageError
 from tasky_tasks.models import TaskFilter, TaskModel, TaskStatus
 
 
@@ -478,8 +478,8 @@ class TestSqliteErrorPaths:
         conn.commit()
         conn.close()
 
-        # Trying to retrieve this task should raise StorageDataError
-        with pytest.raises(StorageDataError):
+        # Trying to retrieve this task should raise SnapshotConversionError
+        with pytest.raises(SnapshotConversionError):
             repo.get_task(valid_task.task_id)
 
     def test_find_tasks_with_corrupted_snapshot(self, tmp_path: Path) -> None:
@@ -502,8 +502,8 @@ class TestSqliteErrorPaths:
         conn.commit()
         conn.close()
 
-        # find_tasks should raise StorageDataError when encountering corrupt data
-        with pytest.raises(StorageDataError):
+        # find_tasks should raise SnapshotConversionError when encountering corrupt data
+        with pytest.raises(SnapshotConversionError):
             repo.find_tasks(TaskFilter())
 
     def test_delete_with_database_error(self, tmp_path: Path) -> None:

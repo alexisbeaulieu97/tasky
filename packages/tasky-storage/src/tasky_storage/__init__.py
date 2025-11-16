@@ -2,16 +2,26 @@
 
 from .backends.json import JsonStorage, JsonTaskRepository, TaskDocument
 from .backends.sqlite import SqliteTaskRepository
-from .errors import StorageConfigurationError, StorageDataError, StorageError
+from .errors import (
+    SnapshotConversionError,
+    StorageConfigurationError,
+    StorageDataError,
+    StorageError,
+    StorageIOError,
+    TransactionConflictError,
+)
 
 __all__ = [
     "JsonStorage",
     "JsonTaskRepository",
+    "SnapshotConversionError",
     "SqliteTaskRepository",
     "StorageConfigurationError",
     "StorageDataError",
     "StorageError",
+    "StorageIOError",
     "TaskDocument",
+    "TransactionConflictError",
 ]
 
 # ============================================================================

@@ -18,7 +18,7 @@ from tasky_storage.backends.json.mappers import (
     task_model_to_snapshot,
 )
 from tasky_storage.backends.json.storage import JsonStorage
-from tasky_storage.errors import StorageDataError
+from tasky_storage.errors import StorageDataError, StorageIOError
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -166,9 +166,13 @@ class JsonTaskRepository(BaseModel):
     def _load_document_optional(self) -> TaskDocument | None:
         try:
             return self._load_document()
-        except StorageDataError as exc:
-            if self._originated_from_missing_file(exc):
+        except StorageIOError as exc:
+            # File doesn't exist yet - return None to trigger initialization
+            if self._is_file_not_found_error(exc):
                 return None
+            logger.warning("I/O error loading task document: %s", exc)
+            raise
+        except StorageDataError as exc:
             logger.warning("Failed to load task document: %s", exc)
             raise
 
@@ -180,6 +184,6 @@ class JsonTaskRepository(BaseModel):
             raise StorageDataError(exc) from exc
 
     @staticmethod
-    def _originated_from_missing_file(error: StorageDataError) -> bool:
+    def _is_file_not_found_error(error: StorageIOError) -> bool:
         cause = error.__cause__ or error.__context__
         return isinstance(cause, FileNotFoundError)

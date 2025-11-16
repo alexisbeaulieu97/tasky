@@ -6,10 +6,10 @@ from typing import TYPE_CHECKING, Any
 
 from tasky_tasks.models import TaskModel
 
-from tasky_storage.shared import (
+from tasky_storage.utils import (
     snapshot_to_task_model as shared_snapshot_to_task_model,
 )
-from tasky_storage.shared import (
+from tasky_storage.utils import (
     task_model_to_snapshot as shared_task_model_to_snapshot,
 )
 

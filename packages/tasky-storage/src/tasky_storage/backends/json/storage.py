@@ -8,7 +8,7 @@ from typing import Any
 
 from pydantic import BaseModel
 
-from tasky_storage.errors import StorageDataError
+from tasky_storage.errors import StorageDataError, StorageIOError
 
 
 class JsonStorage(BaseModel):
@@ -29,18 +29,24 @@ class JsonStorage(BaseModel):
                     json.dumps(template, indent=2),
                     encoding="utf-8",
                 )
-            except (OSError, ValueError, TypeError) as exc:
-                msg = f"Failed to initialize storage: {exc}"
-                raise StorageDataError(msg) from exc
+            except OSError as exc:
+                msg = f"Failed to initialize storage file at {self.path}: {exc}"
+                raise StorageIOError(msg, cause=exc) from exc
+            except (ValueError, TypeError) as exc:
+                msg = f"Failed to serialize template data: {exc}"
+                raise StorageDataError(msg, cause=exc) from exc
 
     def load(self) -> dict[str, Any]:
         """Load and return the persisted JSON document."""
         try:
             content = self.path.read_text(encoding="utf-8")
             return json.loads(content)
-        except (FileNotFoundError, OSError, ValueError, TypeError) as exc:
-            msg = f"Failed to load storage: {exc}"
-            raise StorageDataError(msg) from exc
+        except (FileNotFoundError, OSError) as exc:
+            msg = f"Failed to load storage file at {self.path}: {exc}"
+            raise StorageIOError(msg, cause=exc) from exc
+        except (ValueError, TypeError) as exc:
+            msg = f"Failed to parse JSON content from {self.path}: {exc}"
+            raise StorageDataError(msg, cause=exc) from exc
 
     def save(self, data: dict[str, Any]) -> None:
         """Serialize and persist the provided document.
@@ -54,6 +60,9 @@ class JsonStorage(BaseModel):
                 json.dumps(data, indent=2),
                 encoding="utf-8",
             )
-        except (OSError, ValueError, TypeError) as exc:
-            msg = f"Failed to save storage: {exc}"
-            raise StorageDataError(msg) from exc
+        except OSError as exc:
+            msg = f"Failed to save storage file at {self.path}: {exc}"
+            raise StorageIOError(msg, cause=exc) from exc
+        except (ValueError, TypeError) as exc:
+            msg = f"Failed to serialize data to JSON: {exc}"
+            raise StorageDataError(msg, cause=exc) from exc
