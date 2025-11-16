@@ -424,21 +424,6 @@ class TestTaskUpdateErrorCases:
         assert result.exit_code == 1
         assert "Invalid UUID format" in result.stderr or "uuid" in result.stderr.lower()
 
-    def test_update_invalid_status_transition(
-        self,
-        runner: CliRunner,
-        task_id: str,
-    ) -> None:
-        """Test that invalid status transitions are rejected."""
-        # First complete the task
-        runner.invoke(task_app, ["complete", task_id])
-
-        # Now try to cancel it (invalid transition from completed to cancelled)
-        result = runner.invoke(task_app, ["cancel", task_id])
-
-        assert result.exit_code == 1
-        assert "Cannot transition" in result.stderr or "invalid" in result.stderr.lower()
-
     def test_update_with_no_fields_specified(
         self,
         runner: CliRunner,
@@ -491,3 +476,22 @@ class TestTaskUpdateErrorCases:
         service = create_task_service()
         task = service.get_task(UUID(task_id))
         assert task.name == "Name2"
+
+
+class TestTaskLifecycleErrorCases:
+    """Test error handling for task lifecycle transitions."""
+
+    def test_cancel_completed_task_invalid_transition(
+        self,
+        runner: CliRunner,
+        task_id: str,
+    ) -> None:
+        """Test that canceling a completed task is rejected as invalid transition."""
+        # First complete the task
+        runner.invoke(task_app, ["complete", task_id])
+
+        # Now try to cancel it (invalid transition from completed to cancelled)
+        result = runner.invoke(task_app, ["cancel", task_id])
+
+        assert result.exit_code == 1
+        assert "Cannot transition" in result.stderr or "invalid" in result.stderr.lower()

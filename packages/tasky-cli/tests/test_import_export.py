@@ -212,10 +212,9 @@ class TestImportCommand:
 
         result = runner.invoke(task_app, ["import", str(incomplete_file)])
 
-        # Should fail or skip invalid tasks
-        assert result.exit_code in (0, 1)
-        if result.exit_code == 0:
-            assert "Skipped" in result.stdout or "error" in result.stdout.lower()
+        # Should fail due to invalid export format
+        assert result.exit_code != 0
+        assert "Invalid" in result.stderr or "validation" in result.stderr.lower()
 
     def test_import_strategy_skip_duplicate_task_ids(
         self,
@@ -319,8 +318,9 @@ class TestImportCommand:
         assert result.exit_code == 0
         assert "DRY RUN" in result.stdout or "Would import" in result.stdout
 
-        # Verify database was not modified
-        assert len(service.get_all_tasks()) == initial_count
+        # Verify database was not modified (fresh service instance)
+        service_after = create_task_service()
+        assert len(service_after.get_all_tasks()) == initial_count
 
 
 class TestImportExportIntegration:
@@ -346,8 +346,9 @@ class TestImportExportIntegration:
         # Import
         runner.invoke(task_app, ["import", str(export_file)])
 
-        # Verify all tasks restored
-        restored_tasks = service.get_all_tasks()
+        # Verify all tasks restored (fresh service instance)
+        service_after = create_task_service()
+        restored_tasks = service_after.get_all_tasks()
         assert len(restored_tasks) == len(sample_tasks)
 
         # Verify task names preserved

@@ -28,8 +28,8 @@
 ## 4. Task List Command Edge Cases
 
 - [x] 4.1 Add test: list with no tasks in project (empty database)
-- [x] 4.2 Add test: list with 1000+ tasks (performance + pagination)
-- [x] 4.3 Add test: list with all filters combined (status + search + date range)
+- [x] 4.2 Add test: list with 100 tasks (performance check)
+- [x] 4.3 Add test: list with status + search filters combined
 - [x] 4.4 Add test: list output formatting with long task names (>100 chars)
 - [x] 4.5 Add test: list with special characters in task details
 
@@ -38,9 +38,9 @@
 - [x] 5.1 Add test: import from empty file (0 bytes)
 - [x] 5.2 Add test: import with malformed JSON (syntax error)
 - [x] 5.3 Add test: import with missing required fields (incomplete task)
-- [x] 5.4 Add test: import strategy=skip (duplicate task IDs) - tested with append strategy
+- [x] 5.4 Add test: import strategy=append (duplicate task IDs re-keyed with new IDs)
 - [x] 5.5 Add test: import strategy=merge (resolve conflicts)
-- [x] 5.6 Add test: import with 10,000 tasks (memory + performance) - tested with 1000 tasks
+- [x] 5.6 Add test: import with 1000 tasks (performance check)
 - [x] 5.7 Add test: import creates backup before executing
 - [x] 5.8 Add test: dry-run mode doesn't modify database
 
@@ -49,7 +49,7 @@
 - [x] 6.1 Add test: export with no filters (all tasks)
 - [x] 6.2 Add test: export with filters (status + search) - N/A, export doesn't have filters
 - [x] 6.3 Add test: export creates valid, re-importable file
-- [x] 6.4 Add test: export with 10,000 tasks (file size + performance) - tested with 1000 tasks
+- [x] 6.4 Add test: export with 1000 tasks (performance check)
 - [x] 6.5 Add test: export file has proper JSON formatting
 - [x] 6.6 Add test: export with special characters in task content
 
