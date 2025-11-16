@@ -4,6 +4,7 @@
 
 import json
 import os
+import stat
 import time
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -458,7 +459,9 @@ class TestEdgeCases:
         return ProjectRegistryService(registry_path)
 
     def test_registry_with_100_projects(
-        self, service: ProjectRegistryService, tmp_path: Path,
+        self,
+        service: ProjectRegistryService,
+        tmp_path: Path,
     ) -> None:
         """Test registry performance with 100 projects."""
         # Create 100 projects
@@ -478,7 +481,9 @@ class TestEdgeCases:
         assert mid_project.name == "project_050"
 
     def test_discovery_deeply_nested_structure(
-        self, service: ProjectRegistryService, tmp_path: Path,
+        self,
+        service: ProjectRegistryService,
+        tmp_path: Path,
     ) -> None:
         """Test discovery respects max depth with deeply nested directories."""
         # Create a deeply nested structure with projects at each depth
@@ -511,13 +516,15 @@ class TestEdgeCases:
         expected_project_paths.add(p)  # Depth 1
 
         discovered_paths = {proj.path for proj in discovered}
-        assert (
-            len(discovered) == 2
-        ), f"Expected 2 projects, got {len(discovered)}: {discovered_paths}"
+        assert len(discovered) == 2, (
+            f"Expected 2 projects, got {len(discovered)}: {discovered_paths}"
+        )
         assert discovered_paths == expected_project_paths
 
     def test_discovery_with_many_excluded_directories(
-        self, service: ProjectRegistryService, tmp_path: Path,
+        self,
+        service: ProjectRegistryService,
+        tmp_path: Path,
     ) -> None:
         """Test discovery performance with many excluded directories."""
         root = tmp_path / "workspace"
@@ -542,7 +549,9 @@ class TestEdgeCases:
         assert "my_project" in names
 
     def test_project_path_with_symlink_circular_reference(
-        self, service: ProjectRegistryService, tmp_path: Path,
+        self,
+        service: ProjectRegistryService,
+        tmp_path: Path,
     ) -> None:
         """Test handling of symlink cycles during discovery."""
         root = tmp_path / "workspace"
@@ -562,7 +571,9 @@ class TestEdgeCases:
         assert len(discovered) >= 1
 
     def test_registry_with_special_json_characters(
-        self, registry_path: Path, tmp_path: Path,
+        self,
+        registry_path: Path,
+        tmp_path: Path,
     ) -> None:
         """Test registry handles project names with special JSON characters."""
         service = ProjectRegistryService(registry_path)
@@ -581,7 +592,9 @@ class TestEdgeCases:
         assert len(data["projects"]) == 1
 
     def test_concurrent_discovery_same_path(
-        self, service: ProjectRegistryService, tmp_path: Path,
+        self,
+        service: ProjectRegistryService,
+        tmp_path: Path,
     ) -> None:
         """Test that discovering same path multiple times doesn't create duplicates."""
         # Create a project
@@ -599,7 +612,9 @@ class TestEdgeCases:
         assert len(projects) == 1
 
     def test_register_project_with_relative_path_normalization(
-        self, service: ProjectRegistryService, tmp_path: Path,
+        self,
+        service: ProjectRegistryService,
+        tmp_path: Path,
     ) -> None:
         """Test that relative paths are normalized to absolute paths."""
         # Create a project
@@ -621,7 +636,9 @@ class TestEdgeCases:
             os.chdir(original_cwd)
 
     def test_update_last_accessed_multiple_times(
-        self, service: ProjectRegistryService, tmp_path: Path,
+        self,
+        service: ProjectRegistryService,
+        tmp_path: Path,
     ) -> None:
         """Test updating last_accessed multiple times increases timestamp."""
         # Create and register project
@@ -644,7 +661,9 @@ class TestEdgeCases:
         assert updated_time > initial_time
 
     def test_unregister_then_rediscover_same_project(
-        self, service: ProjectRegistryService, tmp_path: Path,
+        self,
+        service: ProjectRegistryService,
+        tmp_path: Path,
     ) -> None:
         """Test that unregistering and rediscovering works correctly."""
         # Create and register project
@@ -664,7 +683,9 @@ class TestEdgeCases:
         assert len(service.list_projects()) == 1
 
     def test_list_projects_sorted_order_consistency(
-        self, service: ProjectRegistryService, tmp_path: Path,
+        self,
+        service: ProjectRegistryService,
+        tmp_path: Path,
     ) -> None:
         """Test that list_projects returns consistent sort order."""
         # Create multiple projects
@@ -682,3 +703,253 @@ class TestEdgeCases:
 
         # Should be in same order (by last_accessed, most recent first)
         assert [p.name for p in list1] == [p.name for p in list2]
+
+
+class TestRegistryCorruptionRecovery:
+    """Test corruption recovery scenarios for project registry."""
+
+    @pytest.fixture
+    def registry_path(self, tmp_path: Path) -> Path:
+        """Create a temporary registry path."""
+        registry_dir = tmp_path / "registry_storage"
+        registry_dir.mkdir()
+        return registry_dir / "registry.json"
+
+    @pytest.fixture
+    def service(self, registry_path: Path) -> ProjectRegistryService:
+        """Create a registry service instance."""
+        return ProjectRegistryService(registry_path)
+
+    def test_corrupted_json_triggers_backup(
+        self,
+        service: ProjectRegistryService,
+        registry_path: Path,
+    ) -> None:
+        """Test that corrupted JSON triggers backup and recovery."""
+        # Create corrupted JSON file
+        registry_path.parent.mkdir(parents=True, exist_ok=True)
+        corrupted_data = '{"projects": [{"name": "test", invalid json'
+        with registry_path.open("w") as f:
+            f.write(corrupted_data)
+
+        # Load should recover
+        registry = service._load()
+        assert isinstance(registry, ProjectRegistry)
+        assert registry.projects == []
+
+        # Backup should exist
+        backups = list(registry_path.parent.glob("registry.corrupted.*.json"))
+        assert len(backups) == 1
+        assert backups[0].read_text() == corrupted_data
+
+    def test_partially_written_registry_recovery(
+        self,
+        service: ProjectRegistryService,
+        registry_path: Path,
+    ) -> None:
+        """Test recovery from partially written registry file."""
+        # Simulate partial write (incomplete JSON)
+        registry_path.parent.mkdir(parents=True, exist_ok=True)
+        with registry_path.open("w") as f:
+            f.write('{"projects": [{"name": "test", "path": "/tmp/test"')
+            # File ends abruptly
+
+        # Should recover gracefully
+        registry = service._load()
+        assert isinstance(registry, ProjectRegistry)
+        assert registry.projects == []
+
+        # Backup should be created
+        backups = list(registry_path.parent.glob("registry.corrupted.*.json"))
+        assert len(backups) == 1
+
+    def test_invalid_schema_recovery(
+        self,
+        service: ProjectRegistryService,
+        registry_path: Path,
+    ) -> None:
+        """Test recovery from schema validation errors."""
+        # Create JSON with invalid schema
+        registry_path.parent.mkdir(parents=True, exist_ok=True)
+        invalid_schema = {
+            "projects": [
+                {
+                    "name": "test",
+                    # Missing required 'path' field
+                },
+            ],
+        }
+        with registry_path.open("w") as f:
+            json.dump(invalid_schema, f)
+
+        # Should recover and create empty registry
+        registry = service._load()
+        assert isinstance(registry, ProjectRegistry)
+        assert registry.projects == []
+
+        # Backup should exist
+        backups = list(registry_path.parent.glob("registry.corrupted.*.json"))
+        assert len(backups) == 1
+
+    def test_backup_preserves_corrupted_data(
+        self,
+        service: ProjectRegistryService,
+        registry_path: Path,
+    ) -> None:
+        """Test that backup file preserves exact corrupted data."""
+        # Create corrupted file with specific content
+        registry_path.parent.mkdir(parents=True, exist_ok=True)
+        corrupted_content = "This is corrupted data: {[}]"
+        with registry_path.open("w") as f:
+            f.write(corrupted_content)
+
+        # Load to trigger backup
+        service._load()
+
+        # Verify backup has exact content
+        backups = list(registry_path.parent.glob("registry.corrupted.*.json"))
+        assert len(backups) == 1
+        assert backups[0].read_text() == corrupted_content
+
+    def test_multiple_corruption_attempts_create_timestamped_backups(
+        self,
+        service: ProjectRegistryService,
+        registry_path: Path,
+    ) -> None:
+        """Test that multiple corruptions create separate timestamped backups."""
+        registry_path.parent.mkdir(parents=True, exist_ok=True)
+
+        # First corruption
+        with registry_path.open("w") as f:
+            f.write("corruption 1")
+        service._load()
+
+        time.sleep(0.01)  # Ensure different timestamp
+
+        # Create new service instance to reset cached registry
+        service2 = ProjectRegistryService(registry_path)
+
+        # Second corruption
+        with registry_path.open("w") as f:
+            f.write("corruption 2")
+        service2._load()
+
+        # Should have two separate backup files
+        backups = list(registry_path.parent.glob("registry.corrupted.*.json"))
+        assert len(backups) == 2
+
+        # Verify contents are different
+        contents = {backup.read_text() for backup in backups}
+        assert "corruption 1" in contents
+        assert "corruption 2" in contents
+
+    def test_registry_usable_after_corruption_recovery(
+        self,
+        service: ProjectRegistryService,
+        registry_path: Path,
+        tmp_path: Path,
+    ) -> None:
+        """Test that registry is fully functional after recovering from corruption."""
+        # Corrupt the registry
+        registry_path.parent.mkdir(parents=True, exist_ok=True)
+        with registry_path.open("w") as f:
+            f.write("invalid json")
+
+        # Load triggers recovery
+        registry = service._load()
+        assert len(registry.projects) == 0
+
+        # Now use the service normally
+        project_dir = tmp_path / "test-project"
+        project_dir.mkdir()
+        (project_dir / ".tasky").mkdir()
+
+        # Should be able to register projects
+        project = service.register_project(project_dir)
+        assert project.name == "test-project"
+
+        # Should be able to list projects
+        projects = service.list_projects()
+        assert len(projects) == 1
+
+        # Verify data persists to disk correctly
+        service2 = ProjectRegistryService(registry_path)
+        projects2 = service2.list_projects()
+        assert len(projects2) == 1
+        assert projects2[0].name == "test-project"
+
+    def test_atomic_write_prevents_corruption(
+        self,
+        service: ProjectRegistryService,
+        registry_path: Path,
+        tmp_path: Path,
+    ) -> None:
+        """Test that atomic writes prevent partial data corruption."""
+        # Register a project
+        project_dir = tmp_path / "test-project"
+        project_dir.mkdir()
+        (project_dir / ".tasky").mkdir()
+        service.register_project(project_dir)
+
+        # Verify temp file doesn't exist after successful write
+        temp_path = registry_path.with_suffix(".tmp")
+        assert not temp_path.exists()
+
+        # Verify main file exists and is valid
+        assert registry_path.exists()
+        with registry_path.open() as f:
+            data = json.load(f)
+            assert len(data["projects"]) == 1
+
+    def test_save_error_cleanup(
+        self,
+        service: ProjectRegistryService,
+        registry_path: Path,
+    ) -> None:
+        """Test that temp files are cleaned up on save errors."""
+        # Make registry directory read-only
+        registry_path.parent.mkdir(parents=True, exist_ok=True)
+        registry_path.parent.chmod(stat.S_IRUSR | stat.S_IXUSR)
+
+        try:
+            # Try to save - should fail
+            registry = ProjectRegistry()
+            with pytest.raises(PermissionError):
+                service._save(registry)
+
+            # Temp file should not exist
+            temp_path = registry_path.with_suffix(".tmp")
+            assert not temp_path.exists()
+        finally:
+            # Restore permissions for cleanup
+            registry_path.parent.chmod(stat.S_IRWXU)
+
+    def test_empty_file_recovery(
+        self,
+        service: ProjectRegistryService,
+        registry_path: Path,
+    ) -> None:
+        """Test recovery from empty registry file."""
+        # Create empty file
+        registry_path.parent.mkdir(parents=True, exist_ok=True)
+        registry_path.touch()
+
+        # Should recover gracefully
+        registry = service._load()
+        assert isinstance(registry, ProjectRegistry)
+        assert registry.projects == []
+
+    def test_whitespace_only_file_recovery(
+        self,
+        service: ProjectRegistryService,
+        registry_path: Path,
+    ) -> None:
+        """Test recovery from whitespace-only file."""
+        registry_path.parent.mkdir(parents=True, exist_ok=True)
+        with registry_path.open("w") as f:
+            f.write("   \n\t\n   ")
+
+        # Should recover gracefully
+        registry = service._load()
+        assert isinstance(registry, ProjectRegistry)
+        assert registry.projects == []
