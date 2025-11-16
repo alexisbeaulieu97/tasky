@@ -35,7 +35,7 @@ Tick off each change as you complete it (mirrors the execution order below).
 - [x] 6.1 `remove-json-config-support`
 
 ### 🚀 Phase 7: Code Quality & Testing (224 tasks, ~91 hours)
-- [ ] 7.1 `improve-storage-backend-testing` (35 tasks, ~26h)
+- [x] 7.1 `improve-storage-backend-testing` (35 tasks, ~26h)
 - [ ] 7.2 `improve-cli-test-coverage` (47 tasks, ~22h)
 - [ ] 7.3 `refactor-storage-duplication` (30 tasks, ~7h)
 - [ ] 7.4 `improve-performance-and-safety` (42 tasks, ~21h)
