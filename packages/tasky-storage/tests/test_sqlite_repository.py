@@ -526,7 +526,7 @@ class TestSqliteErrorPaths:
         conn.rollback()
         conn.close()
 
-    def test_concurrent_modifications_serialization(self, tmp_path: Path) -> None:  # noqa: C901
+    def test_concurrent_modifications_serialization(self, tmp_path: Path) -> None:
         """Test that concurrent modifications are handled safely."""
         db_path = tmp_path / "tasks.db"
         repo = SqliteTaskRepository(path=db_path)
@@ -572,7 +572,7 @@ class TestSqliteErrorPaths:
 class TestSqliteConcurrencyAndStress:
     """Test concurrency and stress scenarios for SQLite repository."""
 
-    def test_high_volume_concurrent_writes(self, tmp_path: Path) -> None:  # noqa: C901
+    def test_high_volume_concurrent_writes(self, tmp_path: Path) -> None:
         """Test 10 threads each writing 50 tasks concurrently."""
         db_path = tmp_path / "tasks.db"
         repo = SqliteTaskRepository(path=db_path)
@@ -615,7 +615,7 @@ class TestSqliteConcurrencyAndStress:
         all_tasks = repo.get_all_tasks()
         assert len(all_tasks) == 500
 
-    def test_concurrent_read_heavy_workload(self, tmp_path: Path) -> None:  # noqa: C901
+    def test_concurrent_read_heavy_workload(self, tmp_path: Path) -> None:
         """Test many concurrent readers with occasional writers."""
         db_path = tmp_path / "tasks.db"
         repo = SqliteTaskRepository(path=db_path)
@@ -774,7 +774,7 @@ class TestSqliteConcurrencyAndStress:
         all_tasks = repo.get_all_tasks()
         assert len(all_tasks) == 20
 
-    def test_mixed_operation_concurrency(self, tmp_path: Path) -> None:  # noqa: C901
+    def test_mixed_operation_concurrency(self, tmp_path: Path) -> None:
         """Test concurrent mix of create, read, update, and delete operations."""
         db_path = tmp_path / "tasks.db"
         repo = SqliteTaskRepository(path=db_path)

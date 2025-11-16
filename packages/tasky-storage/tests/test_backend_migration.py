@@ -376,6 +376,6 @@ class TestCrossBackendBehavioralIdentity:
         assert len(json_task.name) == 1000
         assert len(sqlite_task.name) == 1000
         assert len(json_task.details) == 10000
-        assert len(json_task.details) == 10000
+        assert len(sqlite_task.details) == 10000
         assert json_task.name == sqlite_task.name
         assert json_task.details == sqlite_task.details

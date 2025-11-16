@@ -1,7 +1,7 @@
 # task-storage Specification
 
 ## Purpose
-TBD - created by archiving change improve-storage-backend-testing. Update Purpose after archive.
+This specification defines the requirements and guarantees for task storage backends in the tasky project. It ensures data integrity, error resilience, and safe concurrency across JSON and SQLite implementations. The spec addresses critical scenarios including database corruption recovery, backend migration with data preservation, and concurrent access patterns. Target audience includes backend implementers and services consuming storage APIs.
 ## Requirements
 ### Requirement: Storage Backend Error Resilience
 

@@ -914,7 +914,7 @@ class TestRegistryCorruptionRecovery:
         try:
             # Try to save - should fail
             registry = ProjectRegistry()
-            with pytest.raises(Exception):  # noqa: B017, PT011
+            with pytest.raises(Exception):  # noqa: B017
                 service._save(registry)
 
             # Temp file should not exist
