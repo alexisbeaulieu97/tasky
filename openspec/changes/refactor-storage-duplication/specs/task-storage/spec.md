@@ -47,23 +47,41 @@ The utilities module SHALL provide consolidated functions/helpers (implementers 
 5. **Pagination**: Apply limit/offset to results
    - Must handle edge cases (limit=0, offset > total, etc.)
 
-6. **Error Types**: Define consistent exceptions inheriting from `StorageError`
-   - `SnapshotConversionError`: Invalid snapshot data
-   - `StorageDataError`: Invalid task field values or Pydantic validation failure
-   - `TransactionConflictError`: Concurrent write conflicts
-   - All must have clear, actionable error messages and context
+6. **Error Types**: Define a custom exception hierarchy to replace raw built-in exceptions
+   - All storage operations SHALL raise only custom exceptions inheriting from `StorageError` (base class)
+   - No backend SHALL raise built-in exceptions (`IOError`, `FileNotFoundError`, `ValueError`, etc.) directly
+   - Each custom error accepts an optional `cause` parameter to wrap the original exception for debugging
+   - Error messages are actionable and consistent across all backends
+
+   **Exception Hierarchy**:
+   ```
+   StorageError (base)
+     ├── SnapshotConversionError (invalid snapshot dict → TaskModel conversion)
+     ├── StorageDataError (Pydantic validation, field validation, or data type failures)
+     │   └── [Optional] TaskValidationError (alias; inherits from StorageDataError for naming clarity)
+     ├── TransactionConflictError (concurrent write conflicts detected)
+     └── StorageIOError (wraps OS/I/O errors: OSError, FileNotFoundError, etc.)
+   ```
+
+   **Error Behavior Mapping**:
+   - `SnapshotConversionError` → Log level: `ERROR` → User message: "Task data corrupted" → Action: Do not retry
+   - `StorageDataError` / `TaskValidationError` → Log level: `WARNING` (validation_error) → HTTP: 400 Bad Request → Action: Do not retry
+   - `TransactionConflictError` → Log level: `WARNING` (conflict) → Action: Retry once, then fail cleanly
+   - `StorageIOError` → Log level: `ERROR` → HTTP: 500 Internal Server Error → Action: Retry once for transient I/O, fail cleanly if persistent
 
 **Test Requirements**:
 - Serialization roundtrip (task → `.model_dump_json()` → `.model_validate_json()`) must produce identical objects
-- Error classes must preserve context information for debugging
+- Error classes must preserve context information (original exception in `cause`) for debugging
 - Both JSON and SQLite backends must use same utilities and produce identical output
+- All backends wrap platform-specific exceptions (OSError, sqlite3.OperationalError, etc.) in custom error classes
 
 #### Scenario: Snapshot conversion is unified
 - **GIVEN** a storage backend needs to convert a snapshot to TaskModel
-- **WHEN** the backend calls `convert_snapshot_to_task(snapshot)`
-- **THEN** conversion uses the same logic regardless of backend type
-- **AND** error handling is consistent across all backends (SnapshotConversionError with message)
-- **AND** all task fields are properly deserialized
+- **WHEN** the backend calls `convert_snapshot_to_task(snapshot)` with invalid data (missing required field)
+- **THEN** the utility raises `SnapshotConversionError` (never `ValueError` or `KeyError`)
+- **AND** error message is actionable: "Failed to convert snapshot: missing required field 'id'"
+- **AND** the original exception is preserved in the `cause` parameter
+- **AND** all task fields are properly deserialized when snapshot is valid
 - **AND** datetime fields are parsed from ISO 8601 strings
 
 #### Scenario: Serialization is standardized
@@ -76,19 +94,23 @@ The utilities module SHALL provide consolidated functions/helpers (implementers 
 
 ### Requirement: Backend Implementation Consistency
 
-All storage backends SHALL implement core operations identically, with differences only in storage mechanism.
+All storage backends SHALL implement core operations identically, with differences only in storage mechanism. All backends SHALL use the custom error hierarchy defined in the Shared Storage Utilities requirement.
 
-#### Scenario: Error handling is identical
-- **GIVEN** a snapshot conversion error occurs in shared utility
-- **WHEN** the error is raised (e.g., SnapshotConversionError, TaskValidationError, TransactionConflictError, IOError, FileNotFoundError)
+#### Scenario: Error handling is identical and uses custom exceptions
+- **GIVEN** an operation fails in either JSON or SQLite backend
+- **WHEN** the backend encounters one of these conditions:
+  1. Invalid snapshot dict (missing fields, bad types) → raises `SnapshotConversionError`
+  2. Pydantic validation fails (invalid UUID, enum value) → raises `StorageDataError` or `TaskValidationError`
+  3. Concurrent write detected (file timestamp mismatch, SQLite BUSY) → raises `TransactionConflictError`
+  4. Disk I/O failure (file not found, locked, permission denied) → raises `StorageIOError`
 - **THEN** all backends handle the error identically:
-  - **SnapshotConversionError**: Invalid snapshot dict → logged as error → user sees "Task data corrupted" message
-  - **TaskValidationError**: Invalid task data (bad UUID, invalid enum) → logged as validation_error → returns 400 Bad Request
-  - **TransactionConflictError**: Concurrent write conflict → logged as conflict → retries once or fails cleanly
-  - **IOError/FileNotFoundError**: Disk I/O failure (JSON file not found, SQLite locked) → logged as error → returns 500 Internal Error
-- **AND** error messages are consistent across backends (same wording, context, suggestions)
-- **AND** error recovery is identical (no retry for validation, retry once for transient I/O)
-- **AND** all backends return consistent status codes/exceptions to callers
+  - Log level matches (ERROR for corruption/I/O, WARNING for validation/conflict)
+  - User-facing message is identical across backends
+  - Retry logic follows the mapping (no retry for validation, 1 retry for transient I/O)
+  - HTTP/exception bubbled to caller matches the error type
+- **AND** original exception is wrapped in `cause` for debugging
+- **AND** error messages are consistent in wording and context
+- **AND** no backend raises raw built-in exceptions (IOError, FileNotFoundError, ValueError, etc.)
 
 #### Scenario: Backends are functionally equivalent across all operations
 - **GIVEN** a sequence of test operations: Create, Read, Update, Delete, Filter by status, Filter by search, Pagination, Multi-operation transaction
