@@ -6,6 +6,13 @@ from typing import TYPE_CHECKING, Any
 
 from tasky_tasks.models import TaskModel
 
+from tasky_storage.utils import (
+    snapshot_to_task_model as shared_snapshot_to_task_model,
+)
+from tasky_storage.utils import (
+    task_model_to_snapshot as shared_task_model_to_snapshot,
+)
+
 if TYPE_CHECKING:
     import sqlite3
 
@@ -29,7 +36,7 @@ def task_model_to_snapshot(task: TaskModel) -> dict[str, Any]:
         Dictionary with JSON-serializable values (strings, ints, etc.)
 
     """
-    return task.model_dump(mode="json")
+    return shared_task_model_to_snapshot(task, mode="json")
 
 
 def snapshot_to_task_model(snapshot: dict[str, Any]) -> TaskModel:
@@ -46,7 +53,7 @@ def snapshot_to_task_model(snapshot: dict[str, Any]) -> TaskModel:
         Validated task model instance
 
     """
-    return TaskModel.model_validate(snapshot)
+    return shared_snapshot_to_task_model(snapshot)
 
 
 def row_to_snapshot(row: sqlite3.Row) -> dict[str, Any]:
