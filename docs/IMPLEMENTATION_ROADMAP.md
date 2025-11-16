@@ -1,21 +1,23 @@
 # Tasky Implementation Roadmap
-## 10-Change Strategic Plan (Nov 2025)
+## 18-Change Strategic Plan (Nov 2025)
 
-This roadmap organizes all 10 OpenSpec changes in optimal implementation order, accounting for dependencies, build-up of foundation features, and risk management.
+This roadmap organizes all 18 OpenSpec changes across Phases 1-8 in optimal implementation order, accounting for dependencies, build-up of foundation features, and risk management.
 
 ---
 
 ## Overview
 
-**Total Effort (Phases 1-5)**: ~56-62 hours of implementation
-**Total Effort (with optional Phase 6)**: ~62-70 hours
-**Phases**: 5 sequential phases (1, 1.5, 2, 3, 4, 4.4, 5) + 1 optional cleanup phase (6)
+**Total Effort (Phases 1-6)**: ~56-62 hours (COMPLETE ✅)
+**Total Effort (Phases 7-7b)**: ~174 hours of code quality + CLI improvements
+**Total Effort (Phases 8+)**: TBD (MCP servers, hooks, advanced features)
+**Phases**: 6 completed (1, 1.5, 2, 3, 4, 4.4, 5, 6) + 2 in progress (7-7b) + future phases
 **Test Gate**: After each phase, run `uv run pytest` to ensure all tests still pass
 
 ## Change Checklist
 
 Tick off each change as you complete it (mirrors the execution order below).
 
+### ✅ Phases 1-6: COMPLETE (Foundation & Features)
 - [x] 1.1 `add-task-create-command`
 - [x] 1.2 `enhance-task-list-output`
 - [x] 1.3 `add-task-show-command`
@@ -30,7 +32,27 @@ Tick off each change as you complete it (mirrors the execution order below).
 - [x] 4.3 `implement-project-list`
 - [x] 4.4 `align-tasky-projects-format`
 - [x] 5.1 `add-project-registry`
-- [ ] 6.1 `remove-json-config-support` (optional, flexible timeline)
+- [x] 6.1 `remove-json-config-support`
+
+### 🚀 Phase 7: Code Quality & Testing (224 tasks, ~91 hours)
+- [ ] 7.1 `improve-storage-backend-testing` (35 tasks, ~26h)
+- [ ] 7.2 `improve-cli-test-coverage` (47 tasks, ~22h)
+- [ ] 7.3 `refactor-storage-duplication` (30 tasks, ~7h)
+- [ ] 7.4 `improve-performance-and-safety` (42 tasks, ~21h)
+- [ ] 7.5 `improve-architecture-and-documentation` (44 tasks, ~15h)
+
+### 🎯 Phase 7b: CLI Improvements (51 tasks, ~51 hours)
+- [ ] 7b.1 `add-cli-input-validators` (25 tasks, ~3h)
+- [ ] 7b.2 `refactor-cli-error-handling` (26 tasks, ~2h)
+
+### 🚀 Phase 8: AI Integration (45 tasks, ~40-50 hours)
+- [ ] 8.1 `add-mcp-server` (MCP protocol integration for Claude)
+
+### 🎯 Phase 9: Event-Driven Automation (35 tasks, ~30-40 hours)
+- [ ] 9.1 `implement-task-hooks` (Lifecycle events and automation)
+
+### 💾 Phase 10: Enterprise Features (55 tasks, ~50-60 hours)
+- [ ] 10.1 `add-advanced-backends` (PostgreSQL, multi-user, audit trails)
 
 ---
 
@@ -723,11 +745,303 @@ This moves completed changes to `openspec/changes/archive/YYYY-MM-DD-<name>/` an
 
 ---
 
-## Questions Before Starting?
+---
 
-- Want to adjust the order?
-- Want to split any phase?
-- Want to implement any changes in parallel?
-- Need clarification on any dependencies?
+## Phase 7: Code Quality & Testing (224 tasks, ~91 hours)
+**Goal**: Bring codebase to production-ready quality with comprehensive test coverage and clean architecture
 
-Start with Phase 1.1 when ready! 🚀
+### Context
+After completing all core features (Phases 1-6), comprehensive audit identified 15 substantial code quality issues:
+- **Critical**: SQLite 54% coverage, CLI 69% coverage, N+1 filtering, non-atomic writes
+- **High**: 100+ lines duplicate code, circular imports, high complexity, missing docs
+- Issues organized into 5 strategic proposals addressing testing, performance, refactoring, and architecture
+
+### 7.1 `improve-storage-backend-testing` ⭐ CRITICAL
+**Why First**: Foundation for all storage operations. SQLite coverage (54%) blocks confidence in data safety.
+**What**: Error path testing, concurrency/stress testing, backend migration tests, corruption recovery
+**Tasks**: 35 | Hours: ~26 | Coverage: 54% → 80%+
+**Depends on**: Nothing (standalone)
+**Enables**: Phases 7.3, 7.4 can run in parallel after this provides confidence
+
+```bash
+/openspec:apply improve-storage-backend-testing
+```
+
+### 7.2 `improve-cli-test-coverage` ⭐ HIGH PRIORITY
+**Why Second in Phase 7**: User-facing error handling and edge cases untested (CLI 69% coverage)
+**What**: Error handler tests, command edge cases, import/export edge cases, input validation integration
+**Tasks**: 47 | Hours: ~22 | Coverage: 69% → 80%+
+**Depends on**: Nothing (can run in parallel with 7.1)
+**Enables**: 7b.1 and 7b.2 (CLI improvements need good test foundation)
+
+```bash
+/openspec:apply improve-cli-test-coverage
+```
+
+### 7.3 `refactor-storage-duplication`
+**Why Third in Phase 7**: After testing confidence is high, refactor duplicate code safely
+**What**: Extract shared snapshot conversion utility, standardize serialization, remove duplicate error handling
+**Tasks**: 30 | Hours: ~7 | Impact: Removes 100+ lines of duplicate code
+**Depends on**: 7.1 complete (tests validate refactoring doesn't break behavior)
+**Enables**: 7.4 (cleaner code for performance optimization)
+
+```bash
+/openspec:apply refactor-storage-duplication
+```
+
+### 7.4 `improve-performance-and-safety`
+**Why Fourth in Phase 7**: After duplicate code removed, optimize performance patterns
+**What**: Filter-first strategy (10x faster filtering), atomic writes (data safety), registry pagination
+**Tasks**: 42 | Hours: ~21 | Impact: Critical performance + reliability improvements
+**Depends on**: 7.3 complete (cleaner code structure for optimization)
+**Enables**: Confident in handling 100k+ projects, large task datasets
+
+```bash
+/openspec:apply improve-performance-and-safety
+```
+
+### 7.5 `improve-architecture-and-documentation`
+**Why Last in Phase 7**: After code is clean and tested, polish architecture
+**What**: Error protocol decoupling, circular import resolution, complexity reduction, ADR creation
+**Tasks**: 44 | Hours: ~15 | Impact: Cleaner architecture, better onboarding
+**Depends on**: 7.1-7.4 complete (improves overall codebase quality)
+**Enables**: Phase 7b (clean foundation for CLI improvements)
+
+```bash
+/openspec:apply improve-architecture-and-documentation
+```
+
+### Phase 7 Validation Checkpoint ✓
+After Phase 7 completion:
+- Test coverage: 82.79% → 85%+ ✅
+- SQLite coverage: 54% → 80%+ ✅
+- CLI coverage: 69% → 80%+ ✅
+- No cyclomatic complexity violations (0 C901 noqa comments) ✅
+- No circular imports ✅
+- No duplicate snapshot code ✅
+- All docstrings present, 4+ ADRs documented ✅
+
+```bash
+# Validation commands
+uv run pytest --cov=packages --cov-fail-under=80
+uv run ruff check --fix
+uv run pyright
+openspec validate --specs
+```
+
+---
+
+## Phase 7b: CLI Improvements (51 tasks, ~51 hours)
+**Goal**: Improve CLI user experience with input validation and error handling consolidation
+
+### Context
+Two high-value CLI improvements that should run AFTER Phase 7 testing foundation is solid.
+These enhance usability and error messages, leveraging comprehensive test coverage from Phase 7.2.
+
+### 7b.1 `add-cli-input-validators` ⭐ HIGH VALUE
+**Why First in Phase 7b**: Input validation framework used by all CLI commands
+**What**: Extract validation into reusable validators (UUID, date, status, priority); fail-fast before service invocation
+**Tasks**: 25 | Hours: ~3 | Impact: User-friendly error messages, consistent validation
+**Depends on**: 7.2 (improved CLI test coverage)
+**Enables**: 7b.2 (error handling improvements integrate with validators)
+
+```bash
+/openspec:apply add-cli-input-validators
+```
+
+### 7b.2 `refactor-cli-error-handling`
+**Why Second in Phase 7b**: Uses validators from 7b.1, integrated with test coverage from 7.2
+**What**: Consolidate duplicate error handlers into registry-based dispatcher
+**Tasks**: 26 | Hours: ~2 | Impact: Maintainable error handling, consistent exit codes
+**Depends on**: 7b.1 complete (validators ready for integration)
+**Enables**: Future CLI commands inherit clean error handling
+
+```bash
+/openspec:apply refactor-cli-error-handling
+```
+
+### Phase 7b Validation Checkpoint ✓
+After Phase 7b completion:
+- CLI validation working end-to-end ✅
+- All error paths handled consistently ✅
+- User-friendly messages in all scenarios ✅
+- Tests pass with integrated validators ✅
+- Exit codes correct (1 for user errors, 2 for internal) ✅
+
+```bash
+# Validation commands
+uv run pytest --cov=packages/tasky-cli --cov-fail-under=80
+uv run ruff check --fix
+uv run pyright
+# Manual test: try error scenarios
+uv run tasky task show invalid-id  # Should show friendly error
+uv run tasky task create           # Should validate input
+```
+
+---
+
+## Phase 7-7b Execution Timeline (Recommended)
+
+```
+Week 1: Storage Foundation
+  Mon-Tue: improve-storage-backend-testing (start)
+  Wed-Thu: improve-cli-test-coverage (parallel)
+  Fri:     Validation gate (80% coverage, all tests pass)
+
+Week 2: Optimization & Cleanup
+  Mon-Tue: refactor-storage-duplication (parallel with next)
+  Wed-Thu: improve-performance-and-safety
+  Fri:     Validation gate (benchmarks pass, no performance regression)
+
+Week 3: Architecture Polish
+  Mon-Wed: improve-architecture-and-documentation
+  Thu:     Validation gate (no C901 violations, ADRs written)
+  Fri:     Final PR review → merge Phase 7
+
+Week 4: CLI Improvements (Optional but recommended)
+  Mon-Tue: add-cli-input-validators
+  Wed:     add-cli-error-handling (refactor)
+  Thu:     Validation gate (CLI tests pass, error handling integrated)
+  Fri:     PR review → merge Phase 7b
+```
+
+---
+
+## Phase 8: MCP Server Integration (45 tasks, ~40-50 hours)
+**Goal**: Enable Claude and other AI assistants to manage tasks via MCP protocol
+
+### Status: ✅ PROPOSED & VALIDATED
+
+**Why After Phase 7b**: Production-ready codebase with clean CLI error handling. MCP inherits all these improvements.
+
+**What it does**:
+- Exposes 10+ task and project operations via MCP tools
+- Enables Claude to create, list, update, complete, delete tasks
+- Service caching for long-lived MCP connections
+- Request-scoped logging with correlation IDs
+- Thread-safe concurrent request handling
+
+**Tasks**: 45 total
+- Server core (caching, logging, config): 7 tasks
+- Task operations (10 tools): 12 tasks
+- Project operations (4 tools): 6 tasks
+- Error handling & resilience: 5 tasks
+- Threading & concurrency: 6 tasks
+- Integration testing: 7 tasks
+- Documentation & examples: 2 tasks
+
+**Depends on**: Phase 7b complete (clean CLI foundation)
+**Enables**: AI-assisted task management, future integrations
+
+```bash
+/openspec:apply add-mcp-server
+```
+
+---
+
+## Phase 9: Task Lifecycle Hooks (35 tasks, ~30-40 hours)
+**Goal**: Enable event-driven automation and external system integration
+
+### Status: ✅ PROPOSED & VALIDATED
+
+**Why After Phase 8**: After MCP proves external system integration works well. Hooks follow same patterns.
+
+**What it does**:
+- 7 lifecycle events (created, updated, completed, cancelled, reopened, deleted, imported)
+- Hook dispatcher and event broadcasting
+- Default handlers (logging, optional CLI output)
+- User-defined hooks support (`~/.tasky/hooks.py`)
+- Integration with all task service methods
+
+**Tasks**: 35 total
+- Event types definition: 8 tasks
+- Dispatcher implementation: 6 tasks
+- Default handlers: 3 tasks
+- Task service integration: 7 tasks
+- CLI integration: 4 tasks
+- Extension points & user hooks: 3 tasks
+- Documentation & examples: 4 tasks
+
+**Depends on**: Phase 8 complete (patterns established)
+**Enables**: Workflow automation, Slack notifications, calendar sync, audit logs
+
+```bash
+/openspec:apply implement-task-hooks
+```
+
+---
+
+## Phase 10: Advanced Storage Backends - PostgreSQL (55 tasks, ~50-60 hours)
+**Goal**: Enable multi-user, enterprise-grade task management
+
+### Status: ✅ PROPOSED & VALIDATED
+
+**Why After Phase 9**: After hooks enable audit trail concept. PostgreSQL audit feature benefits from hook patterns.
+
+**What it does**:
+- Full PostgreSQL backend implementation (matches JSON/SQLite protocol)
+- Multi-user support (project ownership, access control foundation)
+- Audit trail (immutable change log)
+- Transaction support with conflict detection
+- Connection pooling for scalability
+- Automatic schema management (migrations)
+
+**Tasks**: 55 total
+- Schema design & migrations: 9 tasks
+- Backend implementation (CRUD): 10 tasks
+- Transaction & concurrency: 6 tasks
+- Configuration & connection pooling: 7 tasks
+- Error handling & resilience: 6 tasks
+- Audit trail: 6 tasks
+- Testing (unit + integration): 7 tasks
+- Documentation & migration guide: 7 tasks
+- Multi-user foundation: 4 tasks
+
+**Depends on**: Phase 9 complete (hooks established)
+**Enables**: Shared task databases, multi-user collaboration, audit compliance
+
+```bash
+/openspec:apply add-advanced-backends
+```
+
+---
+
+### Future Directions Beyond Phase 10
+
+After Phase 8-10 complete, consider:
+- **Cloud Storage Backends** (S3, Google Cloud for sync across devices)
+- **User Management** (proper multi-user authentication, permissions)
+- **API Server** (HTTP API for mobile/web clients)
+- **Mobile Apps** (iOS/Android clients)
+- **Analytics & Insights** (task metrics, completion trends)
+
+---
+
+## Next Steps
+
+1. **Complete Phase 7** (Code Quality & Testing)
+   - 5 validated proposals ready for implementation
+   - ~91 hours of work, 3-week timeline
+   - Brings codebase to production-ready quality
+
+2. **Complete Phase 7b** (CLI Improvements - Optional but recommended)
+   - 2 validated proposals ready for implementation
+   - ~51 hours of work, 1-week timeline
+   - Enhances user experience
+
+3. **Plan Future Phases** (Phase 8+)
+   - After Phase 7-7b complete, create proposals for MCP, hooks, and backends
+   - Each needs comprehensive audit and specification
+   - Will follow same OpenSpec-driven approach
+
+---
+
+## Ready to Start?
+
+- Review Phase 7-7b proposals: `openspec list` and `openspec show <name>`
+- Adjust execution order if needed
+- Approve proposals when ready to begin
+
+Questions? Check the detailed phase sections above or discuss specific proposals.
+
+Good luck! 🚀
