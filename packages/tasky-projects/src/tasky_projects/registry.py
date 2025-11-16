@@ -62,7 +62,7 @@ class ProjectRegistryService:
         except (json.JSONDecodeError, ValueError):
             logger.exception("Failed to load registry from %s", self.registry_path)
             # Back up corrupted file
-            timestamp = datetime.now(tz=UTC).strftime("%Y%m%d_%H%M%S")
+            timestamp = datetime.now(tz=UTC).strftime("%Y%m%d_%H%M%S%f")
             backup_path = self.registry_path.with_stem(
                 f"{self.registry_path.stem}.corrupted.{timestamp}",
             )
