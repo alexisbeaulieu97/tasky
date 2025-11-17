@@ -2,6 +2,14 @@
 
 from __future__ import annotations
 
+import sys
+
+if __name__ == "tests.conftest":
+    # Ensure pytest registers this plugin under a stable, unique name.
+    module = sys.modules[__name__]
+    module.__name__ = "tasky_tasks.tests.conftest"
+    sys.modules[module.__name__] = module
+
 from uuid import UUID
 
 from tasky_tasks.models import TaskFilter, TaskModel, TaskStatus

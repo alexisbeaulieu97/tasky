@@ -127,7 +127,6 @@ def info_command(
         typer.echo(f"  Storage: {settings.storage.path}")
 
 
-@project_app.command(name="list")
 def _format_project_path(project_path: Path) -> str:
     """Format project path with tilde shortening for home directory.
 
