@@ -61,10 +61,16 @@ The CLI SHALL implement error handling consistently across all commands using a 
 
 The error dispatcher SHALL:
 - Implement a registry-based pattern where handlers register for specific exception types
-- Provide a single `dispatch(exc: Exception, verbose: bool) -> str` method that routes to the appropriate handler
+- Provide a single `dispatch(exc: Exception, verbose: bool) -> ErrorResult` method that routes to the appropriate handler
 - Include handlers for domain exceptions (`TaskNotFoundError`, `TaskValidationError`, `InvalidStateTransitionError`), storage errors, and project-related errors
-- Return user-friendly error messages for all registered exception types
+- Return user-friendly error messages for all registered exception types through `ErrorResult`
 - Provide a fallback handler for unexpected exceptions
+
+`ErrorResult` is a dataclass with the following fields:
+- `message: str` – main error message displayed to the user
+- `suggestion: str | null` – optional guidance rendered separately
+- `exit_code: int` – exit status the CLI SHALL use
+- `traceback: str | null` – populated only when `verbose` is True so transports can include stack traces without reformatting
 
 #### Scenario: Consistent error handling
 
@@ -85,45 +91,56 @@ The error dispatcher SHALL:
 
 **Given** a user runs `tasky task show <non-existent-id>`
 **When** a `TaskNotFoundError` is raised
-**Then** the dispatcher SHALL route to the task domain handler
-**And** the CLI SHALL display: "Error: Task '<id>' not found"
-**And** SHALL NOT display a Python stack trace
-**And** SHALL exit with code 1
+**Then** the dispatcher SHALL route to the task domain handler and return an `ErrorResult`
+**And** `ErrorResult.message` SHALL be `"Task '<id>' not found."`
+**And** `ErrorResult.suggestion` SHALL be `"Run 'tasky task list' to view available tasks."`
+**And** `ErrorResult.exit_code` SHALL be `1`
+**And** `ErrorResult.traceback` SHALL be `null` unless `--verbose` is provided  
+_Example ErrorResult_: `{ "message": "Task '123' not found.", "suggestion": "Run 'tasky task list' to view available tasks.", "exit_code": 1, "traceback": null }`
 
 #### Scenario: Storage exception caught and formatted
 
 **Given** a task operation fails in the storage layer
 **When** a storage-related exception is raised (e.g., permission denied, disk full)
-**Then** the dispatcher SHALL route to the storage error handler
-**And** the CLI SHALL display: "Error: Storage operation failed: <message>"
-**And** SHALL exit with code 1
+**Then** the dispatcher SHALL route to the storage error handler and return an `ErrorResult`
+**And** `ErrorResult.message` SHALL be `"Storage operation failed: <message>"`
+**And** `ErrorResult.suggestion` SHALL mention checking `.tasky` (e.g., `"Run 'tasky project init' or check the .tasky directory."`)
+**And** `ErrorResult.exit_code` SHALL be `1`
+**And** `ErrorResult.traceback` SHALL be populated only in verbose mode  
+_Example ErrorResult_: `{ "message": "Storage operation failed: Permission denied", "suggestion": "Run 'tasky project init' or check the .tasky directory.", "exit_code": 1, "traceback": null }`
 
 #### Scenario: Validation exception caught and formatted
 
 **Given** a user attempts an operation that raises `TaskValidationError`
 **When** the exception is caught by the dispatcher
-**Then** the dispatcher SHALL route to the task domain handler
-**And** the CLI SHALL display: "Error: <validation-message>"
-**And** SHALL provide guidance on fixing the issue if available
-**And** SHALL exit with code 1
+**Then** the dispatcher SHALL route to the task domain handler and return an `ErrorResult`
+**And** `ErrorResult.message` SHALL contain the validation failure
+**And** `ErrorResult.suggestion` SHALL provide guidance (e.g., `"Check the value provided for '<field>'."`)
+**And** `ErrorResult.exit_code` SHALL be `1`
+**And** `ErrorResult.traceback` SHALL be included only when verbose is True  
+_Example ErrorResult_: `{ "message": "Name is required.", "suggestion": "Check the value provided for 'name'.", "exit_code": 1, "traceback": null }`
 
 #### Scenario: Invalid state transition caught and formatted
 
 **Given** a user attempts to transition a task to an invalid state
 **When** an `InvalidStateTransitionError` is raised
-**Then** the dispatcher SHALL route to the task domain handler
-**And** the CLI SHALL display: "Error: Cannot transition task from <from> to <to>"
-**And** SHALL suggest valid transitions
-**And** SHALL exit with code 1
+**Then** the dispatcher SHALL route to the task domain handler and return an `ErrorResult`
+**And** `ErrorResult.message` SHALL be `"Cannot transition from <from> to <to>."`
+**And** `ErrorResult.suggestion` SHALL describe a valid path or next command
+**And** `ErrorResult.exit_code` SHALL be `1`
+**And** `ErrorResult.traceback` SHALL only be set in verbose mode  
+_Example ErrorResult_: `{ "message": "Cannot transition from completed to cancelled.", "suggestion": "Use 'tasky task reopen <id>' to make it pending first.", "exit_code": 1, "traceback": null }`
 
 #### Scenario: Unexpected exception falls back to generic handler
 
 **Given** an exception type not registered in the dispatcher is raised
 **When** the dispatcher receives the exception
-**Then** the fallback handler SHALL be invoked
-**And** the CLI SHALL display: "Error: An unexpected error occurred"
-**And** in verbose mode, additional context MAY be provided
-**And** SHALL exit with code 2 (indicating internal error)
+**Then** the fallback handler SHALL be invoked and return an `ErrorResult`
+**And** `ErrorResult.message` SHALL be `"An unexpected error occurred."`
+**And** `ErrorResult.suggestion` SHALL instruct users to rerun with `--verbose` or file a bug
+**And** `ErrorResult.exit_code` SHALL be `2`
+**And** `ErrorResult.traceback` SHALL contain the stack trace when verbose is enabled  
+_Example ErrorResult_: `{ "message": "An unexpected error occurred.", "suggestion": "Run with --verbose for details or file a bug report.", "exit_code": 2, "traceback": "<stack trace when verbose>" }`
 
 ### Requirement: Verbose Error Mode
 
@@ -191,4 +208,3 @@ When handling exceptions, the CLI SHALL extract context from exception attribute
 **When** formatting the error message  
 **Then** the CLI SHALL extract `task_id` from exception attributes  
 **And** include it in the formatted message: "Task 'abc-123' not found"
-
