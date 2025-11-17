@@ -241,8 +241,6 @@ class TaskFilter(BaseModel):
             True if the snapshot matches all specified criteria, False otherwise.
 
         """
-        from datetime import datetime  # noqa: PLC0415
-
         # Status filter: task must be in one of the specified statuses
         if self.statuses is not None:
             snapshot_status = snapshot.get("status")
@@ -267,8 +265,6 @@ class TaskFilter(BaseModel):
 
                 # Ensure timezone-aware: if naive, assume UTC
                 if created_at.tzinfo is None:
-                    from datetime import UTC  # noqa: PLC0415
-
                     created_at = created_at.replace(tzinfo=UTC)
 
             except (ValueError, TypeError):

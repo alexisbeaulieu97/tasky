@@ -109,9 +109,10 @@ except Exception as exc:
 ```
 
 **Rejected because:**
-- Too broad: catches unexpected errors (KeyboardInterrupt, SystemExit, etc.)
-- Masks programming errors that should propagate
+- Too broad: catches all errors including programming mistakes (AttributeError, TypeError, etc.)
+- Masks bugs that should propagate for debugging
 - No way to distinguish storage errors from other failures
+- Note: KeyboardInterrupt/SystemExit inherit from BaseException, not Exception, so they wouldn't be caught
 
 ## References
 - `packages/tasky-tasks/src/tasky_tasks/protocols.py` - Protocol definition

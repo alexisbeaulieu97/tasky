@@ -85,4 +85,3 @@ Use a full DI container (e.g., `dependency-injector`, `injector`):
 ## References
 - `packages/tasky-storage/src/tasky_storage/registry.py` - Registry implementation
 - `packages/tasky-settings/src/tasky_settings/factory.py` - Factory usage
-- Related issue: https://github.com/[org]/tasky/issues/XXX (if applicable)

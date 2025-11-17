@@ -65,3 +65,14 @@
 - [x] 7.3 Create ARCHITECTURE.md overview if it doesn't exist (COVERED BY ADRs)
 - [x] 7.4 Document how to add new error types without creating coupling (IN ADR-002)
 - [x] 7.5 Document module import guidelines for new contributors (IN AGENTS.MD)
+
+## 8. Review Validation & Fixes
+
+- [x] 8.1 P1: Fix TaskStatus import in __init__.py (import from enums, not models)
+- [x] 8.2 P3: Fix test_import_order_does_not_matter_exceptions_first to actually test exceptions first
+- [x] 8.3 Remove redundant datetime import at models.py line 244
+- [x] 8.4 Remove redundant UTC import at models.py line 270
+- [x] 8.5 Correct ADR-002 claim about Exception catching KeyboardInterrupt/SystemExit
+- [x] 8.6 Remove placeholder XXX link in ADR-001
+- [x] 8.7 Run full test suite to verify all fixes work
+- [x] 8.8 Verify ruff and pyright still pass
