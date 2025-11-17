@@ -74,5 +74,15 @@
 - [x] 8.4 Remove redundant UTC import at models.py line 270
 - [x] 8.5 Correct ADR-002 claim about Exception catching KeyboardInterrupt/SystemExit
 - [x] 8.6 Remove placeholder XXX link in ADR-001
-- [x] 8.7 Run full test suite to verify all fixes work
+- [x] 8.7 Run full test suite to verify all fixes work (used scripts/test-all.sh: 586 tests pass)
 - [x] 8.8 Verify ruff and pyright still pass
+
+## 9. Final Fixes (Second Review)
+
+- [x] 9.1 Fix test_import_order_does_not_matter_exceptions_first to swap imports correctly
+- [x] 9.2 Move Pydantic ValidationError import to module level in errors.py (remove local import)
+- [x] 9.3 Remove C901 suppressions from CLI commands (all ≤10 complexity)
+- [x] 9.4 Update ruff.toml max-complexity from 5 to 10 to match spec
+- [x] 9.5 Add docstrings to _load_document_optional, _load_document, _is_file_not_found_error
+- [x] 9.6 Create scripts/test-all.sh to work around pytest conftest collision in monorepo
+- [x] 9.7 Document pytest limitation and test script in AGENTS.md

@@ -131,7 +131,7 @@ class TestBackendMigration:
         assert json_completed == sqlite_completed
         assert json_cancelled == sqlite_cancelled
 
-    def test_migration_partial_state_after_error(self, tmp_path: Path) -> None:  # noqa: C901
+    def test_migration_partial_state_after_error(self, tmp_path: Path) -> None:
         """Test that migration errors leave detectable partial state."""
         json_path = tmp_path / "tasks.json"
         sqlite_path = tmp_path / "tasks.db"

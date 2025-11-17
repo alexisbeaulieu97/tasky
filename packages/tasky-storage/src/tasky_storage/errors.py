@@ -23,6 +23,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from pydantic import ValidationError as PydanticValidationError
+
 if TYPE_CHECKING:
     from pydantic import ValidationError
 
@@ -107,8 +109,6 @@ class StorageDataError(StorageError):
             Optional original exception for additional context
 
         """
-        from pydantic import ValidationError as PydanticValidationError  # noqa: PLC0415
-
         if isinstance(exc, PydanticValidationError):
             msg = f"Stored task data is invalid: {exc}"
             super().__init__(msg)
