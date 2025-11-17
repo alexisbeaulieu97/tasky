@@ -3,11 +3,10 @@
 from __future__ import annotations
 
 import logging
-import re
 import sys
 import traceback
 from collections.abc import Callable
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 from functools import wraps
 from pathlib import Path
 from typing import NoReturn, Protocol, TypeVar, cast
@@ -33,8 +32,10 @@ from tasky_tasks import (
     TaskNotFoundError,
     TaskValidationError,
 )
-from tasky_tasks.models import TaskStatus
+from tasky_tasks.enums import TaskStatus
 from tasky_tasks.service import TaskService
+
+from tasky_cli.validators import DateValidator, StatusValidator, TaskIdValidator
 
 task_app = typer.Typer(no_args_is_help=True)
 
@@ -109,23 +110,16 @@ def _parse_task_id_and_get_service(task_id: str) -> tuple[TaskService, UUID]:
         KeyError: If backend not registered (caught by error dispatcher)
 
     """
-    # Parse UUID first, before creating service or checking for project
-    # This ensures invalid UUIDs are rejected without touching storage
-    try:
-        uuid = UUID(task_id)
-    except ValueError as exc:
-        typer.echo(
-            f"Invalid UUID format: {task_id}\n"
-            f"Expected format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx "
-            f"(e.g., 123e4567-e89b-12d3-a456-426614174000)",
-            err=True,
-        )
-        raise typer.Exit(1) from exc
+    # Validate UUID format using TaskIdValidator
+    result = TaskIdValidator.validate(task_id)
+    if not result.is_valid:
+        typer.echo(result.error_message, err=True)
+        raise typer.Exit(1)
 
     # Only create service after UUID is validated
     service = _get_service()
 
-    return service, uuid
+    return service, result.value  # type: ignore[return-value]
 
 
 def _validate_status_filter(status: str | None) -> TaskStatus | None:
@@ -144,16 +138,12 @@ def _validate_status_filter(status: str | None) -> TaskStatus | None:
     if status is None:
         return None
 
-    valid_statuses = {s.value for s in TaskStatus}
-    if status.lower() not in valid_statuses:
-        valid_list = ", ".join(sorted(valid_statuses))
-        typer.echo(
-            f"Invalid status: '{status}'. Valid options: {valid_list}",
-            err=True,
-        )
+    result = StatusValidator.validate(status)
+    if not result.is_valid:
+        typer.echo(result.error_message, err=True)
         raise typer.Exit(1)
 
-    return TaskStatus(status.lower())
+    return result.value  # type: ignore[return-value]
 
 
 def _parse_date_filter(date_str: str, *, inclusive_end: bool = False) -> datetime:
@@ -171,34 +161,19 @@ def _parse_date_filter(date_str: str, *, inclusive_end: bool = False) -> datetim
         typer.Exit: If the date format is invalid or cannot be parsed.
 
     """
-    # Validate format is exactly YYYY-MM-DD (reject time components)
-    if not _is_valid_date_format(date_str):
-        typer.echo(
-            f"Invalid date format: '{date_str}'. "
-            "Expected ISO 8601 format: YYYY-MM-DD (e.g., 2025-01-01)",
-            err=True,
-        )
-        raise typer.Exit(1) from None
+    # Validate date format using DateValidator
+    result = DateValidator.validate(date_str)
+    if not result.is_valid:
+        typer.echo(result.error_message, err=True)
+        raise typer.Exit(1)
 
-    try:
-        # Parse date and make it timezone-aware (UTC midnight)
-        parsed_date = datetime.fromisoformat(date_str)
-        result_dt = parsed_date.replace(tzinfo=UTC)
+    # For --created-before, add 1 day to make the exclusive < check
+    # inclusive of the entire day (user expects --created-before 2025-12-31
+    # to include all of Dec 31)
+    if inclusive_end:
+        return result.value + timedelta(days=1)  # type: ignore[operator, return-value]
 
-        # For --created-before, add 1 day to make the exclusive < check
-        # inclusive of the entire day (user expects --created-before 2025-12-31
-        # to include all of Dec 31)
-        if inclusive_end:
-            result_dt = result_dt + timedelta(days=1)
-    except ValueError:
-        typer.echo(
-            f"Invalid date format: '{date_str}'. "
-            "Expected ISO 8601 format: YYYY-MM-DD (e.g., 2025-01-01)",
-            err=True,
-        )
-        raise typer.Exit(1) from None
-    else:
-        return result_dt
+    return result.value  # type: ignore[return-value]
 
 
 def _build_task_list_filter(
@@ -407,23 +382,6 @@ def list_command(
 
     # Display summary line
     _render_task_list_summary(tasks, has_filters=has_filters)
-
-
-def _is_valid_date_format(date_str: str) -> bool:
-    """Validate that date string matches exactly YYYY-MM-DD format.
-
-    Args:
-        date_str: The date string to validate.
-
-    Returns:
-        True if format is YYYY-MM-DD, False otherwise.
-
-    """
-    # Reject any string containing time markers (T, colon, etc.)
-    if "T" in date_str or ":" in date_str or "+" in date_str or "Z" in date_str:
-        return False
-    # Must match YYYY-MM-DD exactly
-    return bool(re.match(r"^\d{4}-\d{2}-\d{2}$", date_str))
 
 
 def _get_status_indicator(status: TaskStatus) -> str:

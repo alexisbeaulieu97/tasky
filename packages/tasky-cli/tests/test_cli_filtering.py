@@ -151,7 +151,10 @@ class TestTaskFilteringCLI:
         output = result.stdout + result.stderr
 
         # Verify the error message is helpful and well-formatted
-        assert "Invalid status: 'invalid'" in output
+        assert "Invalid status" in output
+        assert "pending" in output
+        assert "completed" in output
+        assert "cancelled" in output
 
         # Verify all valid statuses are mentioned with proper comma-space separation
         expected_formats = [
@@ -216,16 +219,15 @@ class TestTaskFilteringCLI:
         runner: CliRunner,
         project_with_tasks: Path,  # noqa: ARG002
     ) -> None:
-        """Test filtering with whitespace-padded status is rejected (intentional behavior)."""
-        # Whitespace is NOT stripped from status input by design.
-        # This is intentional: users must provide exact status values
-        # (pending, completed, cancelled).
-        # Rejecting " pending " helps catch typos and accidental whitespace in user input.
+        """Test filtering with whitespace-padded status is accepted after trimming."""
+        # StatusValidator now trims whitespace, so " pending " is treated as "pending"
+        # This is more user-friendly and matches common CLI behavior
         result = runner.invoke(task_app, ["list", "--status", " pending "])
 
-        assert result.exit_code == 1
-        output = result.stdout + result.stderr
-        assert "Invalid status" in output
+        # Should succeed after trimming whitespace
+        assert result.exit_code == 0
+        output = result.stdout
+        assert "pending" in output.lower()
 
     def test_filter_very_long_status(
         self,

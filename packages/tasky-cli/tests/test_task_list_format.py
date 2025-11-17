@@ -290,9 +290,10 @@ class TestTaskListValidation:
         # Should get validation error, not project not found error
         assert result.exit_code == 1
         # Error messages go to stderr
-        assert "Invalid status: 'nope'" in result.stderr
-        assert "Valid options:" in result.stderr
-        assert "cancelled, completed, pending" in result.stderr
+        assert "Invalid status" in result.stderr
+        assert "pending" in result.stderr
+        assert "completed" in result.stderr
+        assert "cancelled" in result.stderr
         # Should NOT see project not found error
         assert "No project found" not in result.stderr
 

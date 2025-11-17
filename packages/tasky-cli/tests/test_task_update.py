@@ -234,8 +234,10 @@ class TestTaskUpdateErrorHandling:
         result = runner.invoke(task_app, ["update", "not-a-uuid", "--name", "Test"])
 
         assert result.exit_code == 1
-        # Error messages are written to stdout by typer.echo()
-        assert "Invalid UUID format" in result.stdout or "Invalid UUID format" in result.stderr
+        # Error messages are written to stderr by validators
+        output = result.stdout + result.stderr
+        assert "Invalid task ID" in output
+        assert "UUID" in output
 
     def test_update_nonexistent_task(
         self,

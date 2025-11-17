@@ -184,9 +184,8 @@ class TestTaskShowCommandErrors:
         result = runner.invoke(task_app, ["show", "not-a-uuid"])
 
         assert result.exit_code == 1
-        assert "Invalid UUID format" in result.stderr
-        assert "Expected format:" in result.stderr
-        assert "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" in result.stderr
+        assert "Invalid task ID" in result.stderr
+        assert "UUID" in result.stderr
 
     def test_show_task_with_nonexistent_id(
         self,

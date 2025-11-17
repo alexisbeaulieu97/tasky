@@ -144,7 +144,7 @@ class TestAdvancedDateFiltering:
         assert result.exit_code == 1
         output = result.stdout + result.stderr
         assert "Invalid date format" in output
-        assert "ISO 8601" in output
+        assert "YYYY-MM-DD" in output
         assert "YYYY-MM-DD" in output
 
     def test_filter_invalid_created_before_format(

@@ -15,7 +15,7 @@ from tasky_tasks import (
     TaskNotFoundError,
     TaskValidationError,
 )
-from tasky_tasks.models import TaskStatus
+from tasky_tasks.enums import TaskStatus
 from typer.testing import CliRunner
 
 if TYPE_CHECKING:
