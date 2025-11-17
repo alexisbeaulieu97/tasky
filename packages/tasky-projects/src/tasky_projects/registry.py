@@ -23,6 +23,182 @@ REGISTRY_SIZE_WARNING_THRESHOLD = 0.9  # 90% of max size
 MAX_DISAMBIGUATION_ATTEMPTS = 100
 
 
+def _validate_project_path(path: Path) -> Path:
+    """Validate that path exists and contains .tasky directory.
+
+    Args:
+        path: Path to validate
+
+    Returns:
+        Resolved absolute path
+
+    Raises:
+        ValueError: If path doesn't exist or lacks .tasky directory
+
+    """
+    path = path.resolve()
+    if not path.exists():
+        msg = f"Path does not exist: {path}"
+        raise ValueError(msg)
+
+    tasky_dir = path / ".tasky"
+    if not tasky_dir.exists() or not tasky_dir.is_dir():
+        msg = "Not a tasky project (missing .tasky directory)"
+        raise ValueError(msg)
+
+    return path
+
+
+def _check_registry_size_limits(current_size: int) -> None:
+    """Check registry size against hard and warning limits.
+
+    Args:
+        current_size: Current number of projects in registry
+
+    Raises:
+        ValueError: If hard limit is exceeded
+
+    """
+    if current_size >= MAX_REGISTRY_SIZE:
+        msg = (
+            f"Registry size limit exceeded ({current_size}/{MAX_REGISTRY_SIZE}). "
+            "Consider removing unused projects or increasing the limit."
+        )
+        raise ValueError(msg)
+
+    warning_threshold = int(MAX_REGISTRY_SIZE * REGISTRY_SIZE_WARNING_THRESHOLD)
+    if current_size >= warning_threshold:
+        logger.warning(
+            "Registry approaching size limit: %d/%d projects registered",
+            current_size,
+            MAX_REGISTRY_SIZE,
+        )
+
+
+def _disambiguate_with_parent(
+    path: Path,
+    base_name: str,
+    registry: ProjectRegistry,
+) -> str:
+    """Try to disambiguate name using parent directory name.
+
+    Args:
+        path: Project path
+        base_name: Base name to disambiguate
+        registry: Registry to check for collisions
+
+    Returns:
+        Disambiguated name
+
+    Raises:
+        ValueError: If disambiguation fails after max attempts
+
+    """
+    try:
+        parent_name = path.parent.name
+        candidate = f"{base_name}-{parent_name}"
+        logger.debug("Trying disambiguation with parent name: '%s'", candidate)
+
+        # If still colliding, add numeric suffix
+        i = 1
+        while registry.get_by_name(candidate):
+            existing = registry.get_by_name(candidate)
+            if existing and existing.path == path:
+                break
+            candidate = f"{base_name}-{i}"
+            i += 1
+            if i > MAX_DISAMBIGUATION_ATTEMPTS:
+                msg = (
+                    f"Failed to disambiguate project name "
+                    f"after {MAX_DISAMBIGUATION_ATTEMPTS} attempts: {base_name}"
+                )
+                raise ValueError(msg)
+        else:
+            logger.info(
+                "Successfully disambiguated '%s' to '%s' (strategy: parent-name + suffix)",
+                base_name,
+                candidate,
+            )
+
+        return candidate  # noqa: TRY300
+
+    except (OSError, AttributeError) as exc:
+        logger.warning(
+            "Cannot use parent directory for disambiguation (%s: %s), using numeric suffix",
+            type(exc).__name__,
+            exc,
+        )
+        return _disambiguate_with_numeric_suffix(base_name, registry)
+
+
+def _disambiguate_with_numeric_suffix(
+    base_name: str,
+    registry: ProjectRegistry,
+) -> str:
+    """Disambiguate name using numeric suffix fallback.
+
+    Args:
+        base_name: Base name to disambiguate
+        registry: Registry to check for collisions
+
+    Returns:
+        Disambiguated name
+
+    Raises:
+        ValueError: If disambiguation fails after max attempts
+
+    """
+    i = 1
+    while registry.get_by_name(f"{base_name}-{i}"):
+        i += 1
+        if i > MAX_DISAMBIGUATION_ATTEMPTS:
+            msg = (
+                f"Failed to disambiguate project name "
+                f"after {MAX_DISAMBIGUATION_ATTEMPTS} attempts: {base_name}"
+            )
+            raise ValueError(msg)
+
+    candidate = f"{base_name}-{i}"
+    logger.info(
+        "Successfully disambiguated '%s' to '%s' (strategy: numeric-suffix)",
+        base_name,
+        candidate,
+    )
+    return candidate
+
+
+def _resolve_unique_name(
+    path: Path,
+    registry: ProjectRegistry,
+) -> str:
+    """Resolve a unique project name, handling collisions.
+
+    Args:
+        path: Project path
+        registry: Registry to check for name collisions
+
+    Returns:
+        Unique project name
+
+    Raises:
+        ValueError: If name resolution fails
+
+    """
+    candidate_name = path.name
+    existing_with_same_name = registry.get_by_name(candidate_name)
+
+    if existing_with_same_name and existing_with_same_name.path != path:
+        logger.info(
+            "Name collision detected for '%s' (existing: %s, new: %s)",
+            candidate_name,
+            existing_with_same_name.path,
+            path,
+        )
+        return _disambiguate_with_parent(path, path.name, registry)
+
+    return candidate_name
+
+
 class ProjectRegistryService:
     """Service for managing project registration and discovery.
 
@@ -124,7 +300,7 @@ class ProjectRegistryService:
             self._registry = self._load()
         return self._registry
 
-    def register_project(self, path: Path) -> ProjectMetadata:  # noqa: C901, PLR0915
+    def register_project(self, path: Path) -> ProjectMetadata:
         """Register a project in the registry.
 
         Args:
@@ -138,106 +314,16 @@ class ProjectRegistryService:
                 or if registry size limit is exceeded
 
         """
-        path = path.resolve()
-
-        # Validate project exists and has .tasky directory
-        if not path.exists():
-            msg = f"Path does not exist: {path}"
-            raise ValueError(msg)
-
-        tasky_dir = path / ".tasky"
-        if not tasky_dir.exists() or not tasky_dir.is_dir():
-            msg = "Not a tasky project (missing .tasky directory)"
-            raise ValueError(msg)
-
+        path = _validate_project_path(path)
         registry = self.registry
 
-        # Check if project already exists (update, not new registration)
+        # Check if updating existing project
         existing = registry.get_by_path(path)
         if existing is None:
-            # New project: check size limits
-            current_size = len(registry.projects)
+            _check_registry_size_limits(len(registry.projects))
 
-            # Hard limit check
-            if current_size >= MAX_REGISTRY_SIZE:
-                msg = (
-                    f"Registry size limit exceeded ({current_size}/{MAX_REGISTRY_SIZE}). "
-                    "Consider removing unused projects or increasing the limit."
-                )
-                raise ValueError(msg)
-
-            # Warning threshold check
-            warning_threshold = int(MAX_REGISTRY_SIZE * REGISTRY_SIZE_WARNING_THRESHOLD)
-            if current_size >= warning_threshold:
-                logger.warning(
-                    "Registry approaching size limit: %d/%d projects registered",
-                    current_size,
-                    MAX_REGISTRY_SIZE,
-                )
-
-        # Compute candidate name and check for collisions
-        candidate_name = path.name
-
-        # Check for duplicate names and disambiguate if needed
-        existing_with_same_name = registry.get_by_name(candidate_name)
-        if existing_with_same_name and existing_with_same_name.path != path:
-            # Name collision: disambiguate by including parent folder
-            logger.info(
-                "Name collision detected for '%s' (existing: %s, new: %s)",
-                candidate_name,
-                existing_with_same_name.path,
-                path,
-            )
-            try:
-                parent_name = path.parent.name
-                # Use hyphen separator (allowed by validator) instead of parentheses
-                candidate_name = f"{candidate_name}-{parent_name}"
-                logger.debug("Trying disambiguation with parent name: '%s'", candidate_name)
-
-                # If still colliding, add numeric suffix
-                i = 1
-                while registry.get_by_name(candidate_name):
-                    existing = registry.get_by_name(candidate_name)
-                    if existing and existing.path == path:
-                        break
-                    candidate_name = f"{path.name}-{i}"
-                    i += 1
-                    if i > MAX_DISAMBIGUATION_ATTEMPTS:
-                        msg = (
-                            f"Failed to disambiguate project name "
-                            f"after {MAX_DISAMBIGUATION_ATTEMPTS} attempts: {path.name}"
-                        )
-                        raise ValueError(msg)
-
-                logger.info(
-                    "Successfully disambiguated '%s' to '%s' (strategy: parent-name + suffix)",
-                    path.name,
-                    candidate_name,
-                )
-
-            except (OSError, AttributeError) as exc:
-                # Specific errors that may occur when accessing path.parent.name
-                logger.warning(
-                    "Cannot use parent directory for disambiguation (%s: %s), using numeric suffix",
-                    type(exc).__name__,
-                    exc,
-                )
-                # Fallback to numeric suffix
-                i = 1
-                while registry.get_by_name(f"{path.name}-{i}"):
-                    i += 1
-                    if i > MAX_DISAMBIGUATION_ATTEMPTS:
-                        msg = (
-                            f"Failed to disambiguate project name "
-                            f"after {MAX_DISAMBIGUATION_ATTEMPTS} attempts: {path.name}"
-                        )
-                        raise ValueError(msg) from None
-                candidate_name = f"{path.name}-{i}"
-                logger.info(
-                    "Successfully disambiguated '%s' to '%s' (strategy: numeric-suffix)",
-                    path.name,
-                    candidate_name,
-                )
+        # Resolve unique name
+        candidate_name = _resolve_unique_name(path, registry)
 
         # Create or update project metadata
         project = ProjectMetadata(

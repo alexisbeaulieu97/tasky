@@ -3,6 +3,8 @@
 from pathlib import Path
 
 import typer
+from tasky_projects.models import ProjectMetadata
+from tasky_projects.registry import ProjectRegistryService
 from tasky_settings import get_project_registry_service, get_settings, registry
 
 project_app = typer.Typer(no_args_is_help=True)
@@ -126,7 +128,151 @@ def info_command(  # noqa: C901
 
 
 @project_app.command(name="list")
-def list_command(  # noqa: C901, PLR0912, PLR0915
+def _format_project_path(project_path: Path) -> str:
+    """Format project path with tilde shortening for home directory.
+
+    Args:
+        project_path: The path to format
+
+    Returns:
+        Formatted path string with ~ for home directory
+
+    """
+    try:
+        if project_path.is_relative_to(Path.home()):
+            return str(project_path).replace(str(Path.home()), "~")
+        return str(project_path)
+    except (ValueError, OSError):
+        return str(project_path)
+
+
+def _format_project_line(
+    project: ProjectMetadata,
+    max_name_width: int = 20,
+    max_path_width: int = 30,
+) -> str:
+    """Format a single project entry for display.
+
+    Args:
+        project: The project metadata to format
+        max_name_width: Maximum width for project name
+        max_path_width: Maximum width for path display
+
+    Returns:
+        Formatted line string
+
+    """
+    status = "" if project.path.exists() else " [MISSING]"
+    path_display = _format_project_path(project.path)
+    last_accessed_str = project.last_accessed.strftime("%Y-%m-%d %H:%M")
+
+    # Truncate name and path if too long
+    name_display = (
+        project.name
+        if len(project.name) <= max_name_width
+        else f"{project.name[: max_name_width - 1]}…"
+    )
+    path_truncated = (
+        path_display
+        if len(path_display) <= max_path_width
+        else f"{path_display[: max_path_width - 1]}…"
+    )
+
+    return f"  {name_display:<20} {path_truncated:<30} Last accessed: {last_accessed_str}{status}"
+
+
+def _clean_stale_projects(
+    registry_service: ProjectRegistryService,
+    stale_projects: list[ProjectMetadata],
+) -> None:
+    """Remove stale projects from registry and display results.
+
+    Args:
+        registry_service: The registry service to use
+        stale_projects: List of projects with missing paths
+
+    """
+    typer.echo(f"Removing {len(stale_projects)} stale project(s)...")
+    for project in stale_projects:
+        try:
+            registry_service.unregister_project(project.path)
+            typer.echo(f"  ✓ Removed: {project.name}")
+        except Exception as exc:  # noqa: BLE001
+            typer.echo(f"  ✗ Failed to remove {project.name}: {exc}", err=True)
+
+
+def _display_projects(projects: list[ProjectMetadata]) -> None:
+    """Display list of projects in formatted table.
+
+    Args:
+        projects: List of projects to display
+
+    """
+    typer.echo("Projects:")
+    for project in projects:
+        typer.echo(_format_project_line(project))
+
+
+def _auto_discover_if_empty(
+    registry_service: ProjectRegistryService,
+    projects: list[ProjectMetadata],
+    discovery_paths: list[Path],
+    skip_discovery: bool,  # noqa: FBT001
+) -> list[ProjectMetadata]:
+    """Auto-discover projects if registry is empty and discovery not skipped.
+
+    Args:
+        registry_service: The registry service to use
+        projects: Current list of projects
+        discovery_paths: Paths to search for projects
+        skip_discovery: Whether to skip auto-discovery
+
+    Returns:
+        Updated list of projects after discovery
+
+    """
+    if not projects and not skip_discovery:
+        typer.echo("Discovering projects...")
+        new_count = registry_service.discover_and_register(discovery_paths)
+        if new_count > 0:
+            typer.echo(f"✓ Discovered and registered {new_count} project(s)\n")
+            return registry_service.list_projects()
+    return projects
+
+
+def _show_stale_summary(
+    stale_projects: list[ProjectMetadata],
+    cleaned: bool,  # noqa: FBT001
+    validate_mode: bool,  # noqa: FBT001
+) -> None:
+    """Display summary of stale project entries.
+
+    Args:
+        stale_projects: List of projects with missing paths
+        cleaned: Whether stale projects were cleaned
+        validate_mode: Whether in validation mode
+
+    """
+    if not stale_projects:
+        if validate_mode:
+            typer.echo("")
+            typer.echo("✓ All project paths are valid")
+        return
+
+    typer.echo("")
+    if cleaned:
+        return
+    if validate_mode:
+        typer.echo(f"✗ {len(stale_projects)} project(s) have missing paths")
+    else:
+        typer.echo(f"Note: {len(stale_projects)} project(s) have missing paths.")
+        typer.echo(
+            "Use 'tasky project list --clean' to remove them from the registry.",
+        )
+
+
+@project_app.command(name="list")
+def list_command(
     no_discover: bool = typer.Option(  # noqa: FBT001
         False,  # noqa: FBT003
         "--no-discover",
@@ -155,16 +301,14 @@ def list_command(  # noqa: C901, PLR0912, PLR0915
         registry_service = get_project_registry_service()
         settings = get_settings()
 
-        # Auto-discover on first use (if registry is empty and not skipped)
+        # Auto-discover on first use
         projects = registry_service.list_projects()
-        if not projects and not no_discover:
-            typer.echo("Discovering projects...")
-            new_count = registry_service.discover_and_register(
-                settings.project_registry.discovery_paths,
-            )
-            if new_count > 0:
-                typer.echo(f"✓ Discovered and registered {new_count} project(s)\n")
-                projects = registry_service.list_projects()
+        projects = _auto_discover_if_empty(
+            registry_service,
+            projects,
+            settings.project_registry.discovery_paths,
+            no_discover,
+        )
 
         # Handle empty results
         if not projects:
@@ -173,75 +317,15 @@ def list_command(  # noqa: C901, PLR0912, PLR0915
             typer.echo("'tasky project discover' to search for existing projects.")
             return
 
-        # Find stale entries (paths that no longer exist)
+        # Find and optionally clean stale entries
         stale_projects = [p for p in projects if not p.path.exists()]
-
-        # Clean stale entries if requested
         if clean and stale_projects:
-            typer.echo(f"Removing {len(stale_projects)} stale project(s)...")
-            for project in stale_projects:
-                try:
-                    registry_service.unregister_project(project.path)
-                    typer.echo(f"  ✓ Removed: {project.name}")
-                except Exception as exc:  # noqa: BLE001
-                    typer.echo(f"  ✗ Failed to remove {project.name}: {exc}", err=True)
-
-            # Refresh project list
+            _clean_stale_projects(registry_service, stale_projects)
             projects = [p for p in projects if p.path.exists()]
 
-        # Display results with table format
-        typer.echo("Projects:")
-        for project in projects:
-            # Check if path still exists
-            status = "" if project.path.exists() else " [MISSING]"
-            # Shorten path to use ~ for home directory (safe)
-            try:
-                path_display = str(project.path.expanduser()).replace(
-                    str(Path.home()),
-                    "~",
-                )
-                if not project.path.is_relative_to(Path.home()):
-                    path_display = str(project.path)
-            except (ValueError, OSError):
-                # If expanduser fails, use the full path
-                path_display = str(project.path)
-
-            last_accessed_str = project.last_accessed.strftime("%Y-%m-%d %H:%M")
-
-            # Truncate name and path if too long
-            max_name_width = 20
-            max_path_width = 30
-            name_display = (
-                project.name
-                if len(project.name) <= max_name_width
-                else f"{project.name[: max_name_width - 1]}…"
-            )
-            path_truncated = (
-                path_display
-                if len(path_display) <= max_path_width
-                else f"{path_display[: max_path_width - 1]}…"
-            )
-
-            # Format as: name  path  Last accessed: timestamp
-            formatted_line = (
-                f"  {name_display:<20} {path_truncated:<30} "
-                f"Last accessed: {last_accessed_str}{status}"
-            )
-            typer.echo(formatted_line)
-
-        # Show summary of stale entries
-        if stale_projects and not clean:
-            typer.echo("")
-            typer.echo(f"Note: {len(stale_projects)} project(s) have missing paths.")
-            typer.echo(
-                "Use 'tasky project list --clean' to remove them from the registry.",
-            )
-        elif validate:
-            typer.echo("")
-            if stale_projects:
-                typer.echo(f"✗ {len(stale_projects)} project(s) have missing paths")
-            else:
-                typer.echo("✓ All project paths are valid")
+        # Display results and summary
+        _display_projects(projects)
+        _show_stale_summary(stale_projects, clean, validate)
 
     except Exception as exc:
         typer.echo(f"Error: {exc}", err=True)
