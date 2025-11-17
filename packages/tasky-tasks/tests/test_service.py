@@ -4,55 +4,14 @@ from __future__ import annotations
 
 from datetime import UTC
 from time import sleep
-from uuid import UUID, uuid4
+from uuid import uuid4
 
 import pytest
 from tasky_tasks.exceptions import InvalidStateTransitionError, TaskNotFoundError
-from tasky_tasks.models import TaskFilter, TaskModel, TaskStatus
+from tasky_tasks.models import TaskStatus
 from tasky_tasks.service import TaskService
 
-
-class InMemoryTaskRepository:
-    """In-memory repository implementation for testing.
-
-    Implements the TaskRepository protocol without requiring the full
-    protocol definition import, avoiding circular dependencies.
-    """
-
-    def __init__(self) -> None:
-        self.tasks: dict[UUID, TaskModel] = {}
-
-    def initialize(self) -> None:
-        """Reset the repository state."""
-        self.tasks.clear()
-
-    def save_task(self, task: TaskModel) -> None:
-        """Persist a task."""
-        self.tasks[task.task_id] = task
-
-    def get_task(self, task_id: UUID) -> TaskModel | None:
-        """Return a stored task when present."""
-        return self.tasks.get(task_id)
-
-    def get_all_tasks(self) -> list[TaskModel]:
-        """Return all stored tasks."""
-        return list(self.tasks.values())
-
-    def get_tasks_by_status(self, status: TaskStatus) -> list[TaskModel]:
-        """Return tasks filtered by status."""
-        return [task for task in self.tasks.values() if task.status == status]
-
-    def find_tasks(self, task_filter: TaskFilter) -> list[TaskModel]:
-        """Return tasks matching the provided filter."""
-        return [task for task in self.tasks.values() if task_filter.matches(task)]
-
-    def delete_task(self, task_id: UUID) -> bool:
-        """Remove a stored task."""
-        return self.tasks.pop(task_id, None) is not None
-
-    def task_exists(self, task_id: UUID) -> bool:
-        """Determine whether a task is stored."""
-        return task_id in self.tasks
+from .conftest import InMemoryTaskRepository
 
 
 def test_create_task_sets_timestamps() -> None:
