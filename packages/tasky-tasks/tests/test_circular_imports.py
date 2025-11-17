@@ -38,8 +38,8 @@ def test_import_order_does_not_matter_models_first() -> None:
 def test_import_order_does_not_matter_exceptions_first() -> None:
     """Verify importing exceptions first doesn't cause circular import."""
     # This would fail if there was a circular dependency
-    from tasky_tasks.exceptions import InvalidStateTransitionError  # noqa: PLC0415
     from tasky_tasks import TaskModel  # noqa: PLC0415
+    from tasky_tasks.exceptions import InvalidStateTransitionError  # noqa: PLC0415
 
     assert InvalidStateTransitionError is not None
     task = TaskModel(name="Test", details="Details")

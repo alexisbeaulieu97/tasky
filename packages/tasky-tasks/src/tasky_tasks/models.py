@@ -190,7 +190,6 @@ class TaskFilter(BaseModel):
 
     def matches(self, task: TaskModel) -> bool:
         """Check whether ``task`` satisfies all configured criteria."""
-
         return all(
             (
                 self._matches_statuses(task.status),
@@ -202,28 +201,24 @@ class TaskFilter(BaseModel):
 
     def _matches_statuses(self, status: TaskStatus) -> bool:
         """Return True when the status constraint is satisfied."""
-
         if self.statuses is None:
             return True
         return status in self.statuses
 
     def _matches_created_after(self, created_at: datetime) -> bool:
         """Return True when ``created_at`` is on/after the lower bound."""
-
         if self.created_after is None:
             return True
         return created_at >= self.created_after
 
     def _matches_created_before(self, created_at: datetime) -> bool:
         """Return True when ``created_at`` is before the upper bound."""
-
         if self.created_before is None:
             return True
         return created_at < self.created_before
 
     def _matches_name_contains(self, name: str, details: str) -> bool:
         """Return True when the text constraint matches name or details."""
-
         if self.name_contains is None:
             return True
         search_text = self.name_contains.lower()

@@ -41,7 +41,6 @@ def get_settings(
     Settings precedence (highest to lowest): CLI overrides, environment variables,
     project config file, global config file, and finally model defaults.
     """
-
     _project_root = project_root
     _cli_overrides = cli_overrides or {}
 
@@ -58,7 +57,6 @@ def get_settings(
             file_secret_settings: PydanticBaseSettingsSource,
         ) -> tuple[PydanticBaseSettingsSource, ...]:
             """Configure settings source precedence from highest to lowest."""
-
             del init_settings, dotenv_settings, file_secret_settings
             return (
                 InitSettingsSource(settings_cls, _cli_overrides),

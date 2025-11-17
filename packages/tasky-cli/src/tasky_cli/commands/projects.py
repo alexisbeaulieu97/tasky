@@ -31,8 +31,8 @@ def init_command(
     Notes
     -----
     Equivalent to running ``tasky project init --backend <name>`` from the CLI.
-    """
 
+    """
     storage_root = Path(".tasky")
     config_file = storage_root / "config.toml"
 
@@ -69,8 +69,8 @@ def info_command(
     -----
     Useful when switching between multiple Tasky projects and verifying
     registry entries.
-    """
 
+    """
     with _cli_error_boundary("while displaying project info"):
         if project_name:
             _show_registry_project_info(project_name)
@@ -236,7 +236,6 @@ def _cli_error_boundary(action: str) -> Iterator[None]:
         Context manager sentinel for the protected block.
 
     """
-
     try:
         yield
     except typer.Exit:
@@ -246,7 +245,7 @@ def _cli_error_boundary(action: str) -> Iterator[None]:
         if action:
             typer.echo(f"(while {action})", err=True)
         raise typer.Exit(code=1) from exc
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         typer.echo(f"Unexpected error {action}: {exc}", err=True)
         raise typer.Exit(code=1) from exc
 
@@ -265,10 +264,9 @@ def _validate_backend_selection(backend: str) -> None:
         If the backend is not registered in the settings registry.
 
     """
-
     try:
         registry.get(backend)
-    except KeyError as exc:  # noqa: B904
+    except KeyError as exc:
         available = ", ".join(sorted(registry.list_backends()))
         msg = f"Backend '{backend}' not registered. Available backends: {available}"
         raise ValueError(msg) from exc
@@ -286,8 +284,8 @@ def _ensure_overwrite_allowed(config_file: Path) -> None:
     -------
     None
         Raises ``typer.Exit`` if the user declines overwriting.
-    """
 
+    """
     if not config_file.exists():
         return
 
@@ -310,16 +308,18 @@ def _load_or_create_project_config(config_file: Path, backend: str) -> ProjectCo
     -------
     ProjectConfig
         Validated configuration ready to be persisted.
-    """
 
-    if config_file.exists():
-        try:
-            config = ProjectConfig.from_file(config_file)
-            config.storage.backend = backend
-            return config
-        except Exception:  # noqa: BLE001
-            return ProjectConfig(storage=StorageConfig(backend=backend))
-    return ProjectConfig(storage=StorageConfig(backend=backend))
+    """
+    if not config_file.exists():
+        return ProjectConfig(storage=StorageConfig(backend=backend))
+
+    try:
+        config = ProjectConfig.from_file(config_file)
+    except Exception:  # noqa: BLE001
+        return ProjectConfig(storage=StorageConfig(backend=backend))
+
+    config.storage.backend = backend
+    return config
 
 
 def _echo_init_success(config: ProjectConfig, storage_root: Path) -> None:
@@ -336,8 +336,8 @@ def _echo_init_success(config: ProjectConfig, storage_root: Path) -> None:
     -------
     None
         Writes formatted status messages to stdout.
-    """
 
+    """
     typer.echo(f"✓ Project initialized in {storage_root}")
     typer.echo(f"  Backend: {config.storage.backend}")
     typer.echo(f"  Storage: {config.storage.path}")
@@ -355,8 +355,8 @@ def _show_registry_project_info(project_name: str) -> None:
     -------
     None
         Raises ``ValueError`` when the project does not exist.
-    """
 
+    """
     registry_service = get_project_registry_service()
     project = registry_service.get_project(project_name)
     if project is None:
@@ -380,8 +380,8 @@ def _show_current_directory_info() -> None:
     -------
     None
         Raises ``ValueError`` if the directory is not a Tasky project.
-    """
 
+    """
     tasky_dir = Path(".tasky")
     config_toml = tasky_dir / "config.toml"
     if not config_toml.exists():
@@ -413,8 +413,8 @@ def _validate_project_directory(path: str) -> Path:
     ------
     ValueError
         If the path cannot be used as a Tasky project.
-    """
 
+    """
     resolved_path = Path(path).resolve()
     if not resolved_path.exists():
         msg = f"Path does not exist: {resolved_path}"
@@ -428,7 +428,11 @@ def _validate_project_directory(path: str) -> Path:
     return resolved_path
 
 
-def _confirm_unregister(project: ProjectMetadata, skip_confirmation: bool) -> None:
+def _confirm_unregister(
+    project: ProjectMetadata,
+    *,
+    skip_confirmation: bool,
+) -> None:
     """Prompt before unregistering unless ``skip_confirmation`` is True.
 
     Parameters
@@ -442,8 +446,8 @@ def _confirm_unregister(project: ProjectMetadata, skip_confirmation: bool) -> No
     -------
     None
         Raises ``typer.Exit`` if the user cancels the operation.
-    """
 
+    """
     if skip_confirmation:
         return
 
@@ -467,12 +471,40 @@ def _resolve_discovery_paths(paths: list[Path] | None) -> list[Path]:
     -------
     list[Path]
         List of paths that should be scanned for Tasky projects.
-    """
 
+    """
     if paths:
         return [path.resolve() for path in paths]
     settings = get_settings()
     return settings.project_registry.discovery_paths
+
+
+def _show_discovery_paths(search_paths: list[Path]) -> None:
+    """Output the paths being scanned before running discovery."""
+    typer.echo("Discovering projects...")
+    typer.echo("Searching in:")
+    for path in search_paths:
+        typer.echo(f"  - {path}")
+    typer.echo()
+
+
+def _summarize_discovery(
+    registry_service: ProjectRegistryService,
+    new_count: int,
+) -> None:
+    """Print a summary indicating whether new projects were found."""
+    if new_count > 0:
+        typer.echo(f"✓ Discovered and registered {new_count} new project(s)")
+        projects = registry_service.list_projects()
+        typer.echo("\nAll registered projects:")
+        for project in projects:
+            typer.echo(f"  - {project.name} ({project.path})")
+        return
+
+    typer.echo("No new projects found.")
+    total = len(registry_service.list_projects())
+    if total > 0:
+        typer.echo(f"(Already tracking {total} project(s))")
 
 
 def _run_discovery_flow(
@@ -492,13 +524,9 @@ def _run_discovery_flow(
     -------
     None
         Prints progress and discovery summaries to stdout.
-    """
 
-    typer.echo("Discovering projects...")
-    typer.echo("Searching in:")
-    for path in search_paths:
-        typer.echo(f"  - {path}")
-    typer.echo()
+    """
+    _show_discovery_paths(search_paths)
 
     def show_progress(directories_checked: int) -> None:
         typer.echo(f"\rScanning... ({directories_checked} directories checked)", nl=False)
@@ -509,18 +537,7 @@ def _run_discovery_flow(
     )
     typer.echo()
 
-    if new_count > 0:
-        typer.echo(f"✓ Discovered and registered {new_count} new project(s)")
-        projects = registry_service.list_projects()
-        typer.echo("\nAll registered projects:")
-        for project in projects:
-            typer.echo(f"  - {project.name} ({project.path})")
-        return
-
-    typer.echo("No new projects found.")
-    total = len(registry_service.list_projects())
-    if total > 0:
-        typer.echo(f"(Already tracking {total} project(s))")
+    _summarize_discovery(registry_service, new_count)
 
 
 @project_app.command(name="list")
@@ -559,6 +576,7 @@ def list_command(
     Notes
     -----
     Automatically triggers discovery the first time you run ``tasky project list``.
+
     """
     try:
         registry_service = get_project_registry_service()
@@ -614,8 +632,8 @@ def register_command(
     -----
     Lets shared workstations register existing repositories without running
     ``tasky project init`` again.
-    """
 
+    """
     with _cli_error_boundary("while registering project"):
         resolved_path = _validate_project_directory(path)
         registry_service = get_project_registry_service()
@@ -645,16 +663,17 @@ def unregister_command(
     Notes
     -----
     Use together with ``tasky project list --clean`` to prune stale entries.
-    """
 
+    """
     with _cli_error_boundary("while unregistering project"):
         registry_service = get_project_registry_service()
         project = registry_service.get_project(name)
         if project is None:
             typer.echo("Run 'tasky project list' to view registered projects.", err=True)
-            raise ValueError(f"Project not found: {name}")
+            msg = f"Project not found: {name}"
+            raise ValueError(msg)
 
-        _confirm_unregister(project, yes)
+        _confirm_unregister(project, skip_confirmation=yes)
         registry_service.unregister_project(project.path)
         typer.echo(f"✓ Project unregistered: {name}")
 
@@ -683,8 +702,8 @@ def discover_command(
     Notes
     -----
     Shows a live progress indicator while scanning directories.
-    """
 
+    """
     with _cli_error_boundary("while discovering projects"):
         registry_service = get_project_registry_service()
         search_paths = _resolve_discovery_paths(paths)

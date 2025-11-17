@@ -487,7 +487,6 @@ class ProjectRegistryService:
             List of discovered project metadata (deduplicated).
 
         """
-
         discovered: dict[Path, ProjectMetadata] = {}
         for directory in self._iter_discovery_directories(search_paths, progress_callback):
             metadata = self._build_discovered_project(directory)
@@ -511,7 +510,6 @@ class ProjectRegistryService:
             Directory paths that should be examined for Tasky metadata.
 
         """
-
         directories_checked = 0
         for search_path in search_paths:
             if not search_path.exists():
@@ -536,7 +534,6 @@ class ProjectRegistryService:
             otherwise ``None``.
 
         """
-
         tasky_dir = directory / ".tasky"
         if not tasky_dir.exists() or not tasky_dir.is_dir():
             return None
