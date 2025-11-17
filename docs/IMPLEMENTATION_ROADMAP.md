@@ -45,7 +45,7 @@ Tick off each change as you complete it (mirrors the execution order below).
 - [x] 7.8 `improve-architecture-and-documentation` (44 tasks, ~15h)
 
 ### 🎯 Phase 7b: CLI Improvements (51 tasks, ~51 hours)
-- [ ] 7b.1 `add-cli-input-validators` (25 tasks, ~3h)
+- [x] 7b.1 `add-cli-input-validators` (25 tasks, ~3h)
 - [ ] 7b.2 `refactor-cli-error-handling` (26 tasks, ~2h)
 
 ### 🚀 Phase 8: AI Integration (45 tasks, ~40-50 hours)
