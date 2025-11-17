@@ -105,7 +105,7 @@ def _disambiguate_with_parent(
             existing = registry.get_by_name(candidate)
             if existing and existing.path == path:
                 break
-            candidate = f"{base_name}-{i}"
+            candidate = f"{base_name}-{parent_name}-{i}"
             i += 1
             if i > MAX_DISAMBIGUATION_ATTEMPTS:
                 msg = (

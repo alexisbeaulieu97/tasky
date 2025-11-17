@@ -5,21 +5,21 @@ from __future__ import annotations
 
 def test_models_can_import_independently() -> None:
     """Verify TaskModel can be imported without side effects."""
-    from tasky_tasks.models import TaskModel  # noqa: PLC0415
+    from tasky_tasks.models import TaskModel
 
     assert TaskModel is not None
 
 
 def test_exceptions_can_import_independently() -> None:
     """Verify exceptions can be imported without side effects."""
-    from tasky_tasks.exceptions import InvalidStateTransitionError  # noqa: PLC0415
+    from tasky_tasks.exceptions import InvalidStateTransitionError
 
     assert InvalidStateTransitionError is not None
 
 
 def test_enums_can_import_independently() -> None:
     """Verify TaskStatus can be imported without side effects."""
-    from tasky_tasks.enums import TaskStatus  # noqa: PLC0415
+    from tasky_tasks.enums import TaskStatus
 
     assert TaskStatus is not None
 
@@ -27,8 +27,8 @@ def test_enums_can_import_independently() -> None:
 def test_import_order_does_not_matter_models_first() -> None:
     """Verify importing models first doesn't cause circular import."""
     # This would fail if there was a circular dependency
-    from tasky_tasks import TaskModel  # noqa: PLC0415
-    from tasky_tasks.exceptions import InvalidStateTransitionError  # noqa: PLC0415
+    from tasky_tasks import TaskModel
+    from tasky_tasks.exceptions import InvalidStateTransitionError
 
     task = TaskModel(name="Test", details="Details")
     assert task is not None
@@ -38,8 +38,8 @@ def test_import_order_does_not_matter_models_first() -> None:
 def test_import_order_does_not_matter_exceptions_first() -> None:
     """Verify importing exceptions first doesn't cause circular import."""
     # This would fail if there was a circular dependency
-    from tasky_tasks.exceptions import InvalidStateTransitionError  # noqa: PLC0415
-    from tasky_tasks import TaskModel  # noqa: PLC0415
+    from tasky_tasks.exceptions import InvalidStateTransitionError
+    from tasky_tasks import TaskModel
 
     assert InvalidStateTransitionError is not None
     task = TaskModel(name="Test", details="Details")
