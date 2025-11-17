@@ -78,8 +78,8 @@ class TestFilterFirstPerformance:
             status = TaskStatus.COMPLETED if i < 10 else TaskStatus.PENDING
             task = TaskModel(
                 task_id=uuid4(),
-                name=f"Task {i}",
-                details="Special keyword" if i < 10 else f"Details {i}",
+                name="Special Task" if i < 10 else f"Task {i}",
+                details=f"Details {i}",
                 status=status,
             )
             repository.save_task(task)
@@ -93,7 +93,7 @@ class TestFilterFirstPerformance:
         # Performance should scale with result size (10), not total size (1k)
         assert duration_ms < 50, f"Filter took {duration_ms:.1f}ms (expected <50ms for 10 matches)"
         assert len(results) == 10
-        assert all("Special" in task.details for task in results)
+        assert all("Special" in task.name for task in results)
 
 
 class TestAtomicWriteSafety:
@@ -153,8 +153,9 @@ class TestAtomicWriteSafety:
             assert loaded["version"] == "1.0"
             assert len(loaded["tasks"]) == i * 100
 
-        # Verify no temporary files remain
-        assert not (tmp_path / "tasks.tmp").exists()
+        # Verify no temporary files remain (matches new unique temp file pattern)
+        temp_files = list(tmp_path.glob(".tasks.json.*.tmp"))
+        assert len(temp_files) == 0, f"Temporary files not cleaned up: {temp_files}"
 
 
 class TestRegistryScaling:

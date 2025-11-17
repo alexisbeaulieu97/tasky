@@ -66,14 +66,13 @@ class JsonStorage(BaseModel):
         The temporary file uses a unique name to prevent race conditions when
         multiple processes/threads attempt concurrent saves.
         """
-        # Ensure parent directory exists
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-
         # Create unique temporary file in same directory (ensures same filesystem)
         # Using delete=False so we control cleanup, dir ensures atomic rename works
         temp_fd = None
         temp_path = None
         try:
+            # Ensure parent directory exists
+            self.path.parent.mkdir(parents=True, exist_ok=True)
             temp_fd, temp_name = tempfile.mkstemp(
                 suffix=".tmp",
                 prefix=f".{self.path.name}.",
@@ -83,13 +82,13 @@ class JsonStorage(BaseModel):
             temp_path = Path(temp_name)
 
             # Write JSON data to temporary file
+            # Use fdopen for proper buffering and to handle partial writes
             json_bytes = json.dumps(data, indent=2).encode("utf-8")
-            os.write(temp_fd, json_bytes)
-
-            # Ensure data is written to disk before rename
-            os.fsync(temp_fd)
-            os.close(temp_fd)
-            temp_fd = None  # Mark as closed
+            with os.fdopen(temp_fd, "wb") as temp_file:
+                temp_file.write(json_bytes)
+                temp_file.flush()
+                os.fsync(temp_file.fileno())
+            temp_fd = None  # Mark as closed (fdopen closes it)
 
             # Atomic rename: replaces target file atomically
             # On POSIX systems, this is atomic even if target exists

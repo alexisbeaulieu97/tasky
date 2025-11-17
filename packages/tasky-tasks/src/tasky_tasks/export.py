@@ -402,7 +402,7 @@ class TaskImportExportService:
                 created_count += 1
                 existing_ids.add(task.task_id)  # Track for subsequent imports in same batch
 
-            except (TaskImportError, ValueError) as exc:
+            except (TaskImportError, ValueError, ValidationError) as exc:
                 # Expected import errors: validation failures, data issues
                 error_msg = f"Failed to import task '{snapshot.task_id}': {exc}"
                 logger.warning(error_msg)
@@ -514,7 +514,7 @@ class TaskImportExportService:
                     created_count += 1
                     logger.debug("Created new task: %s", task.task_id)
 
-            except (TaskImportError, ValueError) as exc:
+            except (TaskImportError, ValueError, ValidationError) as exc:
                 # Expected import errors: validation failures, data issues
                 error_msg = f"Failed to import task '{snapshot.task_id}': {exc}"
                 logger.warning(error_msg)
@@ -625,7 +625,7 @@ class TaskImportExportService:
                 if not dry_run:
                     self.task_service.repository.save_task(task)
                 created_count += 1
-            except (TaskImportError, ValueError) as exc:
+            except (TaskImportError, ValueError, ValidationError) as exc:
                 # Expected import errors: validation failures, data issues
                 error_msg = f"Failed to import task '{snapshot.task_id}': {exc}"
                 logger.warning(error_msg)
