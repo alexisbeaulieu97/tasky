@@ -7,6 +7,7 @@ to ensure consistent serialization, deserialization, and error handling.
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from typing import Any
 from uuid import uuid4
 
 import pytest
@@ -42,8 +43,6 @@ class TestSnapshotToTaskModel:
 
     def test_raises_snapshot_conversion_error_for_missing_required_field(self) -> None:
         """Test that missing required field raises SnapshotConversionError."""
-        from typing import Any
-
         snapshot: dict[str, Any] = {
             # Missing all required fields
         }

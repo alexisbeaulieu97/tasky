@@ -41,7 +41,7 @@ Tick off each change as you complete it (mirrors the execution order below).
 - [x] 7.4 `consolidate-test-fixtures` (24 tasks, ~2h)
 - [x] 7.5 `extract-list-command-helpers` (33 tasks, ~3h)
 - [x] 7.6 `consolidate-repository-fakes` (24 tasks, ~2h)
-- [ ] 7.7 `improve-performance-and-safety` (42 tasks, ~21h)
+- [x] 7.7 `improve-performance-and-safety` (42 tasks, ~21h)
 - [ ] 7.8 `improve-architecture-and-documentation` (44 tasks, ~15h)
 
 ### 🎯 Phase 7b: CLI Improvements (51 tasks, ~51 hours)

@@ -11,6 +11,17 @@ from tasky_projects.models import ProjectMetadata, ProjectRegistry
 
 logger = logging.getLogger(__name__)
 
+# Maximum number of projects that can be stored in the registry
+# This prevents unbounded memory growth when loading the registry
+MAX_REGISTRY_SIZE = 10_000
+
+# Warning threshold: warn when registry approaches maximum size
+REGISTRY_SIZE_WARNING_THRESHOLD = 0.9  # 90% of max size
+
+# Maximum number of attempts to disambiguate project names
+# Prevents infinite loops when trying to resolve name collisions
+MAX_DISAMBIGUATION_ATTEMPTS = 100
+
 
 class ProjectRegistryService:
     """Service for managing project registration and discovery.
@@ -46,6 +57,14 @@ class ProjectRegistryService:
 
     def _load(self) -> ProjectRegistry:
         """Load registry from disk.
+
+        Note: This loads the entire registry into memory. For the default limit
+        of 10,000 projects with ~500 bytes per project, this is approximately
+        5MB of RAM, which is acceptable. Lazy loading/streaming was considered
+        but deemed unnecessary given:
+        - Default limit prevents unbounded growth
+        - 10k projects ≈ 5-10MB RAM (well under 100MB requirement)
+        - JSON format makes streaming complex without significant benefit
 
         Returns:
             The loaded registry, or empty registry if file doesn't exist
@@ -105,7 +124,7 @@ class ProjectRegistryService:
             self._registry = self._load()
         return self._registry
 
-    def register_project(self, path: Path) -> ProjectMetadata:  # noqa: C901
+    def register_project(self, path: Path) -> ProjectMetadata:  # noqa: C901, PLR0915
         """Register a project in the registry.
 
         Args:
@@ -115,7 +134,8 @@ class ProjectRegistryService:
             The registered project metadata
 
         Raises:
-            ValueError: If path doesn't exist or doesn't contain .tasky/
+            ValueError: If path doesn't exist or doesn't contain .tasky/,
+                or if registry size limit is exceeded
 
         """
         path = path.resolve()
@@ -130,17 +150,50 @@ class ProjectRegistryService:
             msg = "Not a tasky project (missing .tasky directory)"
             raise ValueError(msg)
 
+        registry = self.registry
+
+        # Check if project already exists (update, not new registration)
+        existing = registry.get_by_path(path)
+        if existing is None:
+            # New project: check size limits
+            current_size = len(registry.projects)
+
+            # Hard limit check
+            if current_size >= MAX_REGISTRY_SIZE:
+                msg = (
+                    f"Registry size limit exceeded ({current_size}/{MAX_REGISTRY_SIZE}). "
+                    "Consider removing unused projects or increasing the limit."
+                )
+                raise ValueError(msg)
+
+            # Warning threshold check
+            warning_threshold = int(MAX_REGISTRY_SIZE * REGISTRY_SIZE_WARNING_THRESHOLD)
+            if current_size >= warning_threshold:
+                logger.warning(
+                    "Registry approaching size limit: %d/%d projects registered",
+                    current_size,
+                    MAX_REGISTRY_SIZE,
+                )
+
         # Compute candidate name and check for collisions
         candidate_name = path.name
-        registry = self.registry
 
         # Check for duplicate names and disambiguate if needed
         existing_with_same_name = registry.get_by_name(candidate_name)
         if existing_with_same_name and existing_with_same_name.path != path:
             # Name collision: disambiguate by including parent folder
+            logger.info(
+                "Name collision detected for '%s' (existing: %s, new: %s)",
+                candidate_name,
+                existing_with_same_name.path,
+                path,
+            )
             try:
                 parent_name = path.parent.name
-                candidate_name = f"{candidate_name} ({parent_name})"
+                # Use hyphen separator (allowed by validator) instead of parentheses
+                candidate_name = f"{candidate_name}-{parent_name}"
+                logger.debug("Trying disambiguation with parent name: '%s'", candidate_name)
+
                 # If still colliding, add numeric suffix
                 i = 1
                 while registry.get_by_name(candidate_name):
@@ -149,17 +202,42 @@ class ProjectRegistryService:
                         break
                     candidate_name = f"{path.name}-{i}"
                     i += 1
-            except Exception:  # noqa: BLE001
-                # Fallback to numeric suffix if parent name isn't available
+                    if i > MAX_DISAMBIGUATION_ATTEMPTS:
+                        msg = (
+                            f"Failed to disambiguate project name "
+                            f"after {MAX_DISAMBIGUATION_ATTEMPTS} attempts: {path.name}"
+                        )
+                        raise ValueError(msg)
+
+                logger.info(
+                    "Successfully disambiguated '%s' to '%s' (strategy: parent-name + suffix)",
+                    path.name,
+                    candidate_name,
+                )
+
+            except (OSError, AttributeError) as exc:
+                # Specific errors that may occur when accessing path.parent.name
+                logger.warning(
+                    "Cannot use parent directory for disambiguation (%s: %s), using numeric suffix",
+                    type(exc).__name__,
+                    exc,
+                )
+                # Fallback to numeric suffix
                 i = 1
                 while registry.get_by_name(f"{path.name}-{i}"):
                     i += 1
+                    if i > MAX_DISAMBIGUATION_ATTEMPTS:
+                        msg = (
+                            f"Failed to disambiguate project name "
+                            f"after {MAX_DISAMBIGUATION_ATTEMPTS} attempts: {path.name}"
+                        )
+                        raise ValueError(msg) from None
                 candidate_name = f"{path.name}-{i}"
-            logger.warning(
-                "Name collision for '%s'; disambiguated to '%s'",
-                path.name,
-                candidate_name,
-            )
+                logger.info(
+                    "Successfully disambiguated '%s' to '%s' (strategy: numeric-suffix)",
+                    path.name,
+                    candidate_name,
+                )
 
         # Create or update project metadata
         project = ProjectMetadata(
@@ -205,15 +283,29 @@ class ProjectRegistryService:
         """
         return self.registry.get_by_name(name)
 
-    def list_projects(self) -> list[ProjectMetadata]:
-        """List all registered projects.
+    def list_projects(self, *, limit: int | None = None, offset: int = 0) -> list[ProjectMetadata]:
+        """List registered projects with optional pagination.
+
+        Projects are sorted by last accessed (most recent first) before
+        pagination is applied.
+
+        Args:
+            limit: Maximum number of projects to return (None = no limit)
+            offset: Number of projects to skip (default: 0)
 
         Returns:
-            List of project metadata, sorted by last accessed (most recent first)
+            List of project metadata, paginated and sorted by last accessed
 
         """
         projects = self.registry.projects.copy()
         projects.sort(key=lambda p: p.last_accessed, reverse=True)
+
+        # Apply pagination
+        if offset > 0:
+            projects = projects[offset:]
+        if limit is not None:
+            projects = projects[:limit]
+
         return projects
 
     def update_last_accessed(self, path: Path) -> None:
