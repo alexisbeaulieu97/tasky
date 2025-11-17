@@ -3,38 +3,27 @@
 from __future__ import annotations
 
 import logging
-import sys
-import traceback
 from collections.abc import Callable
 from datetime import datetime, timedelta
 from functools import wraps
 from pathlib import Path
-from typing import NoReturn, Protocol, TypeVar, cast
+from typing import TypeVar, cast
 from uuid import UUID
 
 import click
 import typer
-from pydantic import ValidationError as PydanticValidationError
-from tasky_settings import ProjectNotFoundError, create_task_service, get_project_registry_service
+from tasky_settings import create_task_service, get_project_registry_service
 from tasky_settings.factory import find_project_root
-from tasky_storage.errors import StorageError
 from tasky_tasks import (
-    ExportError,
     ImportResult,
-    IncompatibleVersionError,
-    InvalidExportFormatError,
-    InvalidStateTransitionError,
-    TaskDomainError,
     TaskFilter,
-    TaskImportError,
     TaskImportExportService,
     TaskModel,
-    TaskNotFoundError,
-    TaskValidationError,
 )
 from tasky_tasks.enums import TaskStatus
 from tasky_tasks.service import TaskService
 
+from tasky_cli.error_dispatcher import ErrorDispatcher
 from tasky_cli.validators import date_validator, status_validator, task_id_validator
 
 task_app = typer.Typer(no_args_is_help=True)
@@ -42,15 +31,6 @@ task_app = typer.Typer(no_args_is_help=True)
 F = TypeVar("F", bound=Callable[..., object])
 
 logger = logging.getLogger(__name__)
-
-
-class Handler(Protocol):
-    """Protocol for exception handler functions."""
-
-    def __call__(self, exc: Exception, *, verbose: bool) -> NoReturn:
-        """Handle an exception with optional verbose output."""
-        ...
-
 
 _VERBOSE_KEY = "verbose"
 
@@ -85,7 +65,8 @@ def with_task_error_handling(func: F) -> F:  # noqa: UP047
         except typer.Exit:
             raise
         except Exception as exc:  # pragma: no cover - defensive catch-all  # noqa: BLE001
-            _dispatch_exception(exc, verbose=verbose)
+            dispatcher = ErrorDispatcher()
+            dispatcher.dispatch(exc, verbose=verbose)
 
     return cast("F", wrapper)
 
@@ -602,276 +583,6 @@ def _is_verbose(ctx: typer.Context | None) -> bool:
             return value
         current = current.parent
     return False
-
-
-def _suggest_transition(
-    from_status: TaskStatus | str,
-    to_status: TaskStatus | str,
-    task_id: str,
-) -> str:
-    """Generate context-aware suggestions for invalid state transitions.
-
-    Args:
-        from_status: The current status that prevents the transition.
-        to_status: The desired target status.
-        task_id: The task ID to include in the suggestion.
-
-    Returns:
-        A helpful suggestion string for the user.
-
-    """
-    # Normalize to TaskStatus enums for consistent comparison
-    from_enum = from_status if isinstance(from_status, TaskStatus) else TaskStatus(from_status)
-    to_enum = to_status if isinstance(to_status, TaskStatus) else TaskStatus(to_status)
-
-    # Map of (from_status, to_status) -> suggestion
-    reopen_suggestion = f"Use 'tasky task reopen {task_id}' to make it pending first."
-    completed_suggestion = (
-        f"Task is already completed. Use 'tasky task reopen {task_id}' if you want to make changes."
-    )
-    cancelled_suggestion = (
-        f"Task is already cancelled. Use 'tasky task reopen {task_id}' if you want to make changes."
-    )
-    suggestions = {
-        (TaskStatus.CANCELLED, TaskStatus.COMPLETED): reopen_suggestion,
-        (TaskStatus.COMPLETED, TaskStatus.CANCELLED): reopen_suggestion,
-        (TaskStatus.COMPLETED, TaskStatus.COMPLETED): completed_suggestion,
-        (TaskStatus.CANCELLED, TaskStatus.CANCELLED): cancelled_suggestion,
-        (TaskStatus.PENDING, TaskStatus.PENDING): "Task is already pending. No action needed.",
-    }
-
-    # Return specific suggestion or generic fallback
-    return suggestions.get(
-        (from_enum, to_enum),
-        f"Use 'tasky task list' to inspect the current status of task '{task_id}'.",
-    )
-
-
-def _render_error(
-    message: str,
-    *,
-    suggestion: str | None = None,
-    verbose: bool,
-    exc: Exception | None = None,
-) -> None:
-    typer.echo(f"Error: {message}", err=True)
-    if suggestion:
-        typer.echo(f"Suggestion: {suggestion}", err=True)
-    if verbose and exc is not None:
-        typer.echo("", err=True)
-        traceback.print_exception(type(exc), exc, exc.__traceback__, file=sys.stderr)
-
-
-def _dispatch_exception(exc: Exception, *, verbose: bool) -> NoReturn:
-    if isinstance(exc, typer.Exit):
-        raise exc
-
-    # Dispatch to appropriate handler
-    _route_exception_to_handler(exc, verbose=verbose)
-
-
-def _route_exception_to_handler(exc: Exception, *, verbose: bool) -> NoReturn:
-    """Route exception to the appropriate error handler."""
-    handler_chain: tuple[tuple[type[Exception], Handler], ...] = (
-        (TaskDomainError, cast("Handler", _handle_task_domain_error)),
-        (StorageError, cast("Handler", _handle_storage_error)),
-        (KeyError, cast("Handler", _handle_backend_not_registered_error)),
-        (ProjectNotFoundError, cast("Handler", _handle_project_not_found_error)),
-        (PydanticValidationError, cast("Handler", _handle_pydantic_validation_error)),
-    )
-
-    for exc_type, handler in handler_chain:
-        if isinstance(exc, exc_type):
-            handler(exc, verbose=verbose)
-
-    # Fallback for unexpected errors
-    _handle_unexpected_error(exc, verbose=verbose)
-
-
-def _handle_task_domain_error(exc: TaskDomainError, *, verbose: bool) -> NoReturn:
-    # Route to specific handlers
-    _route_task_domain_error(exc, verbose=verbose)
-    raise typer.Exit(1) from exc
-
-
-def _route_task_domain_error(exc: TaskDomainError, *, verbose: bool) -> None:
-    """Route task domain error to appropriate handler."""
-    if isinstance(exc, TaskNotFoundError):
-        _handle_task_not_found(exc, verbose=verbose)
-        return
-
-    if isinstance(exc, TaskValidationError):
-        _handle_task_validation_error(exc, verbose=verbose)
-        return
-
-    if isinstance(exc, InvalidStateTransitionError):
-        _handle_invalid_transition(exc, verbose=verbose)
-        return
-
-    if _try_handle_import_export_errors(exc, verbose=verbose):
-        return
-
-    _render_error(str(exc) or "Task operation failed.", verbose=verbose, exc=exc)
-
-
-def _try_handle_import_export_errors(exc: TaskDomainError, *, verbose: bool) -> bool:
-    """Try to handle import/export errors. Returns True if handled."""
-    # Handle all import/export errors together
-    import_export_types = (
-        InvalidExportFormatError,
-        IncompatibleVersionError,
-        ExportError,
-        TaskImportError,
-    )
-    if not isinstance(exc, import_export_types):
-        return False
-
-    if isinstance(exc, (InvalidExportFormatError, IncompatibleVersionError)):
-        _handle_import_format_error(exc, verbose=verbose)
-    else:
-        _handle_import_export_error(exc, verbose=verbose)
-    return True
-
-
-def _handle_task_not_found(exc: TaskNotFoundError, *, verbose: bool) -> None:
-    """Handle TaskNotFoundError."""
-    _render_error(
-        f"Task '{exc.task_id}' not found.",
-        suggestion="Run 'tasky task list' to view available tasks.",
-        verbose=verbose,
-        exc=exc,
-    )
-
-
-def _handle_task_validation_error(exc: TaskValidationError, *, verbose: bool) -> None:
-    """Handle TaskValidationError."""
-    suggestion = None
-    if getattr(exc, "field", None):
-        suggestion = f"Check the value provided for '{exc.field}'."
-    message = str(exc) or "Task validation failed."
-    _render_error(message, suggestion=suggestion, verbose=verbose, exc=exc)
-
-
-def _handle_invalid_transition(exc: InvalidStateTransitionError, *, verbose: bool) -> None:
-    """Handle InvalidStateTransitionError."""
-    # Extract user-facing labels from status values (handle both enum and string)
-    from_label = getattr(exc.from_status, "value", str(exc.from_status))
-    to_label = getattr(exc.to_status, "value", str(exc.to_status))
-
-    suggestion = _suggest_transition(
-        from_status=exc.from_status,
-        to_status=exc.to_status,
-        task_id=str(exc.task_id),
-    )
-    _render_error(
-        f"Cannot transition from {from_label} to {to_label}.",
-        suggestion=suggestion,
-        verbose=verbose,
-        exc=exc,
-    )
-
-
-def _handle_import_format_error(exc: TaskDomainError, *, verbose: bool) -> None:
-    """Handle InvalidExportFormatError and IncompatibleVersionError."""
-    if isinstance(exc, InvalidExportFormatError):
-        _render_error(
-            f"Invalid file format: {exc}",
-            suggestion="Ensure the file is a valid JSON export from tasky.",
-            verbose=verbose,
-            exc=exc,
-        )
-    elif isinstance(exc, IncompatibleVersionError):
-        version_info = f" (found: {exc.actual})" if exc.actual else ""
-        _render_error(
-            f"Incompatible format version{version_info}",
-            suggestion="The export file may be from a different version of tasky.",
-            verbose=verbose,
-            exc=exc,
-        )
-
-
-def _handle_import_export_error(exc: TaskDomainError, *, verbose: bool) -> None:
-    """Handle ExportError and TaskImportError."""
-    if isinstance(exc, ExportError):
-        _render_error(
-            f"Export failed: {exc}",
-            suggestion="Check file permissions and disk space.",
-            verbose=verbose,
-            exc=exc,
-        )
-    elif isinstance(exc, TaskImportError):
-        _render_error(
-            f"Import failed: {exc}",
-            suggestion="Verify the import file exists and is readable.",
-            verbose=verbose,
-            exc=exc,
-        )
-
-
-def _handle_storage_error(exc: StorageError, *, verbose: bool) -> NoReturn:
-    _render_error(
-        "Storage failure encountered. Verify project initialization and file permissions.",
-        suggestion="Run 'tasky project init' or check the .tasky directory.",
-        verbose=verbose,
-        exc=exc,
-    )
-    raise typer.Exit(3) from exc
-
-
-def _handle_project_not_found_error(exc: ProjectNotFoundError, *, verbose: bool) -> NoReturn:
-    _render_error(
-        "No project found in current directory.",
-        suggestion="Run 'tasky project init' to create a project.",
-        verbose=verbose,
-        exc=exc,
-    )
-    raise typer.Exit(1) from exc
-
-
-def _handle_backend_not_registered_error(exc: KeyError, *, verbose: bool) -> NoReturn:
-    """Render backend registry errors with actionable guidance."""
-    details = exc.args[0] if exc.args else "Configured backend is not registered."
-    _render_error(
-        str(details),
-        suggestion="Update .tasky/config.toml or re-run 'tasky project init' with a valid backend.",
-        verbose=verbose,
-        exc=exc,
-    )
-    raise typer.Exit(1) from exc
-
-
-def _handle_pydantic_validation_error(exc: PydanticValidationError, *, verbose: bool) -> NoReturn:
-    """Handle Pydantic validation errors with user-friendly messages."""
-    # Extract the first error for a clean message
-    errors = exc.errors()
-    if errors:
-        first_error = errors[0]
-        field = first_error.get("loc", ("unknown",))[-1]
-        message = first_error.get("msg", "Validation failed")
-        _render_error(
-            f"{message.capitalize()} for field '{field}'.",
-            suggestion="Check your input values and try again.",
-            verbose=verbose,
-            exc=exc,
-        )
-    else:
-        _render_error(
-            "Validation failed.",
-            suggestion="Check your input values and try again.",
-            verbose=verbose,
-            exc=exc,
-        )
-    raise typer.Exit(1) from exc
-
-
-def _handle_unexpected_error(exc: Exception, *, verbose: bool) -> NoReturn:
-    _render_error(
-        "An unexpected error occurred.",
-        suggestion="Run with --verbose for details or file a bug report.",
-        verbose=verbose,
-        exc=exc,
-    )
-    raise typer.Exit(1) from exc
 
 
 @task_app.command(name="complete")

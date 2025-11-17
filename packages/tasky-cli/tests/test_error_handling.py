@@ -235,7 +235,7 @@ def test_handle_generic_error_shows_bug_report_suggestion(
 
         result = runner.invoke(app, ["task", "list"])
 
-        assert result.exit_code == 1
+        assert result.exit_code == 2  # Exit code 2 for unexpected/internal errors
         assert "unexpected error occurred" in result.stderr.lower()
         assert "--verbose" in result.stderr or "bug report" in result.stderr.lower()
 
