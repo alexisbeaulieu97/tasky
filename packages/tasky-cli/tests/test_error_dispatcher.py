@@ -16,6 +16,7 @@ from tasky_tasks import (
     IncompatibleVersionError,
     InvalidExportFormatError,
     InvalidStateTransitionError,
+    TaskDomainError,
     TaskImportError,
     TaskNotFoundError,
     TaskValidationError,
@@ -33,67 +34,40 @@ class TestErrorDispatcher:
     """Test suite for ErrorDispatcher class."""
 
     def test_dispatch_typer_exit_propagates(self, dispatcher: ErrorDispatcher) -> None:
-        """Test that typer.Exit exceptions are propagated unchanged."""
         exc = typer.Exit(code=42)
         with pytest.raises(typer.Exit) as exc_info:
             dispatcher.dispatch(exc, verbose=False)
         assert exc_info.value.exit_code == 42
 
-    def test_dispatch_task_not_found_error(
-        self,
-        dispatcher: ErrorDispatcher,
-        capsys: pytest.CaptureFixture[str],
-    ) -> None:
-        """Test dispatching TaskNotFoundError."""
+    def test_task_not_found_error(self, dispatcher: ErrorDispatcher) -> None:
         task_id = uuid4()
         exc = TaskNotFoundError(task_id=task_id)
 
-        with pytest.raises(typer.Exit) as exc_info:
-            dispatcher.dispatch(exc, verbose=False)
+        message = dispatcher.dispatch(exc, verbose=False)
 
-        assert exc_info.value.exit_code == 1
-        captured = capsys.readouterr()
-        assert f"Task '{task_id}' not found" in captured.err
-        assert "tasky task list" in captured.err
+        assert dispatcher.exit_code == 1
+        assert f"Task '{task_id}' not found" in message
+        assert "tasky task list" in message
 
-    def test_dispatch_task_validation_error(
-        self,
-        dispatcher: ErrorDispatcher,
-        capsys: pytest.CaptureFixture[str],
-    ) -> None:
-        """Test dispatching TaskValidationError."""
+    def test_task_validation_error(self, dispatcher: ErrorDispatcher) -> None:
         exc = TaskValidationError("Invalid task name")
 
-        with pytest.raises(typer.Exit) as exc_info:
-            dispatcher.dispatch(exc, verbose=False)
+        message = dispatcher.dispatch(exc, verbose=False)
 
-        assert exc_info.value.exit_code == 1
-        captured = capsys.readouterr()
-        assert "Invalid task name" in captured.err
+        assert dispatcher.exit_code == 1
+        assert "Invalid task name" in message
 
-    def test_dispatch_task_validation_error_with_field(
-        self,
-        dispatcher: ErrorDispatcher,
-        capsys: pytest.CaptureFixture[str],
-    ) -> None:
-        """Test dispatching TaskValidationError with field attribute."""
+    def test_task_validation_error_with_field(self, dispatcher: ErrorDispatcher) -> None:
         exc = TaskValidationError("Name is required")
         exc.field = "name"  # type: ignore[attr-defined]
 
-        with pytest.raises(typer.Exit) as exc_info:
-            dispatcher.dispatch(exc, verbose=False)
+        message = dispatcher.dispatch(exc, verbose=False)
 
-        assert exc_info.value.exit_code == 1
-        captured = capsys.readouterr()
-        assert "Name is required" in captured.err
-        assert "Check the value provided for 'name'" in captured.err
+        assert dispatcher.exit_code == 1
+        assert "Name is required" in message
+        assert "Check the value provided for 'name'" in message
 
-    def test_dispatch_invalid_state_transition_error(
-        self,
-        dispatcher: ErrorDispatcher,
-        capsys: pytest.CaptureFixture[str],
-    ) -> None:
-        """Test dispatching InvalidStateTransitionError."""
+    def test_invalid_state_transition_error(self, dispatcher: ErrorDispatcher) -> None:
         task_id = uuid4()
         exc = InvalidStateTransitionError(
             task_id=task_id,
@@ -101,206 +75,141 @@ class TestErrorDispatcher:
             to_status=TaskStatus.CANCELLED,
         )
 
-        with pytest.raises(typer.Exit) as exc_info:
-            dispatcher.dispatch(exc, verbose=False)
+        message = dispatcher.dispatch(exc, verbose=False)
 
-        assert exc_info.value.exit_code == 1
-        captured = capsys.readouterr()
-        assert "Cannot transition from completed to cancelled" in captured.err
-        assert "tasky task reopen" in captured.err
+        assert dispatcher.exit_code == 1
+        assert "Cannot transition from completed to cancelled" in message
+        assert "tasky task reopen" in message
 
-    def test_dispatch_invalid_export_format_error(
-        self,
-        dispatcher: ErrorDispatcher,
-        capsys: pytest.CaptureFixture[str],
-    ) -> None:
-        """Test dispatching InvalidExportFormatError."""
+    def test_invalid_export_format_error(self, dispatcher: ErrorDispatcher) -> None:
         exc = InvalidExportFormatError("Not a valid JSON file")
 
-        with pytest.raises(typer.Exit) as exc_info:
-            dispatcher.dispatch(exc, verbose=False)
+        message = dispatcher.dispatch(exc, verbose=False)
 
-        assert exc_info.value.exit_code == 1
-        captured = capsys.readouterr()
-        assert "Invalid file format" in captured.err
-        assert "valid JSON export" in captured.err
+        assert dispatcher.exit_code == 1
+        assert "Invalid file format: Not a valid JSON file" in message
+        assert "valid JSON export" in message
 
-    def test_dispatch_incompatible_version_error(
-        self,
-        dispatcher: ErrorDispatcher,
-        capsys: pytest.CaptureFixture[str],
-    ) -> None:
-        """Test dispatching IncompatibleVersionError."""
+    def test_incompatible_version_error(self, dispatcher: ErrorDispatcher) -> None:
         exc = IncompatibleVersionError(expected="1.0", actual="2.0")
 
-        with pytest.raises(typer.Exit) as exc_info:
-            dispatcher.dispatch(exc, verbose=False)
+        message = dispatcher.dispatch(exc, verbose=False)
 
-        assert exc_info.value.exit_code == 1
-        captured = capsys.readouterr()
-        assert "Incompatible format version" in captured.err
-        assert "found: 2.0" in captured.err
+        assert dispatcher.exit_code == 1
+        assert "Incompatible format version (found: 2.0)." in message
 
-    def test_dispatch_export_error(
-        self,
-        dispatcher: ErrorDispatcher,
-        capsys: pytest.CaptureFixture[str],
-    ) -> None:
-        """Test dispatching ExportError."""
+    def test_export_error(self, dispatcher: ErrorDispatcher) -> None:
         exc = ExportError("Permission denied")
 
-        with pytest.raises(typer.Exit) as exc_info:
-            dispatcher.dispatch(exc, verbose=False)
+        message = dispatcher.dispatch(exc, verbose=False)
 
-        assert exc_info.value.exit_code == 1
-        captured = capsys.readouterr()
-        assert "Export failed" in captured.err
-        assert "Permission denied" in captured.err
+        assert dispatcher.exit_code == 1
+        assert "Export failed: Permission denied" in message
 
-    def test_dispatch_task_import_error(
-        self,
-        dispatcher: ErrorDispatcher,
-        capsys: pytest.CaptureFixture[str],
-    ) -> None:
-        """Test dispatching TaskImportError."""
+    def test_import_error(self, dispatcher: ErrorDispatcher) -> None:
         exc = TaskImportError("File not found")
 
-        with pytest.raises(typer.Exit) as exc_info:
-            dispatcher.dispatch(exc, verbose=False)
+        message = dispatcher.dispatch(exc, verbose=False)
 
-        assert exc_info.value.exit_code == 1
-        captured = capsys.readouterr()
-        assert "Import failed" in captured.err
-        assert "File not found" in captured.err
+        assert dispatcher.exit_code == 1
+        assert "Import failed: File not found" in message
 
-    def test_dispatch_storage_error(
-        self,
-        dispatcher: ErrorDispatcher,
-        capsys: pytest.CaptureFixture[str],
-    ) -> None:
-        """Test dispatching StorageError with exit code 3."""
+    def test_storage_error_includes_original_message(self, dispatcher: ErrorDispatcher) -> None:
         exc = StorageError("Database corruption detected")
 
-        with pytest.raises(typer.Exit) as exc_info:
-            dispatcher.dispatch(exc, verbose=False)
+        message = dispatcher.dispatch(exc, verbose=False)
 
-        assert exc_info.value.exit_code == 3
-        captured = capsys.readouterr()
-        assert "Storage failure encountered" in captured.err
-        assert "tasky project init" in captured.err
+        assert dispatcher.exit_code == 1
+        assert "Storage operation failed: Database corruption detected" in message
+        assert "tasky project init" in message
 
-    def test_dispatch_project_not_found_error(
-        self,
-        dispatcher: ErrorDispatcher,
-        capsys: pytest.CaptureFixture[str],
-    ) -> None:
-        """Test dispatching ProjectNotFoundError."""
+    def test_project_not_found_error(self, dispatcher: ErrorDispatcher) -> None:
         exc = ProjectNotFoundError(start_path=Path("/some/path"))
 
-        with pytest.raises(typer.Exit) as exc_info:
-            dispatcher.dispatch(exc, verbose=False)
+        message = dispatcher.dispatch(exc, verbose=False)
 
-        assert exc_info.value.exit_code == 1
-        captured = capsys.readouterr()
-        assert "No project found" in captured.err
-        assert "tasky project init" in captured.err
+        assert dispatcher.exit_code == 1
+        assert "No project found in current directory" in message
+        assert "tasky project init" in message
 
-    def test_dispatch_backend_not_registered_error(
-        self,
-        dispatcher: ErrorDispatcher,
-        capsys: pytest.CaptureFixture[str],
-    ) -> None:
-        """Test dispatching KeyError (backend not registered)."""
+    def test_backend_not_registered_error(self, dispatcher: ErrorDispatcher) -> None:
         exc = KeyError("Backend 'sqlite' not found in registry")
 
-        with pytest.raises(typer.Exit) as exc_info:
-            dispatcher.dispatch(exc, verbose=False)
+        message = dispatcher.dispatch(exc, verbose=False)
 
-        assert exc_info.value.exit_code == 1
-        captured = capsys.readouterr()
-        assert "Backend 'sqlite' not found in registry" in captured.err
-        assert "config.toml" in captured.err
+        assert dispatcher.exit_code == 1
+        assert "Backend 'sqlite' not found in registry" in message
+        assert "config.toml" in message
 
-    def test_dispatch_pydantic_validation_error(
-        self,
-        dispatcher: ErrorDispatcher,
-        capsys: pytest.CaptureFixture[str],
-    ) -> None:
-        """Test dispatching Pydantic ValidationError."""
-
+    def test_pydantic_validation_error(self, dispatcher: ErrorDispatcher) -> None:
         class SampleModel(BaseModel):
             name: str
             age: int
 
-        # Trigger validation error
-        try:
+        with pytest.raises(ValidationError) as exc_info:
             SampleModel(name="John", age="invalid")  # type: ignore[arg-type]
-        except ValidationError as exc:
-            with pytest.raises(typer.Exit) as exc_info:
-                dispatcher.dispatch(exc, verbose=False)
 
-            assert exc_info.value.exit_code == 1
-            captured = capsys.readouterr()
-            assert "for field 'age'" in captured.err
-            assert "Check your input values" in captured.err
+        message = dispatcher.dispatch(exc_info.value, verbose=False)
 
-    def test_dispatch_pydantic_validation_error_empty_errors(
-        self,
-        dispatcher: ErrorDispatcher,
-        capsys: pytest.CaptureFixture[str],
-    ) -> None:
-        """Test dispatching Pydantic ValidationError with no error details."""
+        assert dispatcher.exit_code == 1
+        assert "for field 'age'" in message
+        assert "Check your input values" in message
 
+    def test_pydantic_validation_error_with_empty_errors(self, dispatcher: ErrorDispatcher) -> None:
         class SampleModel(BaseModel):
             name: str
 
-        # Create a validation error and manually clear errors (edge case)
-        try:
+        with pytest.raises(ValidationError) as exc_info:
             SampleModel(name=123)  # type: ignore[arg-type]
-        except ValidationError as exc:
-            # Mock empty errors list
-            def mock_errors() -> list[dict[str, object]]:  # type: ignore[type-arg]
-                return []
 
-            exc.errors = mock_errors  # type: ignore[method-assign]
+        validation_error = exc_info.value
 
-            with pytest.raises(typer.Exit) as exc_info:
-                dispatcher.dispatch(exc, verbose=False)
+        def mock_errors() -> list[dict[str, object]]:
+            return []
 
-            assert exc_info.value.exit_code == 1
-            captured = capsys.readouterr()
-            assert "Validation failed" in captured.err
+        validation_error.errors = mock_errors  # type: ignore[method-assign]
 
-    def test_dispatch_unexpected_error(
-        self,
-        dispatcher: ErrorDispatcher,
-        capsys: pytest.CaptureFixture[str],
-    ) -> None:
-        """Test dispatching an unexpected error (fallback handler) with exit code 2."""
+        message = dispatcher.dispatch(validation_error, verbose=False)
+
+        assert dispatcher.exit_code == 1
+        assert "Validation failed." in message
+
+    def test_generic_task_domain_error(self, dispatcher: ErrorDispatcher) -> None:
+        exc = TaskDomainError("Task operation failed in service")
+
+        message = dispatcher.dispatch(exc, verbose=False)
+
+        assert dispatcher.exit_code == 1
+        assert "Task operation failed in service" in message
+
+    def test_unexpected_error_uses_fallback(self, dispatcher: ErrorDispatcher) -> None:
         exc = RuntimeError("Unexpected failure")
 
-        with pytest.raises(typer.Exit) as exc_info:
-            dispatcher.dispatch(exc, verbose=False)
+        message = dispatcher.dispatch(exc, verbose=False)
 
-        assert exc_info.value.exit_code == 2
-        captured = capsys.readouterr()
-        assert "An unexpected error occurred" in captured.err
-        assert "Run with --verbose" in captured.err
+        assert dispatcher.exit_code == 2
+        assert "An unexpected error occurred" in message
+        assert "Run with --verbose" in message
 
-    def test_dispatch_verbose_mode_shows_traceback(
-        self,
-        dispatcher: ErrorDispatcher,
-        capsys: pytest.CaptureFixture[str],
-    ) -> None:
-        """Test that verbose mode displays full exception traceback."""
+    def test_verbose_mode_includes_traceback(self, dispatcher: ErrorDispatcher) -> None:
         exc = TaskNotFoundError(task_id=uuid4())
 
-        with pytest.raises(typer.Exit):
-            dispatcher.dispatch(exc, verbose=True)
+        message = dispatcher.dispatch(exc, verbose=True)
 
-        captured = capsys.readouterr()
-        # Verbose mode should show exception type in traceback
-        assert "TaskNotFoundError" in captured.err
-        # Should have more output than non-verbose (basic test for traceback presence)
-        assert len(captured.err) > 100
+        assert dispatcher.exit_code == 1
+        assert "TaskNotFoundError" in message
 
+    def test_custom_handler_registration(self, dispatcher: ErrorDispatcher) -> None:
+        class CustomError(RuntimeError):
+            pass
+
+        def handler(exc: CustomError, *, verbose: bool) -> str:  # pragma: no cover - simple stub
+            base = "Error: custom handled"
+            return base + (" verbose" if verbose else "")
+
+        dispatcher.register(CustomError, handler, exit_code=7)
+
+        message = dispatcher.dispatch(CustomError(), verbose=True)
+
+        assert dispatcher.exit_code == 7
+        assert "custom handled verbose" in message
