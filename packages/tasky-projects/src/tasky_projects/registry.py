@@ -184,6 +184,15 @@ def _resolve_unique_name(
         ValueError: If name resolution fails
 
     """
+    existing_project = registry.get_by_path(path)
+    if existing_project:
+        logger.debug(
+            "Project at path '%s' already registered as '%s'; reusing existing name",
+            path,
+            existing_project.name,
+        )
+        return existing_project.name
+
     candidate_name = path.name
     existing_with_same_name = registry.get_by_name(candidate_name)
 
@@ -462,7 +471,7 @@ class ProjectRegistryService:
             return True
         return item.name in self.SKIP_DIRS
 
-    def discover_projects(
+    def discover_projects(  # noqa: C901
         self,
         search_paths: list[Path],
         progress_callback: Callable[[int], None] | None = None,

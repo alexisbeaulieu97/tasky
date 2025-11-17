@@ -11,7 +11,7 @@ project_app = typer.Typer(no_args_is_help=True)
 
 
 @project_app.command(name="init")
-def init_command(
+def init_command(  # noqa: C901
     backend: str = typer.Option("json", "--backend", "-b", help="Storage backend to use"),
 ) -> None:
     """Initialize a new project."""
@@ -59,7 +59,7 @@ def init_command(
 
 
 @project_app.command(name="info")
-def info_command(
+def info_command(  # noqa: C901
     project_name: str | None = typer.Option(
         None,
         "--project-name",
@@ -332,7 +332,7 @@ def list_command(
 
 
 @project_app.command(name="register")
-def register_command(
+def register_command(  # noqa: C901
     path: str = typer.Argument(..., help="Path to the project directory"),
 ) -> None:
     """Register a project in the global registry.
@@ -371,7 +371,7 @@ def register_command(
 
 
 @project_app.command(name="unregister")
-def unregister_command(
+def unregister_command(  # noqa: C901
     name: str = typer.Argument(..., help="Name of the project to unregister"),
     yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation prompt"),  # noqa: FBT001, FBT003
 ) -> None:
@@ -414,7 +414,7 @@ def unregister_command(
 
 
 @project_app.command(name="discover")
-def discover_command(
+def discover_command(  # noqa: C901
     paths: list[Path] | None = typer.Option(  # noqa: B008
         None,
         "--path",

@@ -248,7 +248,7 @@ class TestSqliteTaskRepository:
 
         assert version == 1
 
-    def test_concurrent_creates(self, tmp_path: Path) -> None:
+    def test_concurrent_creates(self, tmp_path: Path) -> None:  # noqa: C901
         """Test multiple threads creating tasks simultaneously."""
         db_path = tmp_path / "tasks.db"
         repo = SqliteTaskRepository(path=db_path)
@@ -298,7 +298,7 @@ class TestSqliteTaskRepository:
         retrieved_ids = {t.task_id for t in all_tasks}
         assert created_ids == retrieved_ids
 
-    def test_concurrent_read_write(self, tmp_path: Path) -> None:
+    def test_concurrent_read_write(self, tmp_path: Path) -> None:  # noqa: C901
         """Test concurrent reads while writes are happening."""
         db_path = tmp_path / "tasks.db"
         repo = SqliteTaskRepository(path=db_path)
@@ -546,7 +546,7 @@ class TestSqliteErrorPaths:
         assert final_task is not None
         assert final_task.name.startswith("Name-")
 
-    def _run_concurrent_updates(
+    def _run_concurrent_updates(  # noqa: C901
         self,
         repo: SqliteTaskRepository,
         task: TaskModel,
@@ -600,7 +600,7 @@ class TestSqliteConcurrencyAndStress:
         all_tasks = repo.get_all_tasks()
         assert len(all_tasks) == 500
 
-    def _bulk_create_tasks(
+    def _bulk_create_tasks(  # noqa: C901
         self,
         repo: SqliteTaskRepository,
         threads: int,
@@ -661,7 +661,7 @@ class TestSqliteConcurrencyAndStress:
         all_tasks = repo.get_all_tasks()
         assert len(all_tasks) == 120  # 100 initial + 20 new
 
-    def _run_read_heavy_workload(
+    def _run_read_heavy_workload(  # noqa: C901
         self,
         repo: SqliteTaskRepository,
     ) -> tuple[list[Exception], list[int], list[int]]:  # type: ignore[type-arg]

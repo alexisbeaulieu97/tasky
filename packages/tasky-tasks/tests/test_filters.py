@@ -221,7 +221,7 @@ class TestTaskFilterSnapshotFiltering:
             created_before=datetime(2025, 11, 11, 12, 0, 0, tzinfo=UTC),
             name_contains="auth",
         )
-        snapshot = {
+        snapshot: dict[str, object] = {
             "status": TaskStatus.PENDING.value,
             "created_at": created_at.isoformat().replace("+00:00", "Z"),
             "name": "Auth bug",
@@ -234,7 +234,7 @@ class TestTaskFilterSnapshotFiltering:
         task_filter = TaskFilter(
             created_after=datetime(2025, 11, 10, 12, 0, 0, tzinfo=UTC),
         )
-        snapshot = {
+        snapshot: dict[str, object] = {
             "status": TaskStatus.PENDING.value,
             "created_at": "invalid-date",
             "name": "Auth bug",

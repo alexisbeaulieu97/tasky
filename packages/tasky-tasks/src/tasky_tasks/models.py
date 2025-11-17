@@ -188,7 +188,7 @@ class TaskFilter(BaseModel):
         description="Filter tasks whose name or details contain this text (case-insensitive).",
     )
 
-    def matches(self, task: TaskModel) -> bool:
+    def matches(self, task: TaskModel) -> bool:  # noqa: C901
         """Check if a task matches all filter criteria (AND logic).
 
         Parameters

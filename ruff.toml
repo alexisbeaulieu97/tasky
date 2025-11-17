@@ -24,7 +24,8 @@ dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 "**/tests/**/*.py" = [
     "S101",
     "PLR2004",
-] # Allow assert statements and magic values in tests
+    "INP001",
+] # Allow assert statements, magic values, and implicit namespace packages in tests
 
 [lint.mccabe]
 max-complexity = 5
