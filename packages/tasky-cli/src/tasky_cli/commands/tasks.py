@@ -29,6 +29,7 @@ from tasky_tasks import (
     TaskFilter,
     TaskImportError,
     TaskImportExportService,
+    TaskModel,
     TaskNotFoundError,
     TaskValidationError,
 )
@@ -127,9 +128,182 @@ def _parse_task_id_and_get_service(task_id: str) -> tuple[TaskService, UUID]:
     return service, uuid
 
 
+def _validate_status_filter(status: str | None) -> TaskStatus | None:
+    """Validate and convert status string to TaskStatus enum.
+
+    Args:
+        status: Status string from command-line argument, or None.
+
+    Returns:
+        TaskStatus enum value if valid, None if status was None.
+
+    Raises:
+        typer.Exit: If status is invalid.
+
+    """
+    if status is None:
+        return None
+
+    valid_statuses = {s.value for s in TaskStatus}
+    if status.lower() not in valid_statuses:
+        valid_list = ", ".join(sorted(valid_statuses))
+        typer.echo(
+            f"Invalid status: '{status}'. Valid options: {valid_list}",
+            err=True,
+        )
+        raise typer.Exit(1)
+
+    return TaskStatus(status.lower())
+
+
+def _parse_date_filter(date_str: str, *, inclusive_end: bool = False) -> datetime:
+    """Parse and validate a date string for filtering.
+
+    Args:
+        date_str: Date string in ISO 8601 format (YYYY-MM-DD).
+        inclusive_end: If True, add 1 day to make the date inclusive of the entire day.
+                      Used for --created-before to include all of the specified date.
+
+    Returns:
+        A timezone-aware datetime object (UTC midnight).
+
+    Raises:
+        typer.Exit: If the date format is invalid or cannot be parsed.
+
+    """
+    # Validate format is exactly YYYY-MM-DD (reject time components)
+    if not _is_valid_date_format(date_str):
+        typer.echo(
+            f"Invalid date format: '{date_str}'. "
+            "Expected ISO 8601 format: YYYY-MM-DD (e.g., 2025-01-01)",
+            err=True,
+        )
+        raise typer.Exit(1) from None
+
+    try:
+        # Parse date and make it timezone-aware (UTC midnight)
+        parsed_date = datetime.fromisoformat(date_str)
+        result_dt = parsed_date.replace(tzinfo=UTC)
+
+        # For --created-before, add 1 day to make the exclusive < check
+        # inclusive of the entire day (user expects --created-before 2025-12-31
+        # to include all of Dec 31)
+        if inclusive_end:
+            result_dt = result_dt + timedelta(days=1)
+    except ValueError:
+        typer.echo(
+            f"Invalid date format: '{date_str}'. "
+            "Expected ISO 8601 format: YYYY-MM-DD (e.g., 2025-01-01)",
+            err=True,
+        )
+        raise typer.Exit(1) from None
+    else:
+        return result_dt
+
+
+def _build_task_list_filter(
+    task_status: TaskStatus | None,
+    created_after_dt: datetime | None,
+    created_before_dt: datetime | None,
+    search: str | None,
+) -> tuple[TaskFilter | None, bool]:
+    """Build a TaskFilter from command-line arguments.
+
+    Args:
+        task_status: Status to filter by, or None.
+        created_after_dt: Start date for filtering, or None.
+        created_before_dt: End date for filtering, or None.
+        search: Text to search for in task name/details, or None.
+                Empty strings are normalized to None.
+
+    Returns:
+        A tuple of (filter_object, has_filters) where:
+        - filter_object is a TaskFilter if any filters are active, else None
+        - has_filters is True if any filter arguments were provided
+
+    """
+    # Normalize empty search to None (per spec: empty search = no filter)
+    normalized_search = None if (search is None or not search.strip()) else search
+
+    has_filters = (
+        task_status is not None
+        or created_after_dt is not None
+        or created_before_dt is not None
+        or normalized_search is not None
+    )
+
+    if has_filters:
+        return (
+            TaskFilter(
+                statuses=[task_status] if task_status is not None else None,
+                created_after=created_after_dt,
+                created_before=created_before_dt,
+                name_contains=normalized_search,
+            ),
+            True,
+        )
+
+    return None, False
+
+
+def _render_task_list_summary(tasks: list[TaskModel], *, has_filters: bool) -> None:
+    """Render the summary line after displaying tasks.
+
+    Args:
+        tasks: List of tasks to summarize.
+        has_filters: Whether filters were applied to the task list.
+
+    """
+    if not tasks:
+        # Show filter-specific message when filtering, generic message otherwise
+        if has_filters:
+            typer.echo("No matching tasks found")
+        else:
+            typer.echo("No tasks to display")
+        return
+
+    # Count tasks by status
+    pending_count = sum(1 for t in tasks if t.status == TaskStatus.PENDING)
+    completed_count = sum(1 for t in tasks if t.status == TaskStatus.COMPLETED)
+    cancelled_count = sum(1 for t in tasks if t.status == TaskStatus.CANCELLED)
+
+    # Display summary line
+    task_word = "task" if len(tasks) == 1 else "tasks"
+    typer.echo(
+        f"\nShowing {len(tasks)} {task_word} "
+        f"({pending_count} pending, {completed_count} completed, "
+        f"{cancelled_count} cancelled)",
+    )
+
+
+def _render_task_list(tasks: list[TaskModel], *, show_timestamps: bool = False) -> None:
+    """Render the list of tasks with status indicators.
+
+    Args:
+        tasks: List of tasks to display (will be sorted by status).
+        show_timestamps: Whether to show created_at and updated_at timestamps.
+
+    """
+    # Sort tasks by status: pending → completed → cancelled
+    status_order = {TaskStatus.PENDING: 0, TaskStatus.COMPLETED: 1, TaskStatus.CANCELLED: 2}
+    sorted_tasks = sorted(tasks, key=lambda t: status_order[t.status])
+
+    # Display tasks with status indicators
+    for task in sorted_tasks:
+        # Map status to indicator
+        status_indicator = _get_status_indicator(task.status)
+        typer.echo(f"{status_indicator} {task.task_id} {task.name} - {task.details}")
+
+        # Show timestamps if requested
+        if show_timestamps:
+            created = task.created_at.strftime("%Y-%m-%dT%H:%M:%SZ")
+            updated = task.updated_at.strftime("%Y-%m-%dT%H:%M:%SZ")
+            typer.echo(f"  Created: {created} | Modified: {updated}")
+
+
 @task_app.command(name="list")
 @with_task_error_handling
-def list_command(  # noqa: C901, PLR0912, PLR0915
+def list_command(
     status: str | None = typer.Option(
         None,
         "--status",
@@ -198,129 +372,41 @@ def list_command(  # noqa: C901, PLR0912, PLR0915
     """
     # Validate status argument first, before creating service
     # This ensures invalid status values are rejected without requiring a project
-    task_status: TaskStatus | None = None
-
-    if status is not None:
-        valid_statuses = {s.value for s in TaskStatus}
-        if status.lower() not in valid_statuses:
-            valid_list = ", ".join(sorted(valid_statuses))
-            typer.echo(
-                f"Invalid status: '{status}'. Valid options: {valid_list}",
-                err=True,
-            )
-            raise typer.Exit(1)
-        task_status = TaskStatus(status.lower())
+    task_status = _validate_status_filter(status)
 
     # Parse and validate date arguments
     created_after_dt: datetime | None = None
     created_before_dt: datetime | None = None
 
     if created_after is not None:
-        # Validate format is exactly YYYY-MM-DD (reject time components)
-        if not _is_valid_date_format(created_after):
-            typer.echo(
-                f"Invalid date format: '{created_after}'. "
-                "Expected ISO 8601 format: YYYY-MM-DD (e.g., 2025-01-01)",
-                err=True,
-            )
-            raise typer.Exit(1) from None
-        try:
-            # Parse date and make it timezone-aware (UTC midnight)
-            parsed_date = datetime.fromisoformat(created_after)
-            created_after_dt = parsed_date.replace(tzinfo=UTC)
-        except ValueError:
-            typer.echo(
-                f"Invalid date format: '{created_after}'. "
-                "Expected ISO 8601 format: YYYY-MM-DD (e.g., 2025-01-01)",
-                err=True,
-            )
-            raise typer.Exit(1) from None
+        created_after_dt = _parse_date_filter(created_after)
 
     if created_before is not None:
-        # Validate format is exactly YYYY-MM-DD (reject time components)
-        if not _is_valid_date_format(created_before):
-            typer.echo(
-                f"Invalid date format: '{created_before}'. "
-                "Expected ISO 8601 format: YYYY-MM-DD (e.g., 2025-01-01)",
-                err=True,
-            )
-            raise typer.Exit(1) from None
-        try:
-            parsed_date = datetime.fromisoformat(created_before)
-            # Add 1 day to make the exclusive < check inclusive of the entire day
-            # (user expects --created-before 2025-12-31 to include all of Dec 31)
-            created_before_dt = parsed_date.replace(tzinfo=UTC) + timedelta(days=1)
-        except ValueError:
-            typer.echo(
-                f"Invalid date format: '{created_before}'. "
-                "Expected ISO 8601 format: YYYY-MM-DD (e.g., 2025-01-01)",
-                err=True,
-            )
-            raise typer.Exit(1) from None
+        created_before_dt = _parse_date_filter(created_before, inclusive_end=True)
 
     # Only create service after validating input
     service = _get_service()
 
-    # Normalize empty search to None (per spec: empty search = no filter)
-    if search is not None and not search.strip():
-        search = None
-
     # Build filter and fetch tasks
-    has_filters = (
-        task_status is not None
-        or created_after_dt is not None
-        or created_before_dt is not None
-        or search is not None
+    task_filter, has_filters = _build_task_list_filter(
+        task_status,
+        created_after_dt,
+        created_before_dt,
+        search,
     )
 
-    if has_filters:
-        # Build TaskFilter with specified criteria
-        task_filter = TaskFilter(
-            statuses=[task_status] if task_status is not None else None,
-            created_after=created_after_dt,
-            created_before=created_before_dt,
-            name_contains=search,
-        )
-        tasks = service.find_tasks(task_filter)
-    else:
-        tasks = service.get_all_tasks()
+    tasks = service.find_tasks(task_filter) if task_filter is not None else service.get_all_tasks()
 
+    # Handle empty results early
     if not tasks:
-        # Show filter-specific message when filtering, generic message otherwise
-        if has_filters:
-            typer.echo("No matching tasks found")
-        else:
-            typer.echo("No tasks to display")
+        _render_task_list_summary(tasks, has_filters=has_filters)
         return
 
-    # Sort tasks by status: pending → completed → cancelled
-    status_order = {TaskStatus.PENDING: 0, TaskStatus.COMPLETED: 1, TaskStatus.CANCELLED: 2}
-    sorted_tasks = sorted(tasks, key=lambda t: status_order[t.status])
-
-    # Count tasks by status
-    pending_count = sum(1 for t in tasks if t.status == TaskStatus.PENDING)
-    completed_count = sum(1 for t in tasks if t.status == TaskStatus.COMPLETED)
-    cancelled_count = sum(1 for t in tasks if t.status == TaskStatus.CANCELLED)
-
     # Display tasks with status indicators
-    for task in sorted_tasks:
-        # Map status to indicator
-        status_indicator = _get_status_indicator(task.status)
-        typer.echo(f"{status_indicator} {task.task_id} {task.name} - {task.details}")
-
-        # Show timestamps if --long flag is provided
-        if long:
-            created = task.created_at.strftime("%Y-%m-%dT%H:%M:%SZ")
-            updated = task.updated_at.strftime("%Y-%m-%dT%H:%M:%SZ")
-            typer.echo(f"  Created: {created} | Modified: {updated}")
+    _render_task_list(tasks, show_timestamps=long)
 
     # Display summary line
-    task_word = "task" if len(tasks) == 1 else "tasks"
-    typer.echo(
-        f"\nShowing {len(tasks)} {task_word} "
-        f"({pending_count} pending, {completed_count} completed, "
-        f"{cancelled_count} cancelled)",
-    )
+    _render_task_list_summary(tasks, has_filters=has_filters)
 
 
 def _is_valid_date_format(date_str: str) -> bool:
