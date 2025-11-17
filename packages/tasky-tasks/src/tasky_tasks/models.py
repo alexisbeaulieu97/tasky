@@ -232,3 +232,65 @@ class TaskFilter(BaseModel):
                 return False
 
         return True
+
+    def matches_snapshot(self, snapshot: dict[str, object]) -> bool:  # noqa: C901
+        """Check if a task snapshot matches all filter criteria (AND logic).
+
+        This method performs filtering directly on the dictionary representation
+        of a task, avoiding the expensive conversion to TaskModel. This enables
+        filter-first strategies for improved performance on large datasets.
+
+        Parameters
+        ----------
+        snapshot:
+            The task snapshot (dict) to evaluate against filter criteria.
+
+        Returns
+        -------
+        bool:
+            True if the snapshot matches all specified criteria, False otherwise.
+
+        """
+        from datetime import datetime  # noqa: PLC0415
+
+        # Status filter: task must be in one of the specified statuses
+        if self.statuses is not None:
+            snapshot_status = snapshot.get("status")
+            # Compare against TaskStatus enum values
+            status_values = [s.value for s in self.statuses]
+            if snapshot_status not in status_values:
+                return False
+
+        # Date filters require parsing ISO 8601 timestamps
+        created_at_str = snapshot.get("created_at")
+        if created_at_str is not None and isinstance(created_at_str, str):
+            try:
+                # Parse ISO 8601 datetime string
+                created_at = datetime.fromisoformat(created_at_str)
+            except (ValueError, TypeError):
+                # If parsing fails, skip this snapshot (invalid data)
+                return False
+
+            # Created after filter (inclusive)
+            if self.created_after is not None and created_at < self.created_after:
+                return False
+
+            # Created before filter (exclusive)
+            if self.created_before is not None and created_at >= self.created_before:
+                return False
+
+        # Text search filter (case-insensitive, searches name and details)
+        if self.name_contains is not None:
+            search_text = self.name_contains.lower()
+            name = snapshot.get("name", "")
+            details = snapshot.get("details", "")
+            # Ensure name and details are strings
+            if not isinstance(name, str):
+                name = str(name) if name else ""
+            if not isinstance(details, str):
+                details = str(details) if details else ""
+            task_text = f"{name} {details}".lower()
+            if search_text not in task_text:
+                return False
+
+        return True
