@@ -1,7 +1,5 @@
 """Configuration and wiring package for Tasky."""
 
-from pathlib import Path
-
 from tasky_projects.registry import ProjectRegistryService
 
 from tasky_settings.backend_registry import BackendFactory, BackendRegistry, registry
