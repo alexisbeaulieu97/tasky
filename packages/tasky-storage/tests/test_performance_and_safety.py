@@ -126,8 +126,8 @@ class TestAtomicWriteSafety:
         assert "version" in loaded_data
         assert "tasks" in loaded_data
 
-        # Verify no .tmp files remain
-        temp_files = list(tmp_path.glob("*.tmp"))
+        # Verify no hidden temp files remain (matches .tasks.json.*.tmp pattern)
+        temp_files = list(tmp_path.glob(f".{storage.path.name}.*.tmp"))
         assert len(temp_files) == 0, f"Temporary file not cleaned up: {temp_files}"
 
     def test_atomic_write_prevents_corruption(self, tmp_path: Path) -> None:
