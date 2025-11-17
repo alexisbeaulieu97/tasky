@@ -8,7 +8,7 @@ This roadmap organizes all 18 OpenSpec changes across Phases 1-8 in optimal impl
 ## Overview
 
 **Total Effort (Phases 1-6)**: ~56-62 hours (COMPLETE ✅)
-**Total Effort (Phases 7-7b)**: ~149 hours of code quality + CLI improvements
+**Total Effort (Phases 7-7b)**: ~105.5 hours of code quality + CLI improvements (Phase 7: ~98h, Phase 7b: ~7.5h)
 **Total Effort (Phases 8+)**: TBD (MCP servers, hooks, advanced features)
 **Phases**: 6 completed (1, 1.5, 2, 3, 4, 4.4, 5, 6) + 2 in progress (7-7b) + future phases
 **Test Gate**: After each phase, run `uv run pytest` to ensure all tests still pass
@@ -44,9 +44,10 @@ Tick off each change as you complete it (mirrors the execution order below).
 - [x] 7.7 `improve-performance-and-safety` (42 tasks, ~21h)
 - [x] 7.8 `improve-architecture-and-documentation` (44 tasks, ~15h)
 
-### 🎯 Phase 7b: CLI Improvements (51 tasks, ~51 hours)
+### 🎯 Phase 7b: CLI Improvements (78 tasks, ~7.5 hours)
 - [x] 7b.1 `add-cli-input-validators` (25 tasks, ~3h)
-- [ ] 7b.2 `refactor-cli-error-handling` (26 tasks, ~2h)
+- [x] 7b.2 `refactor-cli-error-handling` (26 tasks, ~2h)
+- [ ] 7b.3 `refactor-structured-error-results` (27 tasks, ~2.5h)
 
 ### 🚀 Phase 8: AI Integration (45 tasks, ~40-50 hours)
 - [ ] 8.1 `add-mcp-server` (MCP protocol integration for Claude)
@@ -902,11 +903,11 @@ openspec validate --specs
 
 ---
 
-## Phase 7b: CLI Improvements (51 tasks, ~51 hours)
+## Phase 7b: CLI Improvements (78 tasks, ~7.5 hours)
 **Goal**: Improve CLI user experience with input validation and error handling consolidation
 
 ### Context
-Two high-value CLI improvements that should run AFTER Phase 7 testing foundation is solid.
+Three high-value CLI improvements that should run AFTER Phase 7 testing foundation is solid.
 These enhance usability and error messages, leveraging comprehensive test coverage from Phase 7.2.
 
 ### 7b.1 `add-cli-input-validators` ⭐ HIGH VALUE
@@ -925,10 +926,23 @@ These enhance usability and error messages, leveraging comprehensive test covera
 **What**: Consolidate duplicate error handlers into registry-based dispatcher
 **Tasks**: 26 | Hours: ~2 | Impact: Maintainable error handling, consistent exit codes
 **Depends on**: 7b.1 complete (validators ready for integration)
-**Enables**: Future CLI commands inherit clean error handling
+**Enables**: 7b.3 (structured error results build on dispatcher foundation)
 
 ```bash
 /openspec:apply refactor-cli-error-handling
+```
+
+### 7b.3 `refactor-structured-error-results` ⭐ CRITICAL FOR MCP
+**Why Third in Phase 7b**: After error dispatcher is consolidated, make errors multi-transport ready
+**What**: Return structured `ErrorResult` objects (message, suggestion, exit_code, traceback) instead of plain strings
+**Tasks**: 27 | Hours: ~2.5 | Impact: Enables MCP JSON serialization, structured logging, cleaner tests
+**Depends on**: 7b.2 complete (dispatcher foundation ready)
+**Enables**: Phase 8 MCP server error serialization, structured logging infrastructure
+
+**Key benefit**: MCP servers can serialize errors as JSON without changing handler logic. Tests assert on structured fields instead of parsing strings.
+
+```bash
+/openspec:apply refactor-structured-error-results
 ```
 
 ### Phase 7b Validation Checkpoint ✓
@@ -938,6 +952,9 @@ After Phase 7b completion:
 - User-friendly messages in all scenarios ✅
 - Tests pass with integrated validators ✅
 - Exit codes correct (1 for user errors, 2 for internal) ✅
+- Error handlers return structured `ErrorResult` objects ✅
+- Tests assert on structured fields instead of string parsing ✅
+- Foundation ready for MCP error serialization ✅
 
 ```bash
 # Validation commands
@@ -947,6 +964,8 @@ uv run pyright
 # Manual test: try error scenarios
 uv run tasky task show invalid-id  # Should show friendly error
 uv run tasky task create           # Should validate input
+# Verify structured errors ready for MCP
+python -c "from tasky_cli.error_dispatcher import ErrorResult; print('ErrorResult available')"
 ```
 
 ---
@@ -972,10 +991,11 @@ Week 3: Architecture Polish
   Thu:     Validation gate (no C901 violations, ADRs written)
   Fri:     Final PR review → merge Phase 7
 
-Week 4: CLI Improvements (Optional but recommended)
+Week 4: CLI Improvements (Recommended before Phase 8)
   Mon-Tue: add-cli-input-validators (~3h)
-  Wed:     refactor-cli-error-handling (~2h)
-  Thu:     Validation gate (CLI tests pass, error handling integrated)
+  Wed AM:  refactor-cli-error-handling (~2h)
+  Wed PM:  refactor-structured-error-results (~2.5h)
+  Thu:     Validation gate (CLI tests pass, structured errors working)
   Fri:     PR review → merge Phase 7b
 ```
 
