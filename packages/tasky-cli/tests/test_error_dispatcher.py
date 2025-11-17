@@ -1,3 +1,4 @@
+# ruff: noqa: D102
 """Unit tests for the error dispatcher module."""
 
 from __future__ import annotations
@@ -81,7 +82,10 @@ class TestErrorDispatcher:
         assert "Cannot transition from completed to cancelled" in message
         assert "tasky task reopen" in message
 
-    def test_invalid_state_transition_error_with_unknown_statuses(self, dispatcher: ErrorDispatcher) -> None:
+    def test_invalid_state_transition_error_with_unknown_statuses(
+        self,
+        dispatcher: ErrorDispatcher,
+    ) -> None:
         task_id = uuid4()
         exc = InvalidStateTransitionError(
             task_id=task_id,
@@ -218,7 +222,7 @@ class TestErrorDispatcher:
             pass
 
         def handler(exc: CustomError, *, verbose: bool) -> str:  # pragma: no cover - simple stub
-            base = "Error: custom handled"
+            base = f"Error: custom handled ({exc})"
             return base + (" verbose" if verbose else "")
 
         dispatcher.register(CustomError, handler, exit_code=7)
@@ -226,4 +230,5 @@ class TestErrorDispatcher:
         message = dispatcher.dispatch(CustomError(), verbose=True)
 
         assert dispatcher.exit_code == 7
-        assert "custom handled verbose" in message
+        assert "custom handled (" in message
+        assert "verbose" in message

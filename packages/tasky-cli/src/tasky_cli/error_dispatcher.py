@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import traceback
-from typing import Protocol
+from typing import Protocol, TypeVar, cast
 
 import typer
 from pydantic import ValidationError as PydanticValidationError
@@ -21,15 +21,18 @@ from tasky_tasks import (
 )
 from tasky_tasks.enums import TaskStatus
 
+ExcT_contra = TypeVar("ExcT_contra", bound=Exception, contravariant=True)
 
-class ErrorHandler(Protocol):
+
+class ErrorHandler(Protocol[ExcT_contra]):
     """Protocol for exception handler functions."""
 
-    def __call__(self, exc: Exception, *, verbose: bool) -> str:
+    def __call__(self, exc: ExcT_contra, *, verbose: bool) -> str:
         """Return a formatted error message for the provided exception."""
+        ...
 
 
-HandlerEntry = tuple[type[Exception], ErrorHandler, int]
+HandlerEntry = tuple[type[Exception], ErrorHandler[Exception], int]
 
 
 class ErrorDispatcher:
@@ -52,13 +55,14 @@ class ErrorDispatcher:
 
     def register(
         self,
-        exc_type: type[Exception],
-        handler: ErrorHandler,
+        exc_type: type[ExcT_contra],
+        handler: ErrorHandler[ExcT_contra],
         *,
         exit_code: int = 1,
     ) -> None:
         """Register a handler for a specific exception type."""
-        self._registry.append((exc_type, handler, exit_code))
+        entry: HandlerEntry = (exc_type, cast("ErrorHandler[Exception]", handler), exit_code)
+        self._registry.append(entry)
 
     def dispatch(self, exc: Exception, *, verbose: bool) -> str:
         """Route exception to the first matching handler and return a message."""
@@ -88,7 +92,7 @@ class ErrorDispatcher:
         self.register(KeyError, self._handle_backend_not_registered)
         self.register(PydanticValidationError, self._handle_pydantic_validation_error)
 
-    def _resolve_handler(self, exc: Exception) -> tuple[ErrorHandler, int]:
+    def _resolve_handler(self, exc: Exception) -> tuple[ErrorHandler[Exception], int]:
         """Return the first registered handler that matches the exception."""
         for exc_type, handler, exit_code in self._registry:
             if isinstance(exc, exc_type):
@@ -220,7 +224,9 @@ class ErrorDispatcher:
 
     def _handle_backend_not_registered(self, exc: KeyError, *, verbose: bool) -> str:
         details = exc.args[0] if exc.args else "Configured backend is not registered."
-        suggestion = "Update .tasky/config.toml or re-run 'tasky project init' with a valid backend."
+        suggestion = (
+            "Update .tasky/config.toml or re-run 'tasky project init' with a valid backend."
+        )
         return self._format_error(
             str(details),
             suggestion=suggestion,
@@ -272,20 +278,30 @@ class ErrorDispatcher:
         from_enum: TaskStatus | None
         to_enum: TaskStatus | None
         try:
-            from_enum = from_status if isinstance(from_status, TaskStatus) else TaskStatus(from_status)
+            from_enum = (
+                from_status
+                if isinstance(from_status, TaskStatus)
+                else TaskStatus(from_status)
+            )
         except ValueError:
             from_enum = None
         try:
-            to_enum = to_status if isinstance(to_status, TaskStatus) else TaskStatus(to_status)
+            to_enum = (
+                to_status
+                if isinstance(to_status, TaskStatus)
+                else TaskStatus(to_status)
+            )
         except ValueError:
             to_enum = None
 
         reopen_suggestion = f"Use 'tasky task reopen {task_id}' to make it pending first."
         completed_suggestion = (
-            f"Task is already completed. Use 'tasky task reopen {task_id}' if you want to make changes."
+            "Task is already completed. "
+            f"Use 'tasky task reopen {task_id}' if you want to make changes."
         )
         cancelled_suggestion = (
-            f"Task is already cancelled. Use 'tasky task reopen {task_id}' if you want to make changes."
+            "Task is already cancelled. "
+            f"Use 'tasky task reopen {task_id}' if you want to make changes."
         )
         suggestions = {
             (TaskStatus.CANCELLED, TaskStatus.COMPLETED): reopen_suggestion,
@@ -294,9 +310,12 @@ class ErrorDispatcher:
             (TaskStatus.CANCELLED, TaskStatus.CANCELLED): cancelled_suggestion,
             (TaskStatus.PENDING, TaskStatus.PENDING): "Task is already pending. No action needed.",
         }
-        if from_enum is not None and to_enum is not None:
-            if suggestion := suggestions.get((from_enum, to_enum)):
-                return suggestion
+        if (
+            from_enum is not None
+            and to_enum is not None
+            and (suggestion := suggestions.get((from_enum, to_enum)))
+        ):
+            return suggestion
         return f"Use 'tasky task list' to inspect the current status of task '{task_id}'."
 
     def _format_error(

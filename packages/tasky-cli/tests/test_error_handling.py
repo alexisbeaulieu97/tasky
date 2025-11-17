@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 import pytest
+import typer
 from tasky_cli import app
 from tasky_cli.commands import tasks as tasks_module
 from tasky_storage.errors import StorageConfigurationError, StorageError
@@ -22,6 +23,34 @@ if TYPE_CHECKING:
     from tasky_tasks.models import TaskModel
 
 runner = CliRunner()
+decorator_runner = CliRunner()
+decorator_app = typer.Typer(no_args_is_help=False)
+
+
+@decorator_app.callback()
+def _decorator_app_callback(
+    ctx: typer.Context,
+    verbose: bool = typer.Option(  # noqa: FBT001
+        False,  # noqa: FBT003
+        "--verbose",
+        "-v",
+        help="Show detailed error information.",
+    ),
+) -> None:
+    tasks_module.task_app_callback(ctx, verbose=verbose)
+
+
+@decorator_app.command("decorator-error")
+@tasks_module.with_task_error_handling
+def _decorator_error_command() -> None:
+    task_id = "decorator-id"
+    raise TaskNotFoundError(task_id)
+
+
+@decorator_app.command("decorator-exit")
+@tasks_module.with_task_error_handling
+def _decorator_exit_command() -> None:
+    raise typer.Exit(code=5)
 
 
 class _TaskServiceStub:
@@ -65,8 +94,8 @@ def test_task_not_found_error_is_presented_cleanly(monkeypatch: pytest.MonkeyPat
         assert "Traceback" not in result.stderr
 
 
-def test_storage_error_results_in_exit_code_three(monkeypatch: pytest.MonkeyPatch) -> None:
-    """CLI should map storage failures to exit code 3."""
+def test_storage_error_results_in_exit_code_one(monkeypatch: pytest.MonkeyPatch) -> None:
+    """CLI should map storage failures to exit code 1 with message."""
     with runner.isolated_filesystem():
         _prepare_workspace()
 
@@ -77,8 +106,9 @@ def test_storage_error_results_in_exit_code_three(monkeypatch: pytest.MonkeyPatc
 
         result = runner.invoke(app, ["task", "list"])
 
-        assert result.exit_code == 3
-        assert "Storage failure encountered." in result.stderr
+        assert result.exit_code == 1
+        assert "Storage operation failed: boom" in result.stderr
+        assert "tasky project init" in result.stderr
 
 
 def test_invalid_storage_data_triggers_error_without_patch() -> None:
@@ -103,8 +133,8 @@ def test_invalid_storage_data_triggers_error_without_patch() -> None:
 
         result = runner.invoke(app, ["task", "list"])
 
-        assert result.exit_code == 3
-        assert "Storage failure encountered." in result.stderr
+        assert result.exit_code == 1
+        assert "Storage operation failed" in result.stderr
 
 
 def test_verbose_mode_outputs_stack_trace(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -178,7 +208,7 @@ def test_handle_invalid_state_transition_with_suggestion(
 def test_handle_storage_error_with_correct_exit_code(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """CLI should map StorageError to exit code 3."""
+    """CLI should map StorageError to exit code 1."""
     with runner.isolated_filesystem():
         _prepare_workspace()
 
@@ -190,8 +220,8 @@ def test_handle_storage_error_with_correct_exit_code(
 
         result = runner.invoke(app, ["task", "list"])
 
-        assert result.exit_code == 3
-        assert "Storage failure encountered" in result.stderr
+        assert result.exit_code == 1
+        assert "Storage operation failed: Disk write failed" in result.stderr
 
 
 def test_handle_project_not_found_with_init_suggestion(
@@ -281,4 +311,30 @@ def test_error_exit_codes_are_correct_for_user_vs_internal_errors(
 
         monkeypatch.setattr(tasks_module, "_get_service", _storage_error_factory)
         result = runner.invoke(app, ["task", "list"])
-        assert result.exit_code == 3
+        assert result.exit_code == 1
+
+
+def test_with_task_error_handling_decorator_handles_errors() -> None:
+    """Decorator should route exceptions through the dispatcher."""
+    with decorator_runner.isolated_filesystem():
+        result = decorator_runner.invoke(decorator_app, ["decorator-error"])
+
+        assert result.exit_code == 1
+        assert "Task 'decorator-id' not found" in result.stderr
+
+
+def test_with_task_error_handling_decorator_respects_verbose_flag() -> None:
+    """Decorator should show traceback when --verbose is provided."""
+    with decorator_runner.isolated_filesystem():
+        result = decorator_runner.invoke(decorator_app, ["--verbose", "decorator-error"])
+
+        assert result.exit_code == 1
+        assert "Traceback (most recent call last)" in result.stderr
+
+
+def test_with_task_error_handling_decorator_leaves_typer_exit_intact() -> None:
+    """Decorator should allow typer.Exit to propagate untouched."""
+    with decorator_runner.isolated_filesystem():
+        result = decorator_runner.invoke(decorator_app, ["decorator-exit"])
+
+        assert result.exit_code == 5

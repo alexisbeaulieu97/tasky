@@ -64,11 +64,11 @@ def with_task_error_handling(func: F) -> F:  # noqa: UP047
             return func(*args, **kwargs)
         except typer.Exit:
             raise
-        except Exception as exc:  # pragma: no cover - defensive catch-all  # noqa: BLE001
+        except Exception as exc:  # pragma: no cover - defensive catch-all
             dispatcher = ErrorDispatcher()
             message = dispatcher.dispatch(exc, verbose=verbose)
             typer.echo(message, err=True)
-            raise typer.Exit(dispatcher.exit_code)
+            raise typer.Exit(dispatcher.exit_code) from exc
 
     return cast("F", wrapper)
 
