@@ -1,58 +1,20 @@
 """Unit tests for task filtering functionality."""
 
 from unittest.mock import Mock
-from uuid import UUID, uuid4
+from uuid import uuid4
 
 import pytest
 from tasky_tasks.exceptions import TaskValidationError
-from tasky_tasks.models import TaskFilter, TaskModel, TaskStatus
+from tasky_tasks.models import TaskModel, TaskStatus
 from tasky_tasks.service import TaskService
+
+from .conftest import InMemoryTaskRepository
 
 # Import StorageDataError for testing error handling
 try:
     from tasky_storage.errors import StorageDataError
 except ModuleNotFoundError:
     StorageDataError = type("StorageDataError", (Exception,), {})  # type: ignore[misc,assignment]
-
-
-class MockTaskRepository:
-    """Mock repository for testing filtering logic."""
-
-    def __init__(self, tasks: list[TaskModel] | None = None) -> None:
-        self.tasks = tasks or []
-
-    def initialize(self) -> None:
-        """Mock implementation of initialize."""
-
-    def save_task(self, task: TaskModel) -> None:
-        """Mock implementation of save_task."""
-
-    def get_task(self, task_id: UUID) -> TaskModel | None:
-        """Mock implementation of get_task."""
-        for task in self.tasks:
-            if task.task_id == task_id:
-                return task
-        return None
-
-    def get_all_tasks(self) -> list[TaskModel]:
-        """Mock implementation of get_all_tasks."""
-        return self.tasks
-
-    def delete_task(self, task_id: UUID) -> bool:  # noqa: ARG002
-        """Mock implementation of delete_task."""
-        return False
-
-    def task_exists(self, task_id: UUID) -> bool:
-        """Mock implementation of task_exists."""
-        return any(task.task_id == task_id for task in self.tasks)
-
-    def get_tasks_by_status(self, status: TaskStatus) -> list[TaskModel]:
-        """Mock implementation of get_tasks_by_status."""
-        return [task for task in self.tasks if task.status == status]
-
-    def find_tasks(self, task_filter: TaskFilter) -> list[TaskModel]:
-        """Mock implementation of find_tasks."""
-        return [task for task in self.tasks if task_filter.matches(task)]
 
 
 class TestTaskFiltering:
@@ -97,13 +59,13 @@ class TestTaskFiltering:
     @pytest.fixture
     def service_with_tasks(self, sample_tasks: list[TaskModel]) -> TaskService:
         """Create a service with sample tasks."""
-        repository = MockTaskRepository(tasks=sample_tasks)
+        repository = InMemoryTaskRepository.from_tasks(sample_tasks)
         return TaskService(repository=repository)
 
     @pytest.fixture
     def empty_service(self) -> TaskService:
         """Create a service with no tasks."""
-        repository = MockTaskRepository()
+        repository = InMemoryTaskRepository()
         return TaskService(repository=repository)
 
     def test_get_tasks_by_status_pending(self, service_with_tasks: TaskService) -> None:
@@ -165,7 +127,7 @@ class TestTaskFiltering:
 
     def test_get_tasks_by_status_converts_storage_error_to_domain_error(self) -> None:
         """Test that StorageDataError from repository is converted to TaskValidationError."""
-        repository = MockTaskRepository()
+        repository = InMemoryTaskRepository()
         # Mock the repository to throw StorageDataError
         repository.get_tasks_by_status = Mock(side_effect=StorageDataError("Corrupted data"))
         service = TaskService(repository=repository)
