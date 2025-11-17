@@ -58,6 +58,14 @@ class ProjectRegistryService:
     def _load(self) -> ProjectRegistry:
         """Load registry from disk.
 
+        Note: This loads the entire registry into memory. For the default limit
+        of 10,000 projects with ~500 bytes per project, this is approximately
+        5MB of RAM, which is acceptable. Lazy loading/streaming was considered
+        but deemed unnecessary given:
+        - Default limit prevents unbounded growth
+        - 10k projects ≈ 5-10MB RAM (well under 100MB requirement)
+        - JSON format makes streaming complex without significant benefit
+
         Returns:
             The loaded registry, or empty registry if file doesn't exist
 

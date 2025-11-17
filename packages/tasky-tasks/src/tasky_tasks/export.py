@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 from uuid import UUID, uuid4
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError
 from tasky_logging import get_logger  # type: ignore[import-untyped]
 
 from tasky_tasks.exceptions import (
@@ -167,8 +167,9 @@ class TaskImportExportService:
             msg = f"Failed to write export file: {exc}"
             logger.exception(msg)
             raise ExportError(msg) from exc
-        except Exception as exc:
-            msg = f"Export failed: {exc}"
+        except (ValueError, TypeError) as exc:
+            # JSON serialization errors (e.g., non-serializable data)
+            msg = f"Failed to serialize export data: {exc}"
             logger.exception(msg)
             raise ExportError(msg) from exc
         else:
@@ -336,7 +337,7 @@ class TaskImportExportService:
         """
         try:
             return ExportDocument.model_validate(data)
-        except Exception as exc:
+        except ValidationError as exc:
             msg = f"Invalid export format: {exc}"
             logger.exception(msg)
             raise InvalidExportFormatError(msg) from exc
@@ -401,10 +402,12 @@ class TaskImportExportService:
                 created_count += 1
                 existing_ids.add(task.task_id)  # Track for subsequent imports in same batch
 
-            except Exception as exc:  # noqa: BLE001  # Catch all to continue batch import
+            except (TaskImportError, ValueError) as exc:
+                # Expected import errors: validation failures, data issues
                 error_msg = f"Failed to import task '{snapshot.task_id}': {exc}"
                 logger.warning(error_msg)
                 errors.append(error_msg)
+            # Let programmer errors (TypeError, AttributeError, KeyError) propagate
 
         return ImportResult(
             total_processed=len(export_doc.tasks),
@@ -511,10 +514,12 @@ class TaskImportExportService:
                     created_count += 1
                     logger.debug("Created new task: %s", task.task_id)
 
-            except Exception as exc:  # noqa: BLE001  # Catch all to continue batch import
+            except (TaskImportError, ValueError) as exc:
+                # Expected import errors: validation failures, data issues
                 error_msg = f"Failed to import task '{snapshot.task_id}': {exc}"
                 logger.warning(error_msg)
                 errors.append(error_msg)
+            # Let programmer errors (TypeError, AttributeError, KeyError) propagate
 
         return ImportResult(
             total_processed=len(export_doc.tasks),
@@ -620,10 +625,12 @@ class TaskImportExportService:
                 if not dry_run:
                     self.task_service.repository.save_task(task)
                 created_count += 1
-            except Exception as exc:  # noqa: BLE001  # Catch all to continue batch import
+            except (TaskImportError, ValueError) as exc:
+                # Expected import errors: validation failures, data issues
                 error_msg = f"Failed to import task '{snapshot.task_id}': {exc}"
                 logger.warning(error_msg)
                 errors.append(error_msg)
+            # Let programmer errors (TypeError, AttributeError, KeyError) propagate
 
         return ImportResult(
             total_processed=len(export_doc.tasks),
