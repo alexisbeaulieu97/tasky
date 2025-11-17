@@ -188,40 +188,47 @@ class TaskFilter(BaseModel):
         description="Filter tasks whose name or details contain this text (case-insensitive).",
     )
 
-    def matches(self, task: TaskModel) -> bool:  # noqa: C901
-        """Check if a task matches all filter criteria (AND logic).
+    def matches(self, task: TaskModel) -> bool:
+        """Check whether ``task`` satisfies all configured criteria."""
 
-        Parameters
-        ----------
-        task:
-            The task to evaluate against filter criteria.
+        return all(
+            (
+                self._matches_statuses(task.status),
+                self._matches_created_after(task.created_at),
+                self._matches_created_before(task.created_at),
+                self._matches_name_contains(task.name, task.details),
+            ),
+        )
 
-        Returns
-        -------
-        bool:
-            True if the task matches all specified criteria, False otherwise.
+    def _matches_statuses(self, status: TaskStatus) -> bool:
+        """Return True when the status constraint is satisfied."""
 
-        """
-        # Status filter: task must be in one of the specified statuses
-        if self.statuses is not None and task.status not in self.statuses:
-            return False
+        if self.statuses is None:
+            return True
+        return status in self.statuses
 
-        # Created after filter (inclusive)
-        if self.created_after is not None and task.created_at < self.created_after:
-            return False
+    def _matches_created_after(self, created_at: datetime) -> bool:
+        """Return True when ``created_at`` is on/after the lower bound."""
 
-        # Created before filter (exclusive)
-        if self.created_before is not None and task.created_at >= self.created_before:
-            return False
+        if self.created_after is None:
+            return True
+        return created_at >= self.created_after
 
-        # Text search filter (case-insensitive, searches name and details)
-        if self.name_contains is not None:
-            search_text = self.name_contains.lower()
-            task_text = f"{task.name} {task.details}".lower()
-            if search_text not in task_text:
-                return False
+    def _matches_created_before(self, created_at: datetime) -> bool:
+        """Return True when ``created_at`` is before the upper bound."""
 
-        return True
+        if self.created_before is None:
+            return True
+        return created_at < self.created_before
+
+    def _matches_name_contains(self, name: str, details: str) -> bool:
+        """Return True when the text constraint matches name or details."""
+
+        if self.name_contains is None:
+            return True
+        search_text = self.name_contains.lower()
+        task_text = f"{name} {details}".lower()
+        return search_text in task_text
 
     def matches_snapshot(self, snapshot: dict[str, object]) -> bool:  # noqa: C901, PLR0911
         """Check if a task snapshot matches all filter criteria (AND logic).

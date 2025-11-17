@@ -471,7 +471,7 @@ class ProjectRegistryService:
             return True
         return item.name in self.SKIP_DIRS
 
-    def discover_projects(  # noqa: C901
+    def discover_projects(
         self,
         search_paths: list[Path],
         progress_callback: Callable[[int], None] | None = None,
@@ -479,50 +479,80 @@ class ProjectRegistryService:
         """Discover projects in the given search paths.
 
         Args:
-            search_paths: List of paths to search for projects
-            progress_callback: Optional callable that receives directories_checked
-                for progress updates
+            search_paths: Paths to inspect for Tasky metadata.
+            progress_callback: Optional callable that receives the number of
+                directories scanned.
 
         Returns:
-            List of discovered project metadata (deduplicated)
+            List of discovered project metadata (deduplicated).
 
         """
-        discovered: dict[Path, ProjectMetadata] = {}
-        directories_checked = 0
 
+        discovered: dict[Path, ProjectMetadata] = {}
+        for directory in self._iter_discovery_directories(search_paths, progress_callback):
+            metadata = self._build_discovered_project(directory)
+            if metadata and metadata.path not in discovered:
+                discovered[metadata.path] = metadata
+        return list(discovered.values())
+
+    def _iter_discovery_directories(
+        self,
+        search_paths: list[Path],
+        progress_callback: Callable[[int], None] | None = None,
+    ) -> Iterator[Path]:
+        """Yield directories to inspect while updating progress.
+
+        Args:
+            search_paths: Paths that should be traversed.
+            progress_callback: Optional callback invoked with the count of
+                directories inspected so far.
+
+        Yields:
+            Directory paths that should be examined for Tasky metadata.
+
+        """
+
+        directories_checked = 0
         for search_path in search_paths:
             if not search_path.exists():
                 logger.debug("Search path does not exist: %s", search_path)
                 continue
 
             logger.info("Discovering projects in: %s", search_path)
-
             for directory in self._walk_directories(search_path):
                 directories_checked += 1
                 if progress_callback:
                     progress_callback(directories_checked)
+                yield directory
 
-                tasky_dir = directory / ".tasky"
-                if tasky_dir.exists() and tasky_dir.is_dir():
-                    # Found a project
-                    project_path = directory.resolve()
-                    if project_path not in discovered:
-                        try:
-                            metadata = ProjectMetadata(
-                                name=project_path.name,
-                                path=project_path,
-                            )
-                        except Exception as exc:  # noqa: BLE001
-                            logger.warning(
-                                "Skipping invalid project at %s: %s",
-                                project_path,
-                                exc,
-                            )
-                            continue
-                        discovered[project_path] = metadata
-                        logger.debug("Discovered project: %s", project_path)
+    def _build_discovered_project(self, directory: Path) -> ProjectMetadata | None:
+        """Return ProjectMetadata when directory contains a Tasky project.
 
-        return list(discovered.values())
+        Args:
+            directory: Directory to evaluate.
+
+        Returns:
+            Project metadata if the directory contains a ``.tasky`` folder,
+            otherwise ``None``.
+
+        """
+
+        tasky_dir = directory / ".tasky"
+        if not tasky_dir.exists() or not tasky_dir.is_dir():
+            return None
+
+        project_path = directory.resolve()
+        try:
+            metadata = ProjectMetadata(
+                name=project_path.name,
+                path=project_path,
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Skipping invalid project at %s: %s", project_path, exc)
+            return None
+
+        logger.debug("Discovered project: %s", project_path)
+        return metadata
 
     def discover_and_register(
         self,
