@@ -42,7 +42,7 @@ Tick off each change as you complete it (mirrors the execution order below).
 - [x] 7.5 `extract-list-command-helpers` (33 tasks, ~3h)
 - [x] 7.6 `consolidate-repository-fakes` (24 tasks, ~2h)
 - [x] 7.7 `improve-performance-and-safety` (42 tasks, ~21h)
-- [ ] 7.8 `improve-architecture-and-documentation` (44 tasks, ~15h)
+- [x] 7.8 `improve-architecture-and-documentation` (44 tasks, ~15h)
 
 ### 🎯 Phase 7b: CLI Improvements (51 tasks, ~51 hours)
 - [ ] 7b.1 `add-cli-input-validators` (25 tasks, ~3h)
@@ -541,18 +541,18 @@ Only Phase 4's `standardize-config-format` is breaking:
 
 ## Effort Breakdown
 
-| Phase | Changes | Tasks | Hours | Complexity |
-|-------|---------|-------|-------|------------|
-| 1 | 4 | 50+ | 8-10 | Medium |
-| 1.5 | 1 | 12 | 0.5 | Low |
-| 2 | 1 | 32 | 7 | High |
-| 3 | 3 | 59+ | 14-16 | High |
-| 4 | 3 | 28 | 8-9 | Low-Med |
-| 4.4 | 1 | 13 | 0.5 | Low |
-| 5 | 1 | 48 | 18-20 | High |
-| 6 (Optional) | 1 | 8 | 6-8 | Low-Med |
-| **TOTAL (Phases 1-5)** | **11** | **242+** | **56-62** | **Balanced** |
-| **TOTAL (with optional Phase 6)** | **12** | **250+** | **62-70** | **Balanced** |
+| Phase                             | Changes | Tasks    | Hours     | Complexity   |
+| --------------------------------- | ------- | -------- | --------- | ------------ |
+| 1                                 | 4       | 50+      | 8-10      | Medium       |
+| 1.5                               | 1       | 12       | 0.5       | Low          |
+| 2                                 | 1       | 32       | 7         | High         |
+| 3                                 | 3       | 59+      | 14-16     | High         |
+| 4                                 | 3       | 28       | 8-9       | Low-Med      |
+| 4.4                               | 1       | 13       | 0.5       | Low          |
+| 5                                 | 1       | 48       | 18-20     | High         |
+| 6 (Optional)                      | 1       | 8        | 6-8       | Low-Med      |
+| **TOTAL (Phases 1-5)**            | **11**  | **242+** | **56-62** | **Balanced** |
+| **TOTAL (with optional Phase 6)** | **12**  | **250+** | **62-70** | **Balanced** |
 
 ---
 

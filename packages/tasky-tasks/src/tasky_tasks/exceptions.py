@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from tasky_tasks.models import TaskStatus
+from tasky_tasks.enums import TaskStatus
 
 
 class TaskDomainError(Exception):

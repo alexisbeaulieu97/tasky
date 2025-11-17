@@ -9,6 +9,7 @@ from pathlib import Path
 from tasky_tasks.service import TaskService
 
 from tasky_settings.backend_registry import registry
+from tasky_settings.configuration import get_settings
 
 # Backend initialization state (thread-safe)
 # Using a list to avoid global statement - mutable container can be modified
@@ -129,9 +130,6 @@ def create_task_service(project_root: Path | None = None) -> TaskService:
     """
     # Ensure backends are available before accessing registry
     _ensure_backends_registered()
-
-    # Import here to avoid circular dependency during module initialization
-    from tasky_settings import get_settings  # noqa: PLC0415
 
     # Find project root if not provided
     if project_root is None:

@@ -174,6 +174,16 @@ class JsonTaskRepository(BaseModel):
         return cls(storage=storage)
 
     def _load_document_optional(self) -> TaskDocument | None:
+        """Load task document from storage, returning None if file doesn't exist.
+
+        Returns:
+            TaskDocument if file exists and is valid, None if file not found
+
+        Raises:
+            StorageIOError: If I/O error occurs (other than FileNotFoundError)
+            StorageDataError: If document exists but validation fails
+
+        """
         try:
             return self._load_document()
         except StorageIOError as exc:
@@ -187,6 +197,16 @@ class JsonTaskRepository(BaseModel):
             raise
 
     def _load_document(self) -> TaskDocument:
+        """Load and validate task document from storage.
+
+        Returns:
+            Validated TaskDocument
+
+        Raises:
+            StorageIOError: If file cannot be read
+            StorageDataError: If document fails Pydantic validation
+
+        """
         data = self.storage.load()
         try:
             return TaskDocument.model_validate(data)
@@ -195,5 +215,14 @@ class JsonTaskRepository(BaseModel):
 
     @staticmethod
     def _is_file_not_found_error(error: StorageIOError) -> bool:
+        """Check if StorageIOError wraps a FileNotFoundError.
+
+        Args:
+            error: The StorageIOError to inspect
+
+        Returns:
+            True if the error's cause is FileNotFoundError
+
+        """
         cause = error.__cause__ or error.__context__
         return isinstance(cause, FileNotFoundError)

@@ -1,5 +1,6 @@
 """Task domain models and business logic for Tasky."""
 
+from tasky_tasks.enums import TaskStatus
 from tasky_tasks.exceptions import (
     ExportError,
     ImportExportError,
@@ -17,7 +18,8 @@ from tasky_tasks.export import (
     TaskImportExportService,
     TaskSnapshot,
 )
-from tasky_tasks.models import TaskFilter, TaskModel, TaskStatus
+from tasky_tasks.models import TaskFilter, TaskModel
+from tasky_tasks.service import TaskService
 
 __all__ = [
     "ExportDocument",
@@ -33,6 +35,7 @@ __all__ = [
     "TaskImportExportService",
     "TaskModel",
     "TaskNotFoundError",
+    "TaskService",
     "TaskSnapshot",
     "TaskStatus",
     "TaskValidationError",

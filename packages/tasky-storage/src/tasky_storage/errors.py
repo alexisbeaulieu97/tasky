@@ -23,6 +23,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from pydantic import ValidationError as PydanticValidationError
+
 if TYPE_CHECKING:
     from pydantic import ValidationError
 
@@ -85,11 +87,16 @@ class StorageDataError(StorageError):
     - Type mismatches
     - Constraint violations
 
+    This class implements the StorageErrorProtocol from tasky-tasks, allowing
+    the domain layer to catch storage errors without directly importing this class.
+
     Attributes:
         message: Error message with validation details
         cause: Original ValidationError for debugging
 
     """
+
+    __is_storage_error__ = True  # Marker for StorageErrorProtocol
 
     def __init__(self, exc: ValidationError | str, cause: Exception | None = None) -> None:
         """Initialize StorageDataError.
@@ -102,8 +109,6 @@ class StorageDataError(StorageError):
             Optional original exception for additional context
 
         """
-        from pydantic import ValidationError as PydanticValidationError  # noqa: PLC0415
-
         if isinstance(exc, PydanticValidationError):
             msg = f"Stored task data is invalid: {exc}"
             super().__init__(msg)

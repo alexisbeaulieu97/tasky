@@ -13,18 +13,13 @@ from tasky_logging import get_logger  # type: ignore[import-untyped]
 
 from tasky_tasks.exceptions import TaskNotFoundError, TaskValidationError
 from tasky_tasks.models import TaskFilter, TaskModel, TaskStatus
+from tasky_tasks.protocols import StorageErrorProtocol
 
 if TYPE_CHECKING:
     from datetime import datetime
     from uuid import UUID
 
     from tasky_tasks.ports import TaskRepository
-
-# Import StorageDataError or use a fallback if storage package is unavailable
-try:  # pragma: no cover - optional dependency at runtime
-    from tasky_storage.errors import StorageDataError
-except ModuleNotFoundError:  # pragma: no cover - fallback when storage is absent
-    StorageDataError = type("StorageDataError", (Exception,), {})  # type: ignore[misc,assignment]
 
 
 logger: logging.Logger = get_logger("tasks.service")  # type: ignore[no-untyped-call]
@@ -59,9 +54,12 @@ class TaskService:
         logger.debug("Getting task: id=%s", task_id)
         try:
             task = self.repository.get_task(task_id)
-        except StorageDataError as exc:
-            message = f"Stored data for task '{task_id}' is invalid."
-            raise TaskValidationError(message) from exc
+        except Exception as exc:
+            # Catch storage errors that implement the StorageErrorProtocol
+            if isinstance(exc, StorageErrorProtocol):
+                message = f"Stored data for task '{task_id}' is invalid."
+                raise TaskValidationError(message) from exc
+            raise
 
         if task is None:
             raise TaskNotFoundError(task_id)
@@ -98,9 +96,12 @@ class TaskService:
         logger.debug("Getting tasks by status: status=%s", status.value)
         try:
             tasks = self.repository.get_tasks_by_status(status)
-        except StorageDataError as exc:
-            message = "Unable to retrieve tasks due to corrupted data."
-            raise TaskValidationError(message) from exc
+        except Exception as exc:
+            # Catch storage errors that implement the StorageErrorProtocol
+            if isinstance(exc, StorageErrorProtocol):
+                message = "Unable to retrieve tasks due to corrupted data."
+                raise TaskValidationError(message) from exc
+            raise
 
         logger.debug("Retrieved tasks by status: status=%s, count=%d", status.value, len(tasks))
         return tasks
@@ -187,9 +188,12 @@ class TaskService:
         logger.debug("Finding tasks with filter: %s", task_filter)
         try:
             tasks = self.repository.find_tasks(task_filter)
-        except StorageDataError as exc:
-            message = "Unable to retrieve tasks due to corrupted data."
-            raise TaskValidationError(message) from exc
+        except Exception as exc:
+            # Catch storage errors that implement the StorageErrorProtocol
+            if isinstance(exc, StorageErrorProtocol):
+                message = "Unable to retrieve tasks due to corrupted data."
+                raise TaskValidationError(message) from exc
+            raise
 
         logger.debug("Found tasks: count=%d", len(tasks))
         return tasks
@@ -304,9 +308,12 @@ class TaskService:
         """
         try:
             removed = self.repository.delete_task(task_id)
-        except StorageDataError as exc:
-            message = f"Stored data for task '{task_id}' is invalid."
-            raise TaskValidationError(message) from exc
+        except Exception as exc:
+            # Catch storage errors that implement the StorageErrorProtocol
+            if isinstance(exc, StorageErrorProtocol):
+                message = f"Stored data for task '{task_id}' is invalid."
+                raise TaskValidationError(message) from exc
+            raise
 
         if not removed:
             raise TaskNotFoundError(task_id)

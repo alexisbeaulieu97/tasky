@@ -78,3 +78,11 @@ Current history is minimal (`Initial commit`), so set the bar with imperative, 7
 
 ## Architecture Notes
 Maintain the clean-layer design: feature domains (`tasky-tasks`, `tasky-projects`) expose pure models/services plus their repository interfaces, storage implements those interfaces, hooks broadcast lifecycle signals, settings wires everything, and the CLI (or any host) consumes the assembled services. Each new capability follows the same flow—define the schema, rules, and ports inside the relevant feature package, implement the ports inside `tasky-storage`, register hook events in `tasky-hooks`, and let `tasky-settings` expose a ready-made bundle to `tasky-cli`. Keep adapters swappable by depending only on the published protocols, and remove legacy code instead of keeping transitional toggles so the repo always reflects the active architecture.
+
+**Architecture Decision Records (ADRs)**: Key architectural decisions are documented in `docs/architecture/adr/`. Read these to understand why the system is structured the way it is:
+- [ADR-001: Backend Registry Pattern](docs/architecture/adr/0001-backend-registry-pattern.md) - How backends self-register without coupling
+- [ADR-002: Error Handling Strategy](docs/architecture/adr/0002-error-handling-strategy.md) - Protocol-based error decoupling
+- [ADR-003: Configuration Hierarchy](docs/architecture/adr/0003-configuration-hierarchy.md) - Settings precedence order
+- [ADR-004: Project Registry Storage](docs/architecture/adr/0004-project-registry-storage.md) - Why JSON instead of SQLite
+
+See [docs/architecture/adr/README.md](docs/architecture/adr/README.md) for the full ADR index and how to create new ADRs.

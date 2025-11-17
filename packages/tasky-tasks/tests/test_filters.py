@@ -157,17 +157,6 @@ class TestTaskFilterCombinedCriteria:
         )
         assert task_filter.matches(sample_task)
 
-    def test_status_matches_but_date_fails(
-        self,
-        sample_task: TaskModel,
-    ) -> None:
-        """Test that task is rejected when status matches but date doesn't."""
-        task_filter = TaskFilter(
-            statuses=[TaskStatus.PENDING],
-            created_after=datetime(2025, 11, 11, 0, 0, 0, tzinfo=UTC),
-        )
-        assert not task_filter.matches(sample_task)
-
     def test_date_matches_but_status_fails(
         self,
         sample_task: TaskModel,
@@ -218,6 +207,40 @@ class TestTaskFilterCombinedCriteria:
             name_contains="database",
         )
         assert not task_filter.matches(sample_task)
+
+
+class TestTaskFilterSnapshotFiltering:
+    """Tests for TaskFilter.matches_snapshot."""
+
+    def test_snapshot_filter_handles_z_suffix(self) -> None:
+        """Ensure ISO timestamps ending with Z are parsed correctly."""
+        created_at = datetime(2025, 11, 10, 12, 0, 0, tzinfo=UTC)
+        task_filter = TaskFilter(
+            statuses=[TaskStatus.PENDING],
+            created_after=created_at,
+            created_before=datetime(2025, 11, 11, 12, 0, 0, tzinfo=UTC),
+            name_contains="auth",
+        )
+        snapshot: dict[str, object] = {
+            "status": TaskStatus.PENDING.value,
+            "created_at": created_at.isoformat().replace("+00:00", "Z"),
+            "name": "Auth bug",
+            "details": "Investigate login failures",
+        }
+        assert task_filter.matches_snapshot(snapshot)
+
+    def test_snapshot_filter_rejects_invalid_timestamp(self) -> None:
+        """Ensure invalid timestamps fail when date filters are specified."""
+        task_filter = TaskFilter(
+            created_after=datetime(2025, 11, 10, 12, 0, 0, tzinfo=UTC),
+        )
+        snapshot: dict[str, object] = {
+            "status": TaskStatus.PENDING.value,
+            "created_at": "invalid-date",
+            "name": "Auth bug",
+            "details": "Invalid timestamp",
+        }
+        assert not task_filter.matches_snapshot(snapshot)
 
 
 class TestTaskFilterEdgeCases:

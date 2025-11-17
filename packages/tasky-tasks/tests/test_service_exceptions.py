@@ -13,10 +13,19 @@ from tasky_tasks.service import TaskService
 if TYPE_CHECKING:
     from uuid import UUID
 
-try:
-    from tasky_storage.errors import StorageDataError
-except ModuleNotFoundError:  # pragma: no cover
-    StorageDataError = type("StorageDataError", (Exception,), {})  # type: ignore[misc,assignment]
+
+class _MockStorageError(Exception):
+    """Mock exception that implements StorageErrorProtocol."""
+
+    __is_storage_error__ = True  # Marker for StorageErrorProtocol
+
+    def __init__(self, message: str) -> None:
+        super().__init__(message)
+        self._message = message
+
+    def __str__(self) -> str:
+        """Return human-readable error message."""
+        return self._message
 
 
 class _FakeRepository:
@@ -43,7 +52,7 @@ class _FakeRepository:
         """Return task or None based on configuration."""
         if self._raise_data_error:
             message = "corrupt task payload"
-            raise StorageDataError(message)  # type: ignore[misc]
+            raise _MockStorageError(message)
         if self._return_none:
             return None
         if self._task and self._task.task_id == task_id:
@@ -72,7 +81,7 @@ class _FakeRepository:
         """Return success status based on configuration."""
         if self._raise_data_error:
             message = "corrupt task payload"
-            raise StorageDataError(message)  # type: ignore[misc]
+            raise _MockStorageError(message)
         if self._task:
             return self._task.task_id == task_id
         return False
@@ -138,3 +147,23 @@ def test_successful_operations_do_not_raise() -> None:
     assert retrieved is task
 
     assert service.delete_task(task.task_id) is True
+
+
+def test_storage_error_protocol_implementation() -> None:
+    """Verify that any exception matching StorageErrorProtocol is caught correctly.
+
+    This test ensures the service layer is properly decoupled from the storage
+    layer by using a protocol instead of concrete exception types.
+    """
+    repository = _FakeRepository(raise_data_error=True)
+    service = TaskService(repository)
+
+    # The mock error should be caught and converted to TaskValidationError
+    with pytest.raises(TaskValidationError) as exc_info:
+        service.get_task(uuid4())
+
+    assert "invalid" in str(exc_info.value).lower()
+
+    # Verify the original error is preserved in the chain
+    assert exc_info.value.__cause__ is not None
+    assert isinstance(exc_info.value.__cause__, _MockStorageError)
