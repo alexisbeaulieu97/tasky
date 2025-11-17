@@ -190,7 +190,8 @@ class ProjectRegistryService:
             )
             try:
                 parent_name = path.parent.name
-                candidate_name = f"{candidate_name} ({parent_name})"
+                # Use hyphen separator (allowed by validator) instead of parentheses
+                candidate_name = f"{candidate_name}-{parent_name}"
                 logger.debug("Trying disambiguation with parent name: '%s'", candidate_name)
 
                 # If still colliding, add numeric suffix

@@ -266,7 +266,9 @@ class TaskFilter(BaseModel):
         if created_at_str is not None and isinstance(created_at_str, str):
             try:
                 # Parse ISO 8601 datetime string
-                created_at = datetime.fromisoformat(created_at_str)
+                # Python's fromisoformat doesn't accept 'Z', so replace with +00:00
+                normalized_str = created_at_str.replace("Z", "+00:00")
+                created_at = datetime.fromisoformat(normalized_str)
             except (ValueError, TypeError):
                 # If parsing fails, skip this snapshot (invalid data)
                 return False
