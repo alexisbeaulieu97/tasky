@@ -85,11 +85,16 @@ class StorageDataError(StorageError):
     - Type mismatches
     - Constraint violations
 
+    This class implements the StorageErrorProtocol from tasky-tasks, allowing
+    the domain layer to catch storage errors without directly importing this class.
+
     Attributes:
         message: Error message with validation details
         cause: Original ValidationError for debugging
 
     """
+
+    __is_storage_error__ = True  # Marker for StorageErrorProtocol
 
     def __init__(self, exc: ValidationError | str, cause: Exception | None = None) -> None:
         """Initialize StorageDataError.

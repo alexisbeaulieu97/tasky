@@ -3,19 +3,12 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from enum import Enum
 from uuid import UUID, uuid4
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-
-class TaskStatus(Enum):
-    """Enumeration of possible task statuses."""
-
-    PENDING = "pending"
-    COMPLETED = "completed"
-    CANCELLED = "cancelled"
-
+from tasky_tasks.enums import TaskStatus
+from tasky_tasks.exceptions import InvalidStateTransitionError
 
 # Task state transition rules: maps each status to the set of valid target statuses
 # State diagram:
@@ -120,9 +113,6 @@ class TaskModel(BaseModel):
             status is not allowed.
 
         """
-        # Import here to avoid circular dependency (exceptions imports TaskStatus)
-        from tasky_tasks.exceptions import InvalidStateTransitionError  # noqa: PLC0415
-
         allowed_transitions = TASK_TRANSITIONS.get(self.status, set())
         if target_status not in allowed_transitions:
             raise InvalidStateTransitionError(
