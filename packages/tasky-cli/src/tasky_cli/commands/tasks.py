@@ -24,6 +24,7 @@ from tasky_tasks.enums import TaskStatus
 from tasky_tasks.service import TaskService
 
 from tasky_cli.error_dispatcher import ErrorDispatcher
+from tasky_hooks.errors import ErrorResult, format_error_for_cli
 from tasky_cli.validators import date_validator, status_validator, task_id_validator
 
 task_app = typer.Typer(no_args_is_help=True)
@@ -66,9 +67,10 @@ def with_task_error_handling(func: F) -> F:  # noqa: UP047
             raise
         except Exception as exc:  # pragma: no cover - defensive catch-all
             dispatcher = ErrorDispatcher()
-            message = dispatcher.dispatch(exc, verbose=verbose)
+            result = dispatcher.dispatch(exc, verbose=verbose)
+            message = format_error_for_cli(result)
             typer.echo(message, err=True)
-            raise typer.Exit(dispatcher.exit_code) from exc
+            raise typer.Exit(result.exit_code) from exc
 
     return cast("F", wrapper)
 

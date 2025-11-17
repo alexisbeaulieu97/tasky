@@ -7,6 +7,7 @@ from typing import Protocol, TypeVar, cast
 
 import typer
 from pydantic import ValidationError as PydanticValidationError
+from tasky_hooks.errors import ErrorResult
 from tasky_settings import ProjectNotFoundError
 from tasky_storage.errors import StorageError
 from tasky_tasks import (
@@ -25,14 +26,18 @@ ExcT_contra = TypeVar("ExcT_contra", bound=Exception, contravariant=True)
 
 
 class ErrorHandler(Protocol[ExcT_contra]):
-    """Protocol for exception handler functions."""
+    """Protocol for exception handler functions.
 
-    def __call__(self, exc: ExcT_contra, *, verbose: bool) -> str:
-        """Return a formatted error message for the provided exception."""
+    Handlers return structured ErrorResult instead of formatted strings,
+    allowing different transports (CLI, MCP, API) to format errors appropriately.
+    """
+
+    def __call__(self, exc: ExcT_contra, *, verbose: bool) -> ErrorResult:
+        """Return structured error information for the provided exception."""
         ...
 
 
-HandlerEntry = tuple[type[Exception], ErrorHandler[Exception], int]
+HandlerEntry = tuple[type[Exception], ErrorHandler[Exception]]
 
 
 class ErrorDispatcher:
@@ -43,36 +48,31 @@ class ErrorDispatcher:
         self._fallback: HandlerEntry = (
             Exception,
             self._handle_unexpected_error,
-            2,
         )
-        self._exit_code = 1
         self._register_default_handlers()
-
-    @property
-    def exit_code(self) -> int:
-        """Return the exit code produced by the most recent dispatch."""
-        return self._exit_code
 
     def register(
         self,
         exc_type: type[ExcT_contra],
         handler: ErrorHandler[ExcT_contra],
-        *,
-        exit_code: int = 1,
     ) -> None:
         """Register a handler for a specific exception type."""
-        entry: HandlerEntry = (exc_type, cast("ErrorHandler[Exception]", handler), exit_code)
+        entry: HandlerEntry = (exc_type, cast("ErrorHandler[Exception]", handler))
         self._registry.append(entry)
 
-    def dispatch(self, exc: Exception, *, verbose: bool) -> str:
-        """Route exception to the first matching handler and return a message."""
+    def dispatch(self, exc: Exception, *, verbose: bool) -> ErrorResult:
+        """Route exception to the first matching handler and return structured result.
+
+        Returns:
+            ErrorResult containing message, suggestion, exit_code, and optional traceback.
+
+        """
         if isinstance(exc, typer.Exit):
             raise exc
 
-        handler, exit_code = self._resolve_handler(exc)
-        message = handler(exc, verbose=verbose)
-        self._exit_code = exit_code
-        return message
+        handler = self._resolve_handler(exc)
+        result = handler(exc, verbose=verbose)
+        return result
 
     # ========== Registry Helpers ==========
 
@@ -87,22 +87,22 @@ class ErrorDispatcher:
         self.register(TaskImportError, self._handle_import_error)
         self.register(TaskDomainError, self._handle_generic_task_domain_error)
 
-        self.register(StorageError, self._handle_storage_error, exit_code=1)
+        self.register(StorageError, self._handle_storage_error)
         self.register(ProjectNotFoundError, self._handle_project_not_found)
         self.register(KeyError, self._handle_backend_not_registered)
         self.register(PydanticValidationError, self._handle_pydantic_validation_error)
 
-    def _resolve_handler(self, exc: Exception) -> tuple[ErrorHandler[Exception], int]:
+    def _resolve_handler(self, exc: Exception) -> ErrorHandler[Exception]:
         """Return the first registered handler that matches the exception."""
-        for exc_type, handler, exit_code in self._registry:
+        for exc_type, handler in self._registry:
             if isinstance(exc, exc_type):
-                return handler, exit_code
-        _, handler, exit_code = self._fallback
-        return handler, exit_code
+                return handler
+        _, handler = self._fallback
+        return handler
 
     # ========== Task Domain Error Handlers ==========
 
-    def _handle_task_not_found(self, exc: TaskNotFoundError, *, verbose: bool) -> str:
+    def _handle_task_not_found(self, exc: TaskNotFoundError, *, verbose: bool) -> ErrorResult:
         return self._format_error(
             f"Task '{exc.task_id}' not found.",
             suggestion="Run 'tasky task list' to view available tasks.",
@@ -115,7 +115,7 @@ class ErrorDispatcher:
         exc: TaskValidationError,
         *,
         verbose: bool,
-    ) -> str:
+    ) -> ErrorResult:
         suggestion = None
         if getattr(exc, "field", None):
             suggestion = f"Check the value provided for '{exc.field}'."
@@ -131,7 +131,7 @@ class ErrorDispatcher:
         exc: InvalidStateTransitionError,
         *,
         verbose: bool,
-    ) -> str:
+    ) -> ErrorResult:
         from_label = getattr(exc.from_status, "value", str(exc.from_status))
         to_label = getattr(exc.to_status, "value", str(exc.to_status))
         suggestion = self._suggest_transition(
@@ -151,7 +151,7 @@ class ErrorDispatcher:
         exc: InvalidExportFormatError,
         *,
         verbose: bool,
-    ) -> str:
+    ) -> ErrorResult:
         return self._format_error(
             f"Invalid file format: {exc}",
             suggestion="Ensure the file is a valid JSON export from tasky.",
@@ -164,7 +164,7 @@ class ErrorDispatcher:
         exc: IncompatibleVersionError,
         *,
         verbose: bool,
-    ) -> str:
+    ) -> ErrorResult:
         version_info = f" (found: {exc.actual})" if exc.actual else ""
         return self._format_error(
             f"Incompatible format version{version_info}.",
@@ -173,7 +173,7 @@ class ErrorDispatcher:
             exc=exc,
         )
 
-    def _handle_export_error(self, exc: ExportError, *, verbose: bool) -> str:
+    def _handle_export_error(self, exc: ExportError, *, verbose: bool) -> ErrorResult:
         return self._format_error(
             f"Export failed: {exc}",
             suggestion="Check file permissions and disk space.",
@@ -181,7 +181,7 @@ class ErrorDispatcher:
             exc=exc,
         )
 
-    def _handle_import_error(self, exc: TaskImportError, *, verbose: bool) -> str:
+    def _handle_import_error(self, exc: TaskImportError, *, verbose: bool) -> ErrorResult:
         return self._format_error(
             f"Import failed: {exc}",
             suggestion="Verify the import file exists and is readable.",
@@ -194,7 +194,7 @@ class ErrorDispatcher:
         exc: TaskDomainError,
         *,
         verbose: bool,
-    ) -> str:
+    ) -> ErrorResult:
         return self._format_error(
             str(exc) or "Task operation failed.",
             verbose=verbose,
@@ -203,18 +203,19 @@ class ErrorDispatcher:
 
     # ========== Storage Error Handler ==========
 
-    def _handle_storage_error(self, exc: StorageError, *, verbose: bool) -> str:
+    def _handle_storage_error(self, exc: StorageError, *, verbose: bool) -> ErrorResult:
         message = f"Storage operation failed: {exc}"
         return self._format_error(
             message,
             suggestion="Run 'tasky project init' or check the .tasky directory.",
             verbose=verbose,
             exc=exc,
+            exit_code=3,
         )
 
     # ========== Project Error Handlers ==========
 
-    def _handle_project_not_found(self, exc: ProjectNotFoundError, *, verbose: bool) -> str:
+    def _handle_project_not_found(self, exc: ProjectNotFoundError, *, verbose: bool) -> ErrorResult:
         return self._format_error(
             "No project found in current directory.",
             suggestion="Run 'tasky project init' to create a project.",
@@ -222,7 +223,7 @@ class ErrorDispatcher:
             exc=exc,
         )
 
-    def _handle_backend_not_registered(self, exc: KeyError, *, verbose: bool) -> str:
+    def _handle_backend_not_registered(self, exc: KeyError, *, verbose: bool) -> ErrorResult:
         details = exc.args[0] if exc.args else "Configured backend is not registered."
         suggestion = (
             "Update .tasky/config.toml or re-run 'tasky project init' with a valid backend."
@@ -241,7 +242,7 @@ class ErrorDispatcher:
         exc: PydanticValidationError,
         *,
         verbose: bool,
-    ) -> str:
+    ) -> ErrorResult:
         errors = exc.errors()
         if errors:
             first_error = errors[0]
@@ -259,12 +260,13 @@ class ErrorDispatcher:
 
     # ========== Fallback Handler ==========
 
-    def _handle_unexpected_error(self, exc: Exception, *, verbose: bool) -> str:
+    def _handle_unexpected_error(self, exc: Exception, *, verbose: bool) -> ErrorResult:
         return self._format_error(
             "An unexpected error occurred.",
             suggestion="Run with --verbose for details or file a bug report.",
             verbose=verbose,
             exc=exc,
+            exit_code=2,
         )
 
     # ========== Helper Methods ==========
@@ -279,18 +281,12 @@ class ErrorDispatcher:
         to_enum: TaskStatus | None
         try:
             from_enum = (
-                from_status
-                if isinstance(from_status, TaskStatus)
-                else TaskStatus(from_status)
+                from_status if isinstance(from_status, TaskStatus) else TaskStatus(from_status)
             )
         except ValueError:
             from_enum = None
         try:
-            to_enum = (
-                to_status
-                if isinstance(to_status, TaskStatus)
-                else TaskStatus(to_status)
-            )
+            to_enum = to_status if isinstance(to_status, TaskStatus) else TaskStatus(to_status)
         except ValueError:
             to_enum = None
 
@@ -325,12 +321,27 @@ class ErrorDispatcher:
         suggestion: str | None = None,
         verbose: bool,
         exc: Exception | None = None,
-    ) -> str:
-        parts = [f"Error: {message}"]
-        if suggestion:
-            parts.append(f"Suggestion: {suggestion}")
+        exit_code: int = 1,
+    ) -> ErrorResult:
+        """Build structured error result with optional traceback.
+
+        Args:
+            message: Primary error message
+            suggestion: Optional hint for resolving the error
+            verbose: Whether to include traceback
+            exc: Exception instance for traceback extraction
+            exit_code: Process exit code (1 for user errors, 2 for unexpected)
+
+        Returns:
+            ErrorResult with all error information
+
+        """
+        tb = None
         if verbose and exc is not None:
-            trace = "".join(traceback.format_exception(type(exc), exc, exc.__traceback__))
-            parts.append("")
-            parts.append(trace.rstrip())
-        return "\n".join(parts)
+            tb = "".join(traceback.format_exception(type(exc), exc, exc.__traceback__)).rstrip()
+        return ErrorResult(
+            message=message,
+            suggestion=suggestion,
+            exit_code=exit_code,
+            traceback=tb,
+        )

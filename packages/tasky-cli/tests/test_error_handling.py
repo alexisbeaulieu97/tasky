@@ -94,8 +94,8 @@ def test_task_not_found_error_is_presented_cleanly(monkeypatch: pytest.MonkeyPat
         assert "Traceback" not in result.stderr
 
 
-def test_storage_error_results_in_exit_code_one(monkeypatch: pytest.MonkeyPatch) -> None:
-    """CLI should map storage failures to exit code 1 with message."""
+def test_storage_error_results_in_exit_code_three(monkeypatch: pytest.MonkeyPatch) -> None:
+    """CLI should map storage failures to exit code 3 with message."""
     with runner.isolated_filesystem():
         _prepare_workspace()
 
@@ -106,7 +106,7 @@ def test_storage_error_results_in_exit_code_one(monkeypatch: pytest.MonkeyPatch)
 
         result = runner.invoke(app, ["task", "list"])
 
-        assert result.exit_code == 1
+        assert result.exit_code == 3
         assert "Storage operation failed: boom" in result.stderr
         assert "tasky project init" in result.stderr
 
@@ -133,7 +133,7 @@ def test_invalid_storage_data_triggers_error_without_patch() -> None:
 
         result = runner.invoke(app, ["task", "list"])
 
-        assert result.exit_code == 1
+        assert result.exit_code == 3
         assert "Storage operation failed" in result.stderr
 
 
@@ -208,7 +208,7 @@ def test_handle_invalid_state_transition_with_suggestion(
 def test_handle_storage_error_with_correct_exit_code(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """CLI should map StorageError to exit code 1."""
+    """CLI should map StorageError to exit code 3."""
     with runner.isolated_filesystem():
         _prepare_workspace()
 
@@ -220,7 +220,7 @@ def test_handle_storage_error_with_correct_exit_code(
 
         result = runner.invoke(app, ["task", "list"])
 
-        assert result.exit_code == 1
+        assert result.exit_code == 3
         assert "Storage operation failed: Disk write failed" in result.stderr
 
 
@@ -311,7 +311,7 @@ def test_error_exit_codes_are_correct_for_user_vs_internal_errors(
 
         monkeypatch.setattr(tasks_module, "_get_service", _storage_error_factory)
         result = runner.invoke(app, ["task", "list"])
-        assert result.exit_code == 1
+        assert result.exit_code == 3
 
 
 def test_with_task_error_handling_decorator_handles_errors() -> None:
