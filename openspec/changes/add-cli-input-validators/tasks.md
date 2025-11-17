@@ -11,7 +11,6 @@
 - [x] 2.3 Implement `TaskIdValidator` (UUID format validation)
 - [x] 2.4 Implement `DateValidator` (ISO 8601 format validation)
 - [x] 2.5 Implement `StatusValidator` (valid status values)
-- [x] 2.6 Implement `PriorityValidator` (valid priority values)
 - [x] 2.7 Write unit tests for all validators (80%+ coverage)
 - [x] 2.8 Run `uv run pytest packages/tasky-cli/tests/test_validators.py`
 
@@ -19,7 +18,7 @@
 
 - [x] 3.1 Update `show_command` to use `TaskIdValidator` before service invocation
 - [x] 3.2 Update `create_command` to validate task creation inputs
-- [x] 3.3 Update `update_command` to validate status/priority/due date
+- [x] 3.3 Update `update_command` to validate status and due date
 - [x] 3.4 Update `list_command` to validate filter inputs
 - [x] 3.5 Update `delete_command` to validate task ID
 - [x] 3.6 Update `complete_command` to validate task ID

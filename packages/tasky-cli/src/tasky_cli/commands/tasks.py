@@ -35,7 +35,7 @@ from tasky_tasks import (
 from tasky_tasks.enums import TaskStatus
 from tasky_tasks.service import TaskService
 
-from tasky_cli.validators import DateValidator, StatusValidator, TaskIdValidator
+from tasky_cli.validators import date_validator, status_validator, task_id_validator
 
 task_app = typer.Typer(no_args_is_help=True)
 
@@ -111,7 +111,7 @@ def _parse_task_id_and_get_service(task_id: str) -> tuple[TaskService, UUID]:
 
     """
     # Validate UUID format using TaskIdValidator
-    result = TaskIdValidator.validate(task_id)
+    result = task_id_validator.validate(task_id)
     if not result.is_valid:
         typer.echo(result.error_message, err=True)
         raise typer.Exit(1)
@@ -138,7 +138,7 @@ def _validate_status_filter(status: str | None) -> TaskStatus | None:
     if status is None:
         return None
 
-    result = StatusValidator.validate(status)
+    result = status_validator.validate(status)
     if not result.is_valid:
         typer.echo(result.error_message, err=True)
         raise typer.Exit(1)
@@ -162,7 +162,7 @@ def _parse_date_filter(date_str: str, *, inclusive_end: bool = False) -> datetim
 
     """
     # Validate date format using DateValidator
-    result = DateValidator.validate(date_str)
+    result = date_validator.validate(date_str)
     if not result.is_valid:
         typer.echo(result.error_message, err=True)
         raise typer.Exit(1)

@@ -3,10 +3,10 @@
 ### Conventions (Required)
 
 This change MUST follow project patterns:
-- **Model-driven validation**: Validation happens by attempting to create/parse Pydantic models. CLI catches `ValidationError` and displays user-friendly messages.
-- **No separate Validator protocol**: Don't create a standalone validation system. Use Pydantic `@field_validator` on models.
-- **ValidationResult usage**: Only as a light wrapper if needed for CLI-specific validation beyond model creation. Prefer raising Pydantic `ValidationError`.
-- **Typer integration**: Use `typer.Option()` with type hints; Typer and Pydantic handle validation together.
+- **Model-driven validation**: Validators SHALL be implemented as lightweight adapters around Pydantic models. Validators catch `ValidationError` and convert them into user-friendly messages returned via `ValidationResult`.
+- **Validator protocol**: All validators SHALL implement the shared `Validator[T]` protocol so commands can swap or stub validators in tests.
+- **ValidationResult usage**: Validators MUST NOT raise exceptions; they MUST always return a `ValidationResult`. CLI commands interpret the result and decide whether to proceed or exit.
+- **Typer integration**: Commands SHALL keep using Typer arguments/options for parsing, but MUST run validators before creating services so configuration errors are reported without hitting storage layers.
 
 ### Requirement: Input Validation Framework
 
@@ -69,24 +69,12 @@ The system SHALL validate dates in ISO 8601 format before applying to task field
 The system SHALL validate task status against allowed values before updating.
 
 #### Scenario: Valid status accepted
-- **WHEN** user specifies status "todo", "in_progress", or "completed"
+- **WHEN** user specifies status "pending", "completed", or "cancelled"
 - **THEN** validator SHALL accept and return status enum value
 
 #### Scenario: Invalid status rejected
 - **WHEN** user specifies unknown status (e.g., "in progress" with space or "done")
-- **THEN** validator SHALL reject with message listing valid options: "Invalid status. Choose from: todo, in_progress, completed"
-
-### Requirement: Priority Validation
-
-The system SHALL validate task priority against allowed values.
-
-#### Scenario: Valid priority accepted
-- **WHEN** user specifies priority "low", "normal", or "high"
-- **THEN** validator SHALL accept and return priority enum value
-
-#### Scenario: Invalid priority rejected
-- **WHEN** user specifies unknown priority (e.g., "critical" or "1")
-- **THEN** validator SHALL reject with message: "Invalid priority. Choose from: low, normal, high"
+- **THEN** validator SHALL reject with message listing valid options: "Invalid status. Choose from: pending, completed, cancelled"
 
 ### Requirement: Validation Integration in CLI Commands
 

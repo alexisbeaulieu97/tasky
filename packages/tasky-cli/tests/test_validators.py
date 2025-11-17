@@ -6,13 +6,7 @@ from datetime import UTC, datetime
 from uuid import UUID
 
 import pytest
-from tasky_cli.validators import (
-    DateValidator,
-    PriorityValidator,
-    StatusValidator,
-    TaskIdValidator,
-    ValidationResult,
-)
+from tasky_cli.validators import DateValidator, StatusValidator, TaskIdValidator, ValidationResult
 from tasky_tasks.enums import TaskStatus
 
 
@@ -48,10 +42,12 @@ class TestValidationResult:
 class TestTaskIdValidator:
     """Tests for TaskIdValidator."""
 
+    validator = TaskIdValidator()
+
     def test_valid_uuid_accepted(self) -> None:
         """Test that a valid UUID string is accepted and parsed."""
         valid_uuid = "550e8400-e29b-41d4-a716-446655440000"
-        result = TaskIdValidator.validate(valid_uuid)
+        result = self.validator.validate(valid_uuid)
 
         assert result.is_valid
         assert result.value == UUID(valid_uuid)
@@ -60,14 +56,14 @@ class TestTaskIdValidator:
     def test_valid_uuid_with_whitespace_accepted(self) -> None:
         """Test that a valid UUID with leading/trailing whitespace is accepted."""
         valid_uuid = "  550e8400-e29b-41d4-a716-446655440000  "
-        result = TaskIdValidator.validate(valid_uuid)
+        result = self.validator.validate(valid_uuid)
 
         assert result.is_valid
         assert result.value == UUID(valid_uuid.strip())
 
     def test_invalid_uuid_rejected(self) -> None:
         """Test that a non-UUID string is rejected with appropriate message."""
-        result = TaskIdValidator.validate("abc123")
+        result = self.validator.validate("abc123")
 
         assert not result.is_valid
         assert result.value is None
@@ -75,21 +71,21 @@ class TestTaskIdValidator:
 
     def test_empty_string_rejected(self) -> None:
         """Test that an empty string is rejected."""
-        result = TaskIdValidator.validate("")
+        result = self.validator.validate("")
 
         assert not result.is_valid
         assert result.error_message == "Invalid task ID: must be a valid UUID"
 
     def test_whitespace_only_rejected(self) -> None:
         """Test that whitespace-only string is rejected."""
-        result = TaskIdValidator.validate("   ")
+        result = self.validator.validate("   ")
 
         assert not result.is_valid
         assert result.error_message == "Invalid task ID: must be a valid UUID"
 
     def test_partial_uuid_rejected(self) -> None:
         """Test that a partial UUID is rejected."""
-        result = TaskIdValidator.validate("550e8400-e29b-41d4")
+        result = self.validator.validate("550e8400-e29b-41d4")
 
         assert not result.is_valid
         assert result.error_message == "Invalid task ID: must be a valid UUID"
@@ -98,9 +94,11 @@ class TestTaskIdValidator:
 class TestDateValidator:
     """Tests for DateValidator."""
 
+    validator = DateValidator()
+
     def test_valid_iso_date_accepted(self) -> None:
         """Test that a valid YYYY-MM-DD date is accepted."""
-        result = DateValidator.validate("2025-12-31")
+        result = self.validator.validate("2025-12-31")
 
         assert result.is_valid
         assert result.value == datetime(2025, 12, 31, tzinfo=UTC)
@@ -108,14 +106,14 @@ class TestDateValidator:
 
     def test_valid_date_with_whitespace_accepted(self) -> None:
         """Test that a valid date with leading/trailing whitespace is accepted."""
-        result = DateValidator.validate("  2025-12-31  ")
+        result = self.validator.validate("  2025-12-31  ")
 
         assert result.is_valid
         assert result.value == datetime(2025, 12, 31, tzinfo=UTC)
 
     def test_invalid_format_rejected(self) -> None:
         """Test that non-ISO format is rejected."""
-        result = DateValidator.validate("12/31/2025")
+        result = self.validator.validate("12/31/2025")
 
         assert not result.is_valid
         assert result.value is None
@@ -133,14 +131,14 @@ class TestDateValidator:
         ]
 
         for date_str in test_cases:
-            result = DateValidator.validate(date_str)
+            result = self.validator.validate(date_str)
             assert not result.is_valid, f"Should reject: {date_str}"
             assert result.error_message is not None
             assert "Invalid date format" in result.error_message
 
     def test_empty_string_rejected(self) -> None:
         """Test that an empty string is rejected."""
-        result = DateValidator.validate("")
+        result = self.validator.validate("")
 
         assert not result.is_valid
         assert result.error_message is not None
@@ -148,7 +146,7 @@ class TestDateValidator:
 
     def test_whitespace_only_rejected(self) -> None:
         """Test that whitespace-only string is rejected."""
-        result = DateValidator.validate("   ")
+        result = self.validator.validate("   ")
 
         assert not result.is_valid
         assert result.error_message is not None
@@ -156,7 +154,7 @@ class TestDateValidator:
 
     def test_invalid_date_values_rejected(self) -> None:
         """Test that dates with invalid values (e.g., month 13) are rejected."""
-        result = DateValidator.validate("2025-13-01")
+        result = self.validator.validate("2025-13-01")
 
         assert not result.is_valid
         assert result.error_message is not None
@@ -164,7 +162,7 @@ class TestDateValidator:
 
     def test_word_format_rejected(self) -> None:
         """Test that word formats like 'tomorrow' are rejected."""
-        result = DateValidator.validate("tomorrow")
+        result = self.validator.validate("tomorrow")
 
         assert not result.is_valid
         assert result.error_message is not None
@@ -172,7 +170,7 @@ class TestDateValidator:
 
     def test_partial_date_rejected(self) -> None:
         """Test that partial dates are rejected."""
-        result = DateValidator.validate("2025-12")
+        result = self.validator.validate("2025-12")
 
         assert not result.is_valid
         assert result.error_message is not None
@@ -181,6 +179,8 @@ class TestDateValidator:
 
 class TestStatusValidator:
     """Tests for StatusValidator."""
+
+    validator = StatusValidator()
 
     @pytest.mark.parametrize(
         ("status_str", "expected_status"),
@@ -194,7 +194,7 @@ class TestStatusValidator:
     )
     def test_valid_status_accepted(self, status_str: str, expected_status: TaskStatus) -> None:
         """Test that valid status values are accepted."""
-        result = StatusValidator.validate(status_str)
+        result = self.validator.validate(status_str)
 
         assert result.is_valid
         assert result.value == expected_status
@@ -202,7 +202,7 @@ class TestStatusValidator:
 
     def test_invalid_status_rejected(self) -> None:
         """Test that invalid status values are rejected."""
-        result = StatusValidator.validate("done")
+        result = self.validator.validate("done")
 
         assert not result.is_valid
         assert result.value is None
@@ -214,7 +214,7 @@ class TestStatusValidator:
 
     def test_status_with_space_rejected(self) -> None:
         """Test that status with spaces (e.g., 'in progress') is rejected."""
-        result = StatusValidator.validate("in progress")
+        result = self.validator.validate("in progress")
 
         assert not result.is_valid
         assert result.error_message is not None
@@ -222,7 +222,7 @@ class TestStatusValidator:
 
     def test_empty_string_rejected(self) -> None:
         """Test that an empty string is rejected."""
-        result = StatusValidator.validate("")
+        result = self.validator.validate("")
 
         assert not result.is_valid
         assert result.error_message is not None
@@ -230,66 +230,9 @@ class TestStatusValidator:
 
     def test_whitespace_only_rejected(self) -> None:
         """Test that whitespace-only string is rejected."""
-        result = StatusValidator.validate("   ")
+        result = self.validator.validate("   ")
 
         assert not result.is_valid
         assert result.error_message is not None
         assert "Invalid status" in result.error_message
 
-
-class TestPriorityValidator:
-    """Tests for PriorityValidator."""
-
-    @pytest.mark.parametrize(
-        "priority_str",
-        [
-            "low",
-            "normal",
-            "high",
-            "LOW",  # Case insensitive
-            "  high  ",  # Whitespace trimmed
-        ],
-    )
-    def test_valid_priority_accepted(self, priority_str: str) -> None:
-        """Test that valid priority values are accepted."""
-        result = PriorityValidator.validate(priority_str)
-
-        assert result.is_valid
-        assert result.value in {"low", "normal", "high"}
-        assert result.error_message is None
-
-    def test_invalid_priority_rejected(self) -> None:
-        """Test that invalid priority values are rejected."""
-        result = PriorityValidator.validate("critical")
-
-        assert not result.is_valid
-        assert result.value is None
-        assert result.error_message is not None
-        assert "Invalid priority" in result.error_message
-        assert "low" in result.error_message
-        assert "normal" in result.error_message
-        assert "high" in result.error_message
-
-    def test_numeric_priority_rejected(self) -> None:
-        """Test that numeric priorities (e.g., '1', '2') are rejected."""
-        result = PriorityValidator.validate("1")
-
-        assert not result.is_valid
-        assert result.error_message is not None
-        assert "Invalid priority" in result.error_message
-
-    def test_empty_string_rejected(self) -> None:
-        """Test that an empty string is rejected."""
-        result = PriorityValidator.validate("")
-
-        assert not result.is_valid
-        assert result.error_message is not None
-        assert "Invalid priority" in result.error_message
-
-    def test_whitespace_only_rejected(self) -> None:
-        """Test that whitespace-only string is rejected."""
-        result = PriorityValidator.validate("   ")
-
-        assert not result.is_valid
-        assert result.error_message is not None
-        assert "Invalid priority" in result.error_message
