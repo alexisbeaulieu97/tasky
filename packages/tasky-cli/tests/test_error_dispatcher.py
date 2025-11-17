@@ -81,6 +81,20 @@ class TestErrorDispatcher:
         assert "Cannot transition from completed to cancelled" in message
         assert "tasky task reopen" in message
 
+    def test_invalid_state_transition_error_with_unknown_statuses(self, dispatcher: ErrorDispatcher) -> None:
+        task_id = uuid4()
+        exc = InvalidStateTransitionError(
+            task_id=task_id,
+            from_status="UNKNOWN_STATUS",
+            to_status="OTHER_STATUS",
+        )
+
+        message = dispatcher.dispatch(exc, verbose=False)
+
+        assert dispatcher.exit_code == 1
+        assert "Cannot transition from UNKNOWN_STATUS to OTHER_STATUS" in message
+        assert "tasky task list" in message
+
     def test_invalid_export_format_error(self, dispatcher: ErrorDispatcher) -> None:
         exc = InvalidExportFormatError("Not a valid JSON file")
 

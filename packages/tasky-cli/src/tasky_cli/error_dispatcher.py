@@ -269,8 +269,16 @@ class ErrorDispatcher:
         to_status: TaskStatus | str,
         task_id: str,
     ) -> str:
-        from_enum = from_status if isinstance(from_status, TaskStatus) else TaskStatus(from_status)
-        to_enum = to_status if isinstance(to_status, TaskStatus) else TaskStatus(to_status)
+        from_enum: TaskStatus | None
+        to_enum: TaskStatus | None
+        try:
+            from_enum = from_status if isinstance(from_status, TaskStatus) else TaskStatus(from_status)
+        except ValueError:
+            from_enum = None
+        try:
+            to_enum = to_status if isinstance(to_status, TaskStatus) else TaskStatus(to_status)
+        except ValueError:
+            to_enum = None
 
         reopen_suggestion = f"Use 'tasky task reopen {task_id}' to make it pending first."
         completed_suggestion = (
@@ -286,10 +294,10 @@ class ErrorDispatcher:
             (TaskStatus.CANCELLED, TaskStatus.CANCELLED): cancelled_suggestion,
             (TaskStatus.PENDING, TaskStatus.PENDING): "Task is already pending. No action needed.",
         }
-        return suggestions.get(
-            (from_enum, to_enum),
-            f"Use 'tasky task list' to inspect the current status of task '{task_id}'.",
-        )
+        if from_enum is not None and to_enum is not None:
+            if suggestion := suggestions.get((from_enum, to_enum)):
+                return suggestion
+        return f"Use 'tasky task list' to inspect the current status of task '{task_id}'."
 
     def _format_error(
         self,
