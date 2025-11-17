@@ -233,7 +233,7 @@ class TaskFilter(BaseModel):
 
         return True
 
-    def matches_snapshot(self, snapshot: dict[str, object]) -> bool:  # noqa: C901
+    def matches_snapshot(self, snapshot: dict[str, object]) -> bool:  # noqa: C901, PLR0911
         """Check if a task snapshot matches all filter criteria (AND logic).
 
         This method performs filtering directly on the dictionary representation
@@ -262,22 +262,34 @@ class TaskFilter(BaseModel):
                 return False
 
         # Date filters require parsing ISO 8601 timestamps
-        created_at_str = snapshot.get("created_at")
-        if created_at_str is not None and isinstance(created_at_str, str):
+        # If any date filter is specified, reject snapshots without valid timestamps
+        if self.created_after is not None or self.created_before is not None:
+            created_at_str = snapshot.get("created_at")
+            if not created_at_str or not isinstance(created_at_str, str):
+                # Missing or invalid created_at when date filter is active
+                return False
+
             try:
                 # Parse ISO 8601 datetime string
                 # Python's fromisoformat doesn't accept 'Z', so replace with +00:00
                 normalized_str = created_at_str.replace("Z", "+00:00")
                 created_at = datetime.fromisoformat(normalized_str)
+
+                # Ensure timezone-aware: if naive, assume UTC
+                if created_at.tzinfo is None:
+                    from datetime import UTC  # noqa: PLC0415
+
+                    created_at = created_at.replace(tzinfo=UTC)
+
             except (ValueError, TypeError):
-                # If parsing fails, skip this snapshot (invalid data)
+                # If parsing fails and date filter is active, reject snapshot
                 return False
 
-            # Created after filter (inclusive)
+            # Created after filter (inclusive) - both datetimes are now timezone-aware
             if self.created_after is not None and created_at < self.created_after:
                 return False
 
-            # Created before filter (exclusive)
+            # Created before filter (exclusive) - both datetimes are now timezone-aware
             if self.created_before is not None and created_at >= self.created_before:
                 return False
 
