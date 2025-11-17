@@ -8,6 +8,7 @@ from tasky_settings.factory import ProjectNotFoundError, create_task_service, fi
 from tasky_settings.models import (
     AppSettings,
     LoggingSettings,
+    MCPServerSettings,
     ProjectRegistrySettings,
     StorageSettings,
     TaskDefaultsSettings,
@@ -22,6 +23,7 @@ __all__ = [
     "ProjectRegistrySettings",
     "StorageSettings",
     "TaskDefaultsSettings",
+    "MCPServerSettings",
     "create_task_service",
     "find_project_root",
     "get_project_registry_service",

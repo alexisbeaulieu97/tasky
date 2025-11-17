@@ -10,6 +10,8 @@ Tasky's clean architecture (service layer + storage abstraction + domain models)
 - Stateless, request-based operations (fits MCP model perfectly)
 - User control over project context (users manage projects, LLMs manage tasks)
 
+> **Scope update (2025-01-XX):** To ship value incrementally we are constraining this change to a stdio MCP server that exposes the five Tasky tools only. OAuth 2.1, rate limiting, richer metadata (priority/due date, dependencies), and other advanced capabilities will land in future changes.
+
 ## Design Principle
 
 **Tool Simplicity Over Completeness**: 5 focused, purposeful tools outperform 10+ individual tools. Each tool has a single, clear responsibility. Users manage projects; Claude manages tasks within assigned project context.
@@ -28,11 +30,10 @@ Tasky's clean architecture (service layer + storage abstraction + domain models)
   3. `edit_tasks` - Bulk edit/update/delete tasks (unified write operation)
   4. `search_tasks` - Find tasks with filters (returns compact format)
   5. `get_tasks` - Retrieve full task details by ID (relationships, descriptions)
-- Add service caching and connection pooling for long-lived connections
-- Implement request-scoped logging with correlation IDs
-- Add thread-safe wrappers for JSON backend operations
-- Create MCP server startup/shutdown infrastructure
-- Add configuration for MCP server (host, port, timeout, concurrency, project context)
+- Register the tools with `mcp.Server` and ship a `python -m tasky_mcp_server` stdio host
+- Add service caching plus request-scoped logging/trace IDs
+- Explicitly defer OAuth, rate limiting, and dependency/deadline metadata to later phases
+- Update documentation/tests to reflect the experimental MVP scope
 
 ## Design Philosophy
 

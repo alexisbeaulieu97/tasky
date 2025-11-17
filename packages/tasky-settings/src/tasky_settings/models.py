@@ -67,6 +67,65 @@ class ProjectRegistrySettings(BaseModel):
     )
 
 
+class MCPServerSettings(BaseSettings):
+    """Configuration for MCP server instances."""
+
+    model_config = SettingsConfigDict(
+        env_prefix="TASKY_MCP_",
+        case_sensitive=False,
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
+
+    host: str = Field(
+        default="127.0.0.1",
+        description="Host address to bind the MCP server to",
+    )
+    port: int = Field(
+        default=8080,
+        description="Port to bind the MCP server to",
+        ge=1,
+        le=65535,
+    )
+    timeout_seconds: int = Field(
+        default=60,
+        description="Request timeout in seconds",
+        ge=1,
+    )
+    max_concurrent_requests: int = Field(
+        default=10,
+        description="Maximum number of concurrent requests",
+        ge=1,
+    )
+    project_path: Path = Field(
+        default_factory=Path.cwd,
+        description="Project path for task operations",
+    )
+    oauth_issuer_url: str | None = Field(
+        default=None,
+        description="OAuth 2.1 provider issuer URL",
+    )
+    oauth_client_id: str | None = Field(
+        default=None,
+        description="OAuth client ID",
+    )
+    oauth_audience: str | None = Field(
+        default=None,
+        description="Expected token audience",
+    )
+    oauth_resource: str | None = Field(
+        default=None,
+        description="Resource indicator URI (RFC 8707)",
+    )
+
+    def oauth_enabled(self) -> bool:
+        """Return True when OAuth configuration is fully provided."""
+        return bool(
+            self.oauth_issuer_url and self.oauth_client_id and self.oauth_audience,
+        )
+
+
 class AppSettings(BaseSettings):
     """Application-wide settings with hierarchical configuration.
 
@@ -82,6 +141,7 @@ class AppSettings(BaseSettings):
         task_defaults: Default task creation settings
         storage: Storage backend configuration
         project_registry: Project registry configuration
+        mcp: MCP server configuration
 
     """
 
@@ -97,3 +157,4 @@ class AppSettings(BaseSettings):
     project_registry: ProjectRegistrySettings = Field(
         default_factory=ProjectRegistrySettings,
     )
+    mcp: MCPServerSettings = Field(default_factory=MCPServerSettings)

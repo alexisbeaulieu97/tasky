@@ -1,5 +1,7 @@
 ## ADDED Requirements
 
+> **Phase 1 scope:** This change delivers a stdio-based MCP server that exposes five Tasky tools (`project_info`, `create_tasks`, `edit_tasks`, `search_tasks`, `get_tasks`). Advanced capabilities such as OAuth 2.1, rate limiting, richer metadata (priority/due dates/dependencies), and concurrency controls are intentionally deferred to later changes. Sections marked _(Deferred)_ capture that future intent.
+
 ### Conventions (Required)
 
 This change MUST follow project patterns:
@@ -10,7 +12,7 @@ This change MUST follow project patterns:
 
 ### Requirement: MCP Server Implementation
 
-The system SHALL provide an MCP (Model Context Protocol) server that exposes Tasky functionality for use by Claude and other AI assistants. The server SHALL be stateless, request-based, and thread-safe.
+The system SHALL provide an MCP (Model Context Protocol) server that exposes Tasky functionality for use by Claude and other AI assistants. Phase 1 targets a stdio transport with the five core tools wired into `mcp.Server`; the server stays stateless/request-based and reuses the existing TaskService per project. Future transports (HTTP/WebSocket) remain out of scope for this phase.
 
 #### Scenario: Claude creates a task via MCP
 - **WHEN** Claude calls the `create_task` MCP tool with name="Buy groceries", details="Milk, eggs"
@@ -77,8 +79,8 @@ The MCP server SHALL provide ONLY the essential tools Claude needs for practical
 #### Tool 4: `search_tasks` - Find tasks with compact results
 - **Purpose**: Fast filtered search to identify relevant tasks
 - **Parameters**: status (optional), search (optional text), created_after (optional date), due_before (optional date)
-- **Returns**: Array of compact task summaries sorted by priority/due_date
-- **Compact format**: task_id, name, status, due_date, priority only (no descriptions/relationships)
+- **Returns**: Array of compact task summaries (task_id, name, status)
+- **Compact format**: task_id, name, status only (other metadata deferred until the domain publishes it)
 - **Use case**: Claude discovers which tasks match criteria before inspecting details
 - **Design**: Returns minimal data to prevent token waste; Claude uses get_tasks for deep inspection
 
@@ -123,7 +125,7 @@ The MCP server SHALL provide ONLY the essential tools Claude needs for practical
 
 ### Requirement: Error Handling & Reliability
 
-The MCP server SHALL handle errors gracefully, provide clear error messages, and enforce resource limits.
+The MCP server SHALL handle errors gracefully and provide clear error messages. For Phase 1 the server reuses existing Tasky validation plus the new MCP error helpers; rate limiting and per-backend concurrency controls remain deferred.
 
 #### Scenario: Invalid input is rejected with clear error
 - **WHEN** Claude provides invalid input (bad UUID, invalid status value)
@@ -137,16 +139,16 @@ The MCP server SHALL handle errors gracefully, provide clear error messages, and
 - **AND** error message indicates timeout (not generic failure)
 - **AND** resources are cleaned up
 
-#### Scenario: Concurrent operations are handled safely
+#### Scenario: Concurrent operations are handled safely _(Deferred)_
 - **WHEN** multiple MCP requests arrive simultaneously
 - **THEN** all are processed correctly (no data corruption)
 - **AND** JSON backend operations are serialized (thread-safe)
 - **AND** SQLite operations use connection pooling
 - **AND** no deadlocks occur
 
-### Requirement: Authentication & Authorization (OAuth 2.1 / RFC 8707)
+### Requirement: Authentication & Authorization _(Deferred)_
 
-The MCP server SHALL implement OAuth 2.1 authentication for HTTP-based deployments, following MCP June 2025 specification updates and RFC 8707 Resource Indicators.
+Full OAuth 2.1 / RFC 8707 compliance is out of scope for the stdio MVP. When the HTTP transport lands, the server SHALL implement token validation, resource indicators, and scope enforcement per this section. Until then, the server assumes trust in the local CLI/stdio connection.
 
 #### Scenario: Server implements OAuth 2.1 compliance
 - **GIVEN** MCP server configured with HTTP transport (host="0.0.0.0", port=9000)
@@ -193,7 +195,7 @@ The MCP server SHALL implement OAuth 2.1 authentication for HTTP-based deploymen
 
 ### Requirement: MCP Server Configuration
 
-The MCP server SHALL be configurable via environment variables or configuration files.
+The MCP server SHALL be configurable via environment variables or configuration files (via `AppSettings.mcp`). Host/port knobs are placeholders for future transports but remain harmless defaults for the stdio host.
 
 #### Scenario: Server can be customized
 - **GIVEN** MCP server startup
@@ -202,7 +204,7 @@ The MCP server SHALL be configurable via environment variables or configuration 
 - **AND** operations timeout after 60 seconds
 - **AND** max concurrent requests limit is enforced
 
-#### Scenario: Server can be started standalone
+#### Scenario: Server can be started standalone (stdio MVP)
 - **WHEN** running `python -m tasky_mcp_server`
 - **THEN** server starts on configured address
 - **AND** is ready to accept MCP connections

@@ -2,7 +2,12 @@
 
 import pytest
 from pydantic import ValidationError
-from tasky_settings.models import AppSettings, LoggingSettings, TaskDefaultsSettings
+from tasky_settings.models import (
+    AppSettings,
+    LoggingSettings,
+    MCPServerSettings,
+    TaskDefaultsSettings,
+)
 
 
 class TestLoggingSettings:
@@ -94,8 +99,10 @@ class TestAppSettings:
         settings = AppSettings()
         assert isinstance(settings.logging, LoggingSettings)
         assert isinstance(settings.task_defaults, TaskDefaultsSettings)
+        assert isinstance(settings.mcp, MCPServerSettings)
         assert settings.logging.verbosity == 0
         assert settings.task_defaults.priority == 3
+        assert settings.mcp.host == "127.0.0.1"
 
     def test_custom_logging_settings(self) -> None:
         """Test that custom logging settings can be provided."""
@@ -131,3 +138,33 @@ class TestAppSettings:
         assert settings.logging.verbosity == 1
         assert settings.logging.format == "standard"  # default preserved
         assert settings.task_defaults.priority == 3  # other section unaffected
+
+
+class TestMCPServerSettings:
+    """Tests for MCPServerSettings standalone behavior."""
+
+    def test_default_values(self) -> None:
+        """Ensure defaults mirror config expectations."""
+        settings = MCPServerSettings()
+        assert settings.host == "127.0.0.1"
+        assert settings.port == 8080
+        assert settings.timeout_seconds == 60
+        assert settings.max_concurrent_requests == 10
+        assert settings.oauth_enabled() is False
+
+    def test_custom_values(self) -> None:
+        """Custom initialization should respect provided values."""
+        settings = MCPServerSettings(
+            host="0.0.0.0",  # noqa: S104
+            port=9000,
+            timeout_seconds=120,
+            max_concurrent_requests=20,
+            oauth_issuer_url="https://issuer",
+            oauth_client_id="client",
+            oauth_audience="aud",
+        )
+        assert settings.host == "0.0.0.0"  # noqa: S104
+        assert settings.port == 9000
+        assert settings.timeout_seconds == 120
+        assert settings.max_concurrent_requests == 20
+        assert settings.oauth_enabled() is True
