@@ -6,6 +6,7 @@ import uuid
 from pathlib import Path
 
 import pytest
+from tasky_mcp_server.errors import MCPValidationError
 from tasky_mcp_server.tools import (
     CreateTasksRequest,
     EditTaskOperation,
@@ -189,7 +190,7 @@ class TestErrorHandling:
         """Test get_tasks with invalid UUID."""
         get_req = GetTasksRequest(task_ids=["not-a-uuid"])
 
-        with pytest.raises((ValueError, Exception), match="Invalid task_id"):
+        with pytest.raises(MCPValidationError, match="Invalid task_id"):
             get_tasks(task_service, get_req)
 
     def test_invalid_status_in_search(
@@ -199,7 +200,7 @@ class TestErrorHandling:
         """Test search_tasks with invalid status."""
         search_req = SearchTasksRequest(status="invalid_status")
 
-        with pytest.raises((ValueError, Exception), match="Invalid status"):
+        with pytest.raises(MCPValidationError, match="Invalid status"):
             search_tasks(task_service, search_req)
 
     def test_edit_nonexistent_task(
@@ -218,7 +219,7 @@ class TestErrorHandling:
             ],
         )
 
-        with pytest.raises(Exception, match=r"not found|does not exist"):
+        with pytest.raises(MCPValidationError):
             edit_tasks(task_service, edit_req)
 
     def test_invalid_action_in_edit(
@@ -237,7 +238,7 @@ class TestErrorHandling:
             ],
         )
 
-        with pytest.raises(Exception, match="Unknown action"):
+        with pytest.raises(MCPValidationError, match="Unknown action"):
             edit_tasks(task_service, edit_req)
 
 

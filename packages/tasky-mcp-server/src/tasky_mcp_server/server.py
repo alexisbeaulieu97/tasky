@@ -11,7 +11,7 @@ import uuid
 from collections.abc import Awaitable, Callable, Coroutine, MutableMapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 import mcp.types as mcp_types
 from mcp.server import NotificationOptions, Server
@@ -20,7 +20,12 @@ from pydantic import BaseModel, ValidationError
 from tasky_settings import create_task_service
 from tasky_tasks.service import TaskService
 
-from tasky_mcp_server.errors import MCPError, MCPTimeoutError, MCPValidationError
+from tasky_mcp_server.errors import (
+    MCPError,
+    MCPTimeoutError,
+    MCPValidationError,
+    map_domain_error_to_mcp,
+)
 from tasky_mcp_server.tools import (
     CreateTasksRequest,
     EditTasksRequest,
@@ -50,6 +55,7 @@ class ToolSpec:
 
 # Generic type for request parsing helpers
 RequestModel = TypeVar("RequestModel", bound=BaseModel)
+HandlerResult = TypeVar("HandlerResult")
 
 
 # Context variable for request correlation ID
@@ -106,6 +112,7 @@ class MCPServer:
         self._service_cache: dict[Path, TaskService] = {}
         self._cache_lock = threading.RLock()
         self._shutdown_handlers: list[Callable[[], None]] = []
+        self._concurrency_sem = asyncio.Semaphore(self.settings.max_concurrent_requests)
 
         # Set up request logging
         self.logger = RequestLoggingAdapter(
@@ -179,10 +186,10 @@ class MCPServer:
 
     async def handle_with_timeout(
         self,
-        coro: Coroutine[Any, Any, Any],
+        coro: Coroutine[Any, Any, HandlerResult],
         *,
         timeout_seconds: int | None = None,
-    ) -> Any:  # noqa: ANN401
+    ) -> HandlerResult:
         """Execute a coroutine with timeout enforcement.
 
         Args:
@@ -207,12 +214,12 @@ class MCPServer:
     async def run_tool(
         self,
         tool_name: str,
-        handler: Callable[..., Awaitable[Any]] | Callable[..., Any],
+        handler: Callable[..., Awaitable[HandlerResult]] | Callable[..., HandlerResult],
         /,
-        *args: Any,
+        *args: object,
         timeout_seconds: int | None = None,
-        **kwargs: Any,
-    ) -> Any:  # noqa: ANN401
+        **kwargs: object,
+    ) -> HandlerResult:
         """Execute a tool handler with request context, logging, and timeout enforcement.
 
         Args:
@@ -224,17 +231,23 @@ class MCPServer:
 
         Returns:
             Whatever the handler returns
+
         """
         request_id = self.set_request_context()
-        self.logger.info("Handling tool '%s' (request_id=%s)", tool_name, request_id)
+        self.logger.info(
+            "Handling tool '%s' (request_id=%s)",
+            tool_name,
+            request_id,
+        )
         try:
-            if asyncio.iscoroutinefunction(handler):
-                coro = handler(*args, **kwargs)
-            else:
-                coro = asyncio.to_thread(handler, *args, **kwargs)
-            result = await self.handle_with_timeout(coro, timeout_seconds=timeout_seconds)
-            self.logger.info("Completed tool '%s' (request_id=%s)", tool_name, request_id)
-            return result
+            async with self._concurrency_sem:
+                if asyncio.iscoroutinefunction(handler):
+                    coro = handler(*args, **kwargs)
+                else:
+                    coro = asyncio.to_thread(handler, *args, **kwargs)
+                result = await self.handle_with_timeout(coro, timeout_seconds=timeout_seconds)
+                self.logger.info("Completed tool '%s' (request_id=%s)", tool_name, request_id)
+                return result
         finally:
             request_id_var.set("no-request-id")
 
@@ -280,11 +293,18 @@ class MCPServer:
                     "type": "object",
                     "properties": {
                         "project_name": {"type": "string"},
+                        "project_description": {"type": "string"},
                         "project_path": {"type": "string"},
                         "available_statuses": {"type": "array", "items": {"type": "string"}},
                         "task_counts": {"type": "object"},
                     },
-                    "required": ["project_name", "project_path", "available_statuses", "task_counts"],
+                    "required": [
+                        "project_name",
+                        "project_description",
+                        "project_path",
+                        "available_statuses",
+                        "task_counts",
+                    ],
                 },
                 handler=self._tool_project_info,
             ),
@@ -361,6 +381,8 @@ class MCPServer:
                         "status": {"type": "string"},
                         "search": {"type": "string"},
                         "created_after": {"type": "string"},
+                        "limit": {"type": "integer", "minimum": 1, "maximum": 200},
+                        "offset": {"type": "integer", "minimum": 0},
                     },
                     "additionalProperties": False,
                 },
@@ -408,7 +430,10 @@ class MCPServer:
             ),
         }
 
-    async def _list_tools(self, _: mcp_types.ListToolsRequest | None = None) -> list[mcp_types.Tool]:
+    async def _list_tools(
+        self,
+        _: mcp_types.ListToolsRequest | None = None,
+    ) -> list[mcp_types.Tool]:
         return [
             mcp_types.Tool(
                 name=spec.name,
@@ -419,24 +444,28 @@ class MCPServer:
             for spec in self._tool_specs.values()
         ]
 
-    async def _call_tool(self, name: str, arguments: dict | None) -> mcp_types.CallToolResult:
-        payload_args = arguments or {}
+    async def _call_tool(
+        self,
+        name: str,
+        arguments: dict[str, Any] | None,
+    ) -> mcp_types.CallToolResult:
+        payload_args: dict[str, Any] = arguments or {}
         return await self.run_tool(name, self._execute_tool, name, payload_args)
 
     def _execute_tool(self, tool_name: str, arguments: dict[str, Any]) -> mcp_types.CallToolResult:
         spec = self._tool_specs.get(tool_name)
         if spec is None:
-            return self._error_call_result(f"Unknown tool '{tool_name}'")
+            return self._error_call_result(MCPValidationError(f"Unknown tool '{tool_name}'"))
 
         service = self.get_service()
         try:
             payload = spec.handler(service, arguments)
         except MCPError as exc:
-            return self._error_call_result(str(exc))
+            return self._error_call_result(exc)
         except ValidationError as exc:
-            return self._error_call_result(str(exc))
-        except Exception as exc:  # pragma: no cover - defensive
-            return self._error_call_result(str(exc))
+            return self._error_call_result(MCPValidationError(str(exc)))
+        except Exception as exc:  # pragma: no cover - defensive  # noqa: BLE001
+            return self._error_call_result(exc)
         return self._make_call_result(payload)
 
     def _make_call_result(self, payload: dict[str, Any]) -> mcp_types.CallToolResult:
@@ -445,17 +474,44 @@ class MCPServer:
             structuredContent=payload,
         )
 
-    def _error_call_result(self, message: str) -> mcp_types.CallToolResult:
+    def _error_call_result(self, error: Exception) -> mcp_types.CallToolResult:
+        request_id = request_id_var.get()
+        error_payload = self._build_error_payload(error, request_id)
+        text_message = f"[{request_id}] {error_payload['error']['message']}"
         return mcp_types.CallToolResult(
-            content=[mcp_types.TextContent(type="text", text=message)],
+            content=[mcp_types.TextContent(type="text", text=text_message)],
+            structuredContent=error_payload,
             isError=True,
         )
+
+    def _build_error_payload(self, error: Exception, request_id: str) -> dict[str, Any]:
+        if isinstance(error, MCPError):
+            mapped = map_domain_error_to_mcp(error)
+            suggestions = cast("MCPError", error).suggestions
+        else:
+            mapped = map_domain_error_to_mcp(error)
+            suggestions = None
+
+        payload: dict[str, Any] = {
+            "error": {
+                "code": mapped["code"],
+                "message": mapped["message"],
+                "request_id": request_id,
+            },
+        }
+        if suggestions:
+            payload["error"]["suggestions"] = suggestions
+        return payload
 
     # ========== Tool Logic ==========
 
     def _tool_project_info(self, service: TaskService, params: dict[str, Any]) -> dict[str, Any]:
         if params:
-            raise MCPValidationError("project_info does not accept parameters")
+            msg = "project_info does not accept parameters"
+            raise MCPValidationError(
+                msg,
+                suggestions=["Call without arguments"],
+            )
         response = project_info(service, self.settings.project_path)
         return response.model_dump(mode="json")
 

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Coroutine
 from pathlib import Path
 
 import pytest
@@ -123,7 +124,7 @@ async def test_run_tool_wraps_sync_handler(monkeypatch: pytest.MonkeyPatch) -> N
     captured: dict[str, int | None] = {"timeout": None}
 
     async def fake_handle(
-        coro,
+        coro: Coroutine[object, object, object],
         *,
         timeout_seconds: int | None = None,
     ) -> object:
@@ -154,12 +155,34 @@ async def test_run_tool_supports_async_handler() -> None:
 
 
 @pytest.mark.asyncio
+async def test_run_tool_enforces_concurrency_limit() -> None:
+    """run_tool should limit parallel executions per settings."""
+    settings = MCPServerSettings(max_concurrent_requests=1)
+    server = MCPServer(settings)
+    order: list[str] = []
+
+    async def handler(label: str) -> str:
+        order.append(f"start-{label}")
+        await asyncio.sleep(0.01)
+        order.append(f"end-{label}")
+        return label
+
+    async def invoke(label: str) -> str:
+        return await server.run_tool(f"tool-{label}", handler, label)
+
+    results = await asyncio.gather(invoke("a"), invoke("b"))
+
+    assert results == ["a", "b"]
+    assert order == ["start-a", "end-a", "start-b", "end-b"]
+
+
+@pytest.mark.asyncio
 async def test_list_tools_reports_all_registered_tools() -> None:
     """Ensure list_tools advertises all five Tasky tools."""
     settings = MCPServerSettings()
     server = MCPServer(settings)
 
-    tools = await server._list_tools(None)
+    tools = await server._list_tools(None)  # noqa: SLF001
 
     assert {tool.name for tool in tools} == {
         "project_info",
@@ -176,10 +199,27 @@ async def test_call_tool_project_info(monkeypatch: pytest.MonkeyPatch, tmp_path:
     settings = MCPServerSettings(project_path=tmp_path)
     server = MCPServer(settings)
     task_service = TaskService(InMemoryTaskRepository())
-    monkeypatch.setattr(server, "get_service", lambda project_path=None: task_service)
+    monkeypatch.setattr(server, "get_service", lambda _project_path=None: task_service)
 
-    result = await server._call_tool("project_info", {})
+    result = await server._call_tool("project_info", {})  # noqa: SLF001
 
     assert result.structuredContent is not None
     assert result.structuredContent["project_name"] == tmp_path.name
+    assert "project_description" in result.structuredContent
     assert not result.isError
+
+
+@pytest.mark.asyncio
+async def test_call_tool_error_includes_request_id(tmp_path: Path) -> None:
+    """Structured errors should include codes and request IDs."""
+    settings = MCPServerSettings(project_path=tmp_path)
+    server = MCPServer(settings)
+    (tmp_path / ".tasky").mkdir()
+    (tmp_path / ".tasky" / "config.toml").write_text('[backend]\nname = "json"\n')
+
+    result = await server._call_tool("project_info", {"unexpected": True})  # noqa: SLF001
+
+    assert result.isError
+    payload = result.structuredContent
+    assert payload["error"]["code"] == "validation_error"
+    assert isinstance(payload["error"].get("request_id"), str)

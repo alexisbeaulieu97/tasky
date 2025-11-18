@@ -10,18 +10,24 @@ This module implements the 5 core MCP tools:
 
 from __future__ import annotations
 
+import logging
+import tomllib
+from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, NoReturn
 from uuid import UUID
 
 from pydantic import BaseModel, Field
 from tasky_tasks.enums import TaskStatus
+from tasky_tasks.models import TaskModel
 
 from tasky_mcp_server.errors import MCPValidationError
 
 if TYPE_CHECKING:
     from tasky_tasks.service import TaskService
+
+logger = logging.getLogger(__name__)
 
 
 # ========== Tool Request/Response Models ==========
@@ -31,6 +37,7 @@ class ProjectInfoResponse(BaseModel):
     """Response for project_info tool."""
 
     project_name: str = Field(description="Name of the project")
+    project_description: str = Field(description="Description of the project")
     project_path: str = Field(description="Path to the project")
     available_statuses: list[str] = Field(
         description="Valid task status values",
@@ -104,6 +111,8 @@ class SearchTasksRequest(BaseModel):
         default=None,
         description="Filter by creation date (ISO format)",
     )
+    limit: int = Field(default=50, ge=1, le=200, description="Maximum tasks to return")
+    offset: int = Field(default=0, ge=0, description="Result offset for pagination")
 
 
 class TaskSummary(BaseModel):
@@ -160,8 +169,11 @@ def project_info(service: TaskService, project_path: Path) -> ProjectInfoRespons
         "cancelled": sum(1 for t in all_tasks if t.status == TaskStatus.CANCELLED),
     }
 
+    description = _load_project_description(project_path)
+
     return ProjectInfoResponse(
         project_name=project_path.name,
+        project_description=description,
         project_path=str(project_path),
         available_statuses=[s.value for s in TaskStatus],
         task_counts=task_counts,
@@ -186,21 +198,101 @@ def create_tasks(
 
     """
     created_tasks = []
+    persisted_task_ids: list[UUID] = []
 
-    for spec in request.tasks:
-        try:
-            # Create the task
+    try:
+        for spec in request.tasks:
             task = service.create_task(name=spec.name, details=spec.details or "N/A")
-
+            persisted_task_ids.append(task.task_id)
             created_tasks.append(task.model_dump(mode="json"))
-
-        except MCPValidationError:
-            raise
-        except Exception as e:
-            msg = f"Failed to create task '{spec.name}': {e}"
-            raise MCPValidationError(msg) from e
+    except MCPValidationError:
+        _rollback_created_tasks(service, persisted_task_ids)
+        raise
+    except Exception as e:
+        _rollback_created_tasks(service, persisted_task_ids)
+        msg = f"Failed to create task '{spec.name}': {e}"
+        raise MCPValidationError(
+            msg,
+            suggestions=["Verify task names and details are valid"],
+        ) from e
 
     return CreateTasksResponse(created=created_tasks)
+
+
+def _handle_update_action(
+    service: TaskService,
+    task_id: UUID,
+    op: EditTaskOperation,
+) -> dict[str, Any]:
+    """Handle update action on a task.
+
+    Args:
+        service: TaskService instance
+        task_id: UUID of the task to update
+        op: Edit operation with update details
+
+    Returns:
+        Updated task as dictionary
+
+    """
+    task = service.get_task(task_id)
+    if op.name is not None:
+        task.name = op.name
+    if op.details is not None:
+        task.details = op.details
+    service.update_task(task)
+    return task.model_dump(mode="json")
+
+
+def _handle_delete_action(
+    service: TaskService,
+    task_id: UUID,
+    op: EditTaskOperation,  # noqa: ARG001
+) -> dict[str, Any]:
+    """Handle delete action on a task.
+
+    Args:
+        service: TaskService instance
+        task_id: UUID of the task to delete
+        op: Edit operation (unused but kept for signature consistency)
+
+    Returns:
+        Deletion confirmation dictionary
+
+    """
+    service.delete_task(task_id)
+    return {
+        "task_id": str(task_id),
+        "status": "deleted",
+        "deletion_confirmed": True,
+    }
+
+
+def _handle_state_transition_action(
+    service: TaskService,
+    task_id: UUID,
+    action: str,
+) -> dict[str, Any]:
+    """Handle state transition actions (complete, cancel, reopen).
+
+    Args:
+        service: TaskService instance
+        task_id: UUID of the task to transition
+        action: Transition action name
+
+    Returns:
+        Updated task as dictionary
+
+    """
+    action_map = {
+        "complete": service.complete_task,
+        "cancel": service.cancel_task,
+        "reopen": service.reopen_task,
+    }
+    transition = action_map[action]
+    transition(task_id)
+    task = service.get_task(task_id)
+    return task.model_dump(mode="json")
 
 
 def edit_tasks(  # noqa: C901
@@ -220,78 +312,56 @@ def edit_tasks(  # noqa: C901
         MCPValidationError: If edit operation fails
 
     """
-
-    def _validate_action(action: str) -> None:
-        """Validate that the action is supported.
-
-        Args:
-            action: The action to validate
-
-        Raises:
-            MCPValidationError: If action is not supported
-
-        """
+    def _invalid_action(action: str) -> NoReturn:
         valid_actions = {"update", "delete", "complete", "cancel", "reopen"}
-        if action not in valid_actions:
-            msg = f"Unknown action: {action}"
-            raise MCPValidationError(msg)
+        msg = f"Unknown action: {action}"
+        raise MCPValidationError(
+            msg,
+            suggestions=[f"Valid actions: {', '.join(sorted(valid_actions))}"],
+        )
 
-    edited_tasks = []
+    edited_tasks: list[dict[str, Any]] = []
+    rollback_actions: list[Callable[[], None]] = []
 
-    for op in request.operations:
-        try:
-            # Parse task ID
+    try:
+        for op in request.operations:
             try:
                 task_id = UUID(op.task_id)
             except (ValueError, TypeError) as e:
                 msg = f"Invalid task_id: {op.task_id}"
-                raise MCPValidationError(msg) from e
+                raise MCPValidationError(
+                    msg,
+                    suggestions=["Provide a valid UUID"],
+                ) from e
 
-            # Get the task
+            # Create rollback snapshot before modification
             task = service.get_task(task_id)
+            snapshot = task.model_copy(deep=True)
 
-            # Perform the action
+            def _restore_snapshot(saved_task: TaskModel = snapshot) -> None:
+                service.repository.save_task(saved_task)  # type: ignore[attr-defined]
+
+            rollback_actions.append(_restore_snapshot)
+
+            # Execute action using handler dispatch
             if op.action == "update":
-                if op.name is not None:
-                    task.name = op.name
-                if op.details is not None:
-                    task.details = op.details
-                service.update_task(task)
-
+                result = _handle_update_action(service, task_id, op)
             elif op.action == "delete":
-                service.delete_task(task_id)
-                # Return a minimal response for deleted tasks
-                edited_tasks.append(
-                    {
-                        "task_id": str(task_id),
-                        "status": "deleted",
-                        "deletion_confirmed": True,
-                    },
-                )
-                continue
-
-            elif op.action == "complete":
-                service.complete_task(task_id)
-                task = service.get_task(task_id)
-
-            elif op.action == "cancel":
-                service.cancel_task(task_id)
-                task = service.get_task(task_id)
-
-            elif op.action == "reopen":
-                service.reopen_task(task_id)
-                task = service.get_task(task_id)
-
+                result = _handle_delete_action(service, task_id, op)
+            elif op.action in {"complete", "cancel", "reopen"}:
+                result = _handle_state_transition_action(service, task_id, op.action)
             else:
-                _validate_action(op.action)
+                _invalid_action(op.action)
 
-            edited_tasks.append(task.model_dump(mode="json"))
+            edited_tasks.append(result)
 
-        except MCPValidationError:
-            raise
-        except Exception as e:
-            msg = f"Failed to edit task '{op.task_id}': {e}"
-            raise MCPValidationError(msg) from e
+    except MCPValidationError:
+        _rollback_edits(rollback_actions)
+        raise
+    except Exception as e:
+        _rollback_edits(rollback_actions)
+        msg = f"Failed to edit task '{op.task_id}': {e}"
+        raise MCPValidationError(msg) from e
 
     return EditTasksResponse(edited=edited_tasks)
 
@@ -320,7 +390,10 @@ def search_tasks(  # noqa: C901
             tasks = service.get_tasks_by_status(status_enum)
         except ValueError as e:
             msg = f"Invalid status: {request.status}"
-            raise MCPValidationError(msg) from e
+            raise MCPValidationError(
+                msg,
+                suggestions=[f"Valid statuses: {', '.join(s.value for s in TaskStatus)}"],
+            ) from e
     else:
         tasks = service.get_all_tasks()
 
@@ -338,7 +411,10 @@ def search_tasks(  # noqa: C901
             tasks = [t for t in tasks if t.created_at >= created_after]
         except (ValueError, TypeError) as e:
             msg = f"Invalid created_after format: {request.created_after}"
-            raise MCPValidationError(msg) from e
+            raise MCPValidationError(
+                msg,
+                suggestions=["Use ISO 8601 timestamps, e.g. 2025-01-01T00:00:00+00:00"],
+            ) from e
 
     # Sort by status and created_at
     tasks_sorted = sorted(
@@ -356,7 +432,11 @@ def search_tasks(  # noqa: C901
         for t in tasks_sorted
     ]
 
-    return SearchTasksResponse(tasks=summaries, total_count=len(summaries))
+    offset = request.offset
+    limit = request.limit
+    paged = summaries[offset : offset + limit]
+
+    return SearchTasksResponse(tasks=paged, total_count=len(summaries))
 
 
 def get_tasks(service: TaskService, request: GetTasksRequest) -> GetTasksResponse:
@@ -382,9 +462,58 @@ def get_tasks(service: TaskService, request: GetTasksRequest) -> GetTasksRespons
             tasks.append(task.model_dump(mode="json"))
         except (ValueError, TypeError) as e:
             msg = f"Invalid task_id: {task_id_str}"
-            raise MCPValidationError(msg) from e
+            raise MCPValidationError(
+                msg,
+                suggestions=["Provide task IDs as UUID strings"],
+            ) from e
         except Exception as e:
             msg = f"Failed to get task '{task_id_str}': {e}"
             raise MCPValidationError(msg) from e
 
     return GetTasksResponse(tasks=tasks)
+
+
+def _rollback_created_tasks(service: TaskService, task_ids: list[UUID]) -> None:
+    """Rollback created tasks by deleting them (best effort).
+
+    Args:
+        service: TaskService instance
+        task_ids: List of task UUIDs to delete
+
+    """
+    for task_id in reversed(task_ids):
+        try:
+            service.delete_task(task_id)
+        except Exception as e:  # pragma: no cover - best effort cleanup  # noqa: BLE001
+            logger.debug("Rollback failed for task %s: %s", task_id, e)
+            continue
+
+
+def _rollback_edits(rollback_actions: list[Callable[[], None]]) -> None:
+    """Execute rollback actions in reverse order (best effort).
+
+    Args:
+        rollback_actions: List of rollback callables to execute
+
+    """
+    for i, action in enumerate(reversed(rollback_actions)):
+        try:
+            action()
+        except Exception as e:  # pragma: no cover - best effort cleanup  # noqa: BLE001
+            logger.debug("Rollback action %d failed: %s", len(rollback_actions) - i - 1, e)
+            continue
+
+
+def _load_project_description(project_path: Path) -> str:
+    config_file = project_path / ".tasky" / "config.toml"
+    if config_file.is_file():
+        try:
+            data = tomllib.loads(config_file.read_text(encoding="utf-8"))
+            project_section = data.get("project")
+            if isinstance(project_section, dict):
+                description = project_section.get("description")
+                if isinstance(description, str) and description.strip():
+                    return description.strip()
+        except Exception:  # pragma: no cover - config parsing best effort  # noqa: BLE001
+            return f"Tasky project at {project_path}"
+    return f"Tasky project at {project_path}"

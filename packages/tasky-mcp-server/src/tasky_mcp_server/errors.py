@@ -2,11 +2,35 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable, Mapping
+
 from tasky_tasks.exceptions import TaskDomainError
 
 
 class MCPError(TaskDomainError):
-    """Base class for MCP server errors."""
+    """Base class for MCP server errors with structured suggestions."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        suggestions: Iterable[str] | Mapping[str, object] | str | None = None,
+        **context: object,
+    ) -> None:
+        super().__init__(message, **context)
+        # Normalize suggestions to a JSON-serializable structure for error payloads
+        normalized: list[str] | dict[str, object] | None
+        if suggestions is None:
+            normalized = None
+        elif isinstance(suggestions, Mapping):
+            normalized = dict(suggestions)
+        elif isinstance(suggestions, str):
+            normalized = [suggestions]
+        elif isinstance(suggestions, Iterable):
+            normalized = [str(item) for item in suggestions]
+        else:
+            normalized = [str(suggestions)]
+        self.suggestions = normalized
 
 
 class MCPValidationError(MCPError):

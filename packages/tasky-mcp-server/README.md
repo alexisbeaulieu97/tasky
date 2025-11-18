@@ -8,7 +8,7 @@ Model Context Protocol (MCP) server for Tasky task management.
 
 ## Status
 
-> **Experimental preview:** The current package delivers Tasky-facing tool handlers, service caching, and configuration plumbing, but the MCP transport bindings, OAuth 2.1 enforcement, and concurrency/rate-limiting controls from the OpenSpec are still under development. Treat this as a foundation rather than a production-ready server.
+> **Phase 1 stdio MVP:** The server implements all 5 core MCP tools over stdio transport with service caching, request tracing, and graceful shutdown. OAuth 2.1, HTTP transport, and advanced concurrency controls are deferred to future phases. **Note:** JSON backend has known concurrency limitations (see Threading Model section) - use SQLite for multi-user scenarios.
 
 ## Features
 
@@ -63,7 +63,7 @@ uv run tasky tasks create "Update docs" "Document new API endpoints"
 ### 2. Start the MCP Server
 
 ```bash
-# Start server (defaults to localhost:8080)
+# Start server on stdio (host/port retained for future transports)
 uv run python -m tasky_mcp_server
 
 # Or specify custom configuration
@@ -71,6 +71,8 @@ uv run python -m tasky_mcp_server \
   --host 0.0.0.0 \
   --port 9000 \
   --project-path /path/to/project \
+  --timeout-seconds 120 \
+  --max-concurrent-requests 20 \
   --debug
 ```
 
@@ -86,6 +88,7 @@ Get project metadata, available status options, and task counts.
 ```json
 {
   "project_name": "my-project",
+  "project_description": "Project description",
   "project_path": "/Users/alice/my-project",
   "available_statuses": ["pending", "completed", "cancelled"],
   "task_counts": {"pending": 6, "completed": 3, "cancelled": 1}
@@ -130,7 +133,9 @@ Find tasks with filters. Supports status, substring, and created-after filters.
 {
   "status": "pending",
   "search": "review",
-  "created_after": "2025-01-01T00:00:00+00:00"
+  "created_after": "2025-01-01T00:00:00+00:00",
+  "limit": 25,
+  "offset": 0
 }
 ```
 
@@ -202,13 +207,27 @@ The server maintains a cache of `TaskService` instances keyed by project path. T
 
 Each request gets a unique correlation ID stored in a context variable. The logging adapter automatically includes this ID in all log messages for debugging multi-step workflows.
 
-### Threading Model
+### Threading Model and Concurrency
 
-The server is thread-safe with the following guarantees:
+The server implements concurrency controls with the following guarantees:
 
 - **Service cache**: Protected by `threading.RLock` for concurrent access
 - **Request isolation**: Each request gets its own context and correlation ID
-- **Backend safety**: JSON backend uses file locking; SQLite uses connection pooling
+- **Concurrent request limiting**: Semaphore caps concurrent requests (default: 10, configurable via `max_concurrent_requests`)
+
+**Known Limitations (Phase 1 - stdio MVP):**
+
+⚠️ **JSON Backend Concurrency**: The JSON backend is **not fully thread-safe for concurrent edits to the same project**. While the server limits concurrent requests via semaphore, concurrent operations within a single request window can experience race conditions:
+- Multiple concurrent requests to the same project may result in lost updates
+- Last-write-wins semantics apply (no optimistic locking or conflict detection)
+- Corruption risk is low for typical single-user stdio usage but increases with concurrent access
+
+**Recommendations:**
+- For single-user stdio scenarios (Phase 1 target), the risk is minimal
+- For multi-user or HTTP transport scenarios, use SQLite backend instead of JSON
+- Future phases will add per-project request serialization and optimistic locking
+
+**SQLite Backend**: Connection pooling ensures thread-safe concurrent access with proper transaction isolation.
 
 ### Graceful Shutdown
 

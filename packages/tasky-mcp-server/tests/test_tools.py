@@ -37,6 +37,7 @@ def test_project_info_basic(task_service: TaskService, tmp_path: Path) -> None:
 
     assert isinstance(response, ProjectInfoResponse)
     assert response.project_name == tmp_path.name
+    assert response.project_description.startswith("Tasky project")
     assert response.project_path == str(tmp_path)
     assert "pending" in response.available_statuses
     assert "completed" in response.available_statuses
@@ -83,6 +84,21 @@ def test_create_multiple_tasks(task_service: TaskService) -> None:
     assert len(response.created) == 3
     names = [t["name"] for t in response.created]
     assert names == ["Task 1", "Task 2", "Task 3"]
+
+
+def test_create_tasks_rolls_back_on_failure(task_service: TaskService) -> None:
+    """Ensure create_tasks leaves no partial results on failure."""
+    request = CreateTasksRequest(
+        tasks=[
+            TaskCreateSpec(name="Valid", details="ok"),
+            TaskCreateSpec(name="", details="bad"),
+        ],
+    )
+
+    with pytest.raises(MCPValidationError):
+        create_tasks(task_service, request)
+
+    assert task_service.get_all_tasks() == []
 
 
 # ========== edit_tasks Tests ==========
@@ -203,6 +219,23 @@ def test_edit_task_invalid_id(task_service: TaskService) -> None:
         edit_tasks(task_service, request)
 
 
+def test_edit_tasks_rolls_back_on_failure(task_service: TaskService) -> None:
+    """Ensure edit_tasks reverts earlier operations when one fails."""
+    task = task_service.create_task("Original", "Details")
+    request = EditTasksRequest(
+        operations=[
+            EditTaskOperation(task_id=str(task.task_id), action="update", name="Changed"),
+            EditTaskOperation(task_id=str(task.task_id), action="unknown"),
+        ],
+    )
+
+    with pytest.raises(MCPValidationError):
+        edit_tasks(task_service, request)
+
+    reloaded = task_service.get_task(task.task_id)
+    assert reloaded.name == "Original"
+
+
 def test_edit_multiple_tasks(task_service: TaskService) -> None:
     """Test editing multiple tasks in one request."""
     task1 = task_service.create_task("Task 1", "Details 1")
@@ -277,6 +310,19 @@ def test_search_compact_format(task_service: TaskService) -> None:
     assert task_summary.task_id is not None
     assert task_summary.name == "Test Task"
     assert task_summary.status == TaskStatus.PENDING.value
+
+
+def test_search_pagination(task_service: TaskService) -> None:
+    """Test pagination parameters limit returned tasks."""
+    for i in range(5):
+        task_service.create_task(f"Task {i}", f"Details {i}")
+
+    request = SearchTasksRequest(limit=2, offset=1)
+    response = search_tasks(task_service, request)
+
+    assert response.total_count == 5
+    assert len(response.tasks) == 2
+    assert response.tasks[0].name == "Task 1"
 
 
 # ========== get_tasks Tests ==========

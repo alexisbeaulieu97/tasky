@@ -1,9 +1,10 @@
+"""Tests for ErrorResult helpers."""
+
 from __future__ import annotations
 
 import json
 
 import pytest
-
 from tasky_hooks.errors import (
     ErrorResult,
     format_error_for_cli,
@@ -13,16 +14,19 @@ from tasky_hooks.errors import (
 
 
 def test_error_result_validation() -> None:
+    """ErrorResult should preserve fields."""
     result = ErrorResult(message="Boom", suggestion=None, exit_code=2, traceback=None)
     assert result.message == "Boom"
 
 
 def test_error_result_rejects_bad_exit_code() -> None:
-    with pytest.raises(ValueError):
+    """ErrorResult enforces positive exit codes."""
+    with pytest.raises(ValueError, match="exit_code must be > 0"):
         ErrorResult(message="bad", suggestion=None, exit_code=0, traceback=None)
 
 
 def test_cli_formatter_includes_traceback() -> None:
+    """CLI formatter should include suggestion and traceback."""
     result = ErrorResult(
         message="Missing task",
         suggestion="Run 'tasky task list'.",
@@ -38,6 +42,7 @@ def test_cli_formatter_includes_traceback() -> None:
 
 
 def test_mcp_serializer_and_log_fields() -> None:
+    """MCP serializer and log helpers should include exit code."""
     result = ErrorResult(
         message="Storage failure",
         suggestion="Check .tasky directory.",

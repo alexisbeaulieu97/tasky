@@ -12,6 +12,7 @@ from uuid import UUID
 
 import click
 import typer
+from tasky_hooks.errors import format_error_for_cli
 from tasky_settings import create_task_service, get_project_registry_service
 from tasky_settings.factory import find_project_root
 from tasky_tasks import (
@@ -24,7 +25,6 @@ from tasky_tasks.enums import TaskStatus
 from tasky_tasks.service import TaskService
 
 from tasky_cli.error_dispatcher import ErrorDispatcher
-from tasky_hooks.errors import ErrorResult, format_error_for_cli
 from tasky_cli.validators import date_validator, status_validator, task_id_validator
 
 task_app = typer.Typer(no_args_is_help=True)
