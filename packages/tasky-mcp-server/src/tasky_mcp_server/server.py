@@ -11,7 +11,7 @@ import uuid
 from collections.abc import Awaitable, Callable, Coroutine, MutableMapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, TypeVar, cast
+from typing import TYPE_CHECKING, Any, TypeVar
 
 import mcp.types as mcp_types
 from mcp.server import NotificationOptions, Server
@@ -28,9 +28,15 @@ from tasky_mcp_server.errors import (
 )
 from tasky_mcp_server.tools import (
     CreateTasksRequest,
+    CreateTasksResponse,
     EditTasksRequest,
+    EditTasksResponse,
     GetTasksRequest,
+    GetTasksResponse,
+    ProjectInfoRequest,
+    ProjectInfoResponse,
     SearchTasksRequest,
+    SearchTasksResponse,
     create_tasks,
     edit_tasks,
     get_tasks,
@@ -188,7 +194,7 @@ class MCPServer:
         self,
         coro: Coroutine[Any, Any, HandlerResult],
         *,
-        timeout_seconds: int | None = None,
+        timeout_seconds: float | None = None,
     ) -> HandlerResult:
         """Execute a coroutine with timeout enforcement.
 
@@ -217,7 +223,7 @@ class MCPServer:
         handler: Callable[..., Awaitable[HandlerResult]] | Callable[..., HandlerResult],
         /,
         *args: object,
-        timeout_seconds: int | None = None,
+        timeout_seconds: float | None = None,
         **kwargs: object,
     ) -> HandlerResult:
         """Execute a tool handler with request context, logging, and timeout enforcement.
@@ -266,166 +272,40 @@ class MCPServer:
     # ========== MCP Tool Registration ==========
 
     def _build_tool_specs(self) -> dict[str, ToolSpec]:
-        task_schema = {
-            "type": "object",
-            "properties": {
-                "task_id": {"type": "string"},
-                "name": {"type": "string"},
-                "details": {"type": "string"},
-                "status": {"type": "string"},
-                "created_at": {"type": "string"},
-                "updated_at": {"type": "string"},
-            },
-            "required": ["task_id", "name", "details", "status", "created_at", "updated_at"],
-            "additionalProperties": True,
-        }
-
         return {
             "project_info": ToolSpec(
                 name="project_info",
                 description="Return project metadata, status options, and task counts.",
-                input_schema={
-                    "type": "object",
-                    "properties": {},
-                    "additionalProperties": False,
-                },
-                output_schema={
-                    "type": "object",
-                    "properties": {
-                        "project_name": {"type": "string"},
-                        "project_description": {"type": "string"},
-                        "project_path": {"type": "string"},
-                        "available_statuses": {"type": "array", "items": {"type": "string"}},
-                        "task_counts": {"type": "object"},
-                    },
-                    "required": [
-                        "project_name",
-                        "project_description",
-                        "project_path",
-                        "available_statuses",
-                        "task_counts",
-                    ],
-                },
+                input_schema=ProjectInfoRequest.model_json_schema(),
+                output_schema=ProjectInfoResponse.model_json_schema(),
                 handler=self._tool_project_info,
             ),
             "create_tasks": ToolSpec(
                 name="create_tasks",
                 description="Create one or more tasks.",
-                input_schema={
-                    "type": "object",
-                    "properties": {
-                        "tasks": {
-                            "type": "array",
-                            "items": {
-                                "type": "object",
-                                "properties": {
-                                    "name": {"type": "string"},
-                                    "details": {"type": "string"},
-                                },
-                                "required": ["name"],
-                                "additionalProperties": True,
-                            },
-                            "minItems": 1,
-                        },
-                    },
-                    "required": ["tasks"],
-                },
-                output_schema={
-                    "type": "object",
-                    "properties": {
-                        "created": {"type": "array", "items": task_schema},
-                    },
-                    "required": ["created"],
-                },
+                input_schema=CreateTasksRequest.model_json_schema(),
+                output_schema=CreateTasksResponse.model_json_schema(),
                 handler=self._tool_create_tasks,
             ),
             "edit_tasks": ToolSpec(
                 name="edit_tasks",
                 description="Update, delete, or transition tasks in bulk.",
-                input_schema={
-                    "type": "object",
-                    "properties": {
-                        "operations": {
-                            "type": "array",
-                            "items": {
-                                "type": "object",
-                                "properties": {
-                                    "task_id": {"type": "string"},
-                                    "action": {"type": "string"},
-                                    "name": {"type": "string"},
-                                    "details": {"type": "string"},
-                                },
-                                "required": ["task_id", "action"],
-                                "additionalProperties": True,
-                            },
-                            "minItems": 1,
-                        },
-                    },
-                    "required": ["operations"],
-                },
-                output_schema={
-                    "type": "object",
-                    "properties": {
-                        "edited": {"type": "array", "items": task_schema},
-                    },
-                    "required": ["edited"],
-                },
+                input_schema=EditTasksRequest.model_json_schema(),
+                output_schema=EditTasksResponse.model_json_schema(),
                 handler=self._tool_edit_tasks,
             ),
             "search_tasks": ToolSpec(
                 name="search_tasks",
                 description="Find tasks using optional filters.",
-                input_schema={
-                    "type": "object",
-                    "properties": {
-                        "status": {"type": "string"},
-                        "search": {"type": "string"},
-                        "created_after": {"type": "string"},
-                        "limit": {"type": "integer", "minimum": 1, "maximum": 200},
-                        "offset": {"type": "integer", "minimum": 0},
-                    },
-                    "additionalProperties": False,
-                },
-                output_schema={
-                    "type": "object",
-                    "properties": {
-                        "tasks": {
-                            "type": "array",
-                            "items": {
-                                "type": "object",
-                                "properties": {
-                                    "task_id": {"type": "string"},
-                                    "name": {"type": "string"},
-                                    "status": {"type": "string"},
-                                },
-                                "required": ["task_id", "name", "status"],
-                            },
-                        },
-                        "total_count": {"type": "integer"},
-                    },
-                    "required": ["tasks", "total_count"],
-                },
+                input_schema=SearchTasksRequest.model_json_schema(),
+                output_schema=SearchTasksResponse.model_json_schema(),
                 handler=self._tool_search_tasks,
             ),
             "get_tasks": ToolSpec(
                 name="get_tasks",
                 description="Retrieve full task details for specific IDs.",
-                input_schema={
-                    "type": "object",
-                    "properties": {
-                        "task_ids": {
-                            "type": "array",
-                            "items": {"type": "string"},
-                            "minItems": 1,
-                        },
-                    },
-                    "required": ["task_ids"],
-                },
-                output_schema={
-                    "type": "object",
-                    "properties": {"tasks": {"type": "array", "items": task_schema}},
-                    "required": ["tasks"],
-                },
+                input_schema=GetTasksRequest.model_json_schema(),
+                output_schema=GetTasksResponse.model_json_schema(),
                 handler=self._tool_get_tasks,
             ),
         }
@@ -487,7 +367,7 @@ class MCPServer:
     def _build_error_payload(self, error: Exception, request_id: str) -> dict[str, Any]:
         if isinstance(error, MCPError):
             mapped = map_domain_error_to_mcp(error)
-            suggestions = cast("MCPError", error).suggestions
+            suggestions = error.suggestions
         else:
             mapped = map_domain_error_to_mcp(error)
             suggestions = None
@@ -506,12 +386,7 @@ class MCPServer:
     # ========== Tool Logic ==========
 
     def _tool_project_info(self, service: TaskService, params: dict[str, Any]) -> dict[str, Any]:
-        if params:
-            msg = "project_info does not accept parameters"
-            raise MCPValidationError(
-                msg,
-                suggestions=["Call without arguments"],
-            )
+        self._parse_request(ProjectInfoRequest, params)
         response = project_info(service, self.settings.project_path)
         return response.model_dump(mode="json")
 

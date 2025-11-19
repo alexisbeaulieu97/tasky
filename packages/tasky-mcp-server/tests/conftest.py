@@ -8,9 +8,10 @@ from uuid import UUID
 
 import pytest
 from tasky_settings.factory import create_task_service
+from tasky_tasks.enums import TaskStatus
 
 if TYPE_CHECKING:
-    from tasky_tasks.models import TaskModel
+    from tasky_tasks.models import TaskFilter, TaskModel
     from tasky_tasks.service import TaskService
 
 
@@ -29,6 +30,9 @@ class InMemoryTaskRepository:
             repo._tasks[task.task_id] = task
         return repo
 
+    def initialize(self) -> None:
+        """Initialize repository."""
+
     def create_task(self, task: TaskModel) -> TaskModel:
         """Create a task."""
         self._tasks[task.task_id] = task
@@ -45,6 +49,21 @@ class InMemoryTaskRepository:
     def get_all_tasks(self) -> list[TaskModel]:
         """Get all tasks."""
         return list(self._tasks.values())
+
+    def get_tasks_by_status(self, status: TaskStatus) -> list[TaskModel]:
+        """Get tasks by status."""
+        return [t for t in self._tasks.values() if t.status == status]
+
+    def find_tasks(self, task_filter: TaskFilter) -> list[TaskModel]:
+        """Find tasks by filter."""
+        tasks = list(self._tasks.values())
+        if task_filter.statuses:
+            tasks = [t for t in tasks if t.status in task_filter.statuses]
+        return tasks
+
+    def task_exists(self, task_id: UUID) -> bool:
+        """Check if task exists."""
+        return task_id in self._tasks
 
     def update_task(self, task: TaskModel) -> TaskModel:
         """Update a task."""

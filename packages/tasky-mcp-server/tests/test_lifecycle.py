@@ -1,4 +1,6 @@
-"""Server lifecycle tests for MCP server."""
+"""Tests for server lifecycle (startup, shutdown, caching)."""
+
+# pyright: reportPrivateUsage=false
 
 from __future__ import annotations
 

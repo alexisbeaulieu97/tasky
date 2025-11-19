@@ -1,10 +1,13 @@
 """Tests for MCP server core functionality."""
 
+# pyright: reportPrivateUsage=false
+
 from __future__ import annotations
 
 import asyncio
 from collections.abc import Coroutine
 from pathlib import Path
+from typing import Any
 
 import pytest
 from tasky_mcp_server.config import MCPServerSettings
@@ -58,7 +61,7 @@ def test_add_shutdown_hook() -> None:
     settings = MCPServerSettings()
     server = MCPServer(settings)
 
-    called = []
+    called: list[bool] = []
 
     def hook() -> None:
         called.append(True)
@@ -73,7 +76,7 @@ async def test_shutdown_runs_hooks() -> None:
     settings = MCPServerSettings()
     server = MCPServer(settings)
 
-    called = []
+    called: list[int] = []
 
     def hook1() -> None:
         called.append(1)
@@ -121,12 +124,12 @@ async def test_run_tool_wraps_sync_handler(monkeypatch: pytest.MonkeyPatch) -> N
     """run_tool should set request context and honor timeout overrides."""
     settings = MCPServerSettings()
     server = MCPServer(settings)
-    captured: dict[str, int | None] = {"timeout": None}
+    captured: dict[str, float | None] = {"timeout": None}
 
     async def fake_handle(
         coro: Coroutine[object, object, object],
         *,
-        timeout_seconds: int | None = None,
+        timeout_seconds: float | None = None,
     ) -> object:
         captured["timeout"] = timeout_seconds
         return await coro
@@ -199,13 +202,18 @@ async def test_call_tool_project_info(monkeypatch: pytest.MonkeyPatch, tmp_path:
     settings = MCPServerSettings(project_path=tmp_path)
     server = MCPServer(settings)
     task_service = TaskService(InMemoryTaskRepository())
-    monkeypatch.setattr(server, "get_service", lambda _project_path=None: task_service)
+
+    def mock_get_service(_project_path: Path | None = None) -> TaskService:
+        return task_service
+
+    monkeypatch.setattr(server, "get_service", mock_get_service)
 
     result = await server._call_tool("project_info", {})  # noqa: SLF001
 
     assert result.structuredContent is not None
-    assert result.structuredContent["project_name"] == tmp_path.name
-    assert "project_description" in result.structuredContent
+    content: dict[str, Any] = result.structuredContent  # type: ignore[reportGeneralTypeIssues]
+    assert content["project_name"] == tmp_path.name
+    assert "project_description" in content
     assert not result.isError
 
 
@@ -220,6 +228,6 @@ async def test_call_tool_error_includes_request_id(tmp_path: Path) -> None:
     result = await server._call_tool("project_info", {"unexpected": True})  # noqa: SLF001
 
     assert result.isError
-    payload = result.structuredContent
+    payload: dict[str, Any] = result.structuredContent  # type: ignore[reportGeneralTypeIssues]
     assert payload["error"]["code"] == "validation_error"
     assert isinstance(payload["error"].get("request_id"), str)

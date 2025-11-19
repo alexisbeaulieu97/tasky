@@ -23,10 +23,10 @@ class MCPError(TaskDomainError):
         if suggestions is None:
             normalized = None
         elif isinstance(suggestions, Mapping):
-            normalized = dict(suggestions)
+            normalized = dict(suggestions)  # type: ignore[reportUnknownArgumentType]
         elif isinstance(suggestions, str):
             normalized = [suggestions]
-        elif isinstance(suggestions, Iterable):
+        elif isinstance(suggestions, Iterable):  # type: ignore[reportUnnecessaryIsInstance]
             normalized = [str(item) for item in suggestions]
         else:
             normalized = [str(suggestions)]

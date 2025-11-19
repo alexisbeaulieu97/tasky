@@ -323,7 +323,7 @@ class TestTaskCreateErrorCases:
 
         result = runner.invoke(task_app, ["create", "Task", "Details"])
 
-        assert result.exit_code == 1  # Storage error treated as user-facing failure
+        assert result.exit_code == 3  # Storage error treated as system failure
         assert "Storage operation failed: Disk full" in result.stderr
 
     def test_create_task_project_not_found(

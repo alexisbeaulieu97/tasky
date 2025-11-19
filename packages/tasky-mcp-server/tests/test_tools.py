@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from pathlib import Path
-from uuid import UUID
 
 import pytest
 from tasky_mcp_server.errors import MCPValidationError
@@ -15,6 +14,7 @@ from tasky_mcp_server.tools import (
     ProjectInfoResponse,
     SearchTasksRequest,
     TaskCreateSpec,
+    TaskDeletionResult,
     create_tasks,
     edit_tasks,
     get_tasks,
@@ -22,6 +22,7 @@ from tasky_mcp_server.tools import (
     search_tasks,
 )
 from tasky_tasks.enums import TaskStatus
+from tasky_tasks.models import TaskModel
 from tasky_tasks.service import TaskService
 
 # ========== project_info Tests ==========
@@ -63,10 +64,9 @@ def test_create_single_task(task_service: TaskService) -> None:
 
     assert len(response.created) == 1
     task = response.created[0]
-    assert task["name"] == "Test Task"
-    assert task["details"] == "Test Details"
-    assert "task_id" in task
-    assert UUID(task["task_id"])  # Valid UUID
+    assert task.name == "Test Task"
+    assert task.details == "Test Details"
+    assert task.task_id is not None
 
 
 def test_create_multiple_tasks(task_service: TaskService) -> None:
@@ -82,7 +82,7 @@ def test_create_multiple_tasks(task_service: TaskService) -> None:
     response = create_tasks(task_service, request)
 
     assert len(response.created) == 3
-    names = [t["name"] for t in response.created]
+    names = [t.name for t in response.created]
     assert names == ["Task 1", "Task 2", "Task 3"]
 
 
@@ -122,8 +122,10 @@ def test_edit_task_update_name(task_service: TaskService) -> None:
     response = edit_tasks(task_service, request)
 
     assert len(response.edited) == 1
-    assert response.edited[0]["name"] == "Updated Name"
-    assert response.edited[0]["details"] == "Original Details"
+    result = response.edited[0]
+    assert isinstance(result, TaskModel)
+    assert result.name == "Updated Name"
+    assert result.details == "Original Details"
 
 
 def test_edit_task_update_details(task_service: TaskService) -> None:
@@ -144,7 +146,9 @@ def test_edit_task_update_details(task_service: TaskService) -> None:
     response = edit_tasks(task_service, request)
 
     assert len(response.edited) == 1
-    assert response.edited[0]["details"] == "Updated Details"
+    result = response.edited[0]
+    assert isinstance(result, TaskModel)
+    assert result.details == "Updated Details"
 
 
 def test_edit_task_complete(task_service: TaskService) -> None:
@@ -161,7 +165,7 @@ def test_edit_task_complete(task_service: TaskService) -> None:
     response = edit_tasks(task_service, request)
 
     assert len(response.edited) == 1
-    assert response.edited[0]["status"] == TaskStatus.COMPLETED.value
+    assert response.edited[0].status == TaskStatus.COMPLETED
 
 
 def test_edit_task_cancel(task_service: TaskService) -> None:
@@ -178,7 +182,7 @@ def test_edit_task_cancel(task_service: TaskService) -> None:
     response = edit_tasks(task_service, request)
 
     assert len(response.edited) == 1
-    assert response.edited[0]["status"] == TaskStatus.CANCELLED.value
+    assert response.edited[0].status == TaskStatus.CANCELLED
 
 
 def test_edit_task_delete(task_service: TaskService) -> None:
@@ -195,8 +199,10 @@ def test_edit_task_delete(task_service: TaskService) -> None:
     response = edit_tasks(task_service, request)
 
     assert len(response.edited) == 1
-    assert response.edited[0]["status"] == "deleted"
-    assert response.edited[0]["deletion_confirmed"] is True
+    result = response.edited[0]
+    assert isinstance(result, TaskDeletionResult)
+    assert result.status == "deleted"
+    assert result.deletion_confirmed is True
 
     # Verify task is actually deleted
     all_tasks = task_service.get_all_tasks()
@@ -255,8 +261,10 @@ def test_edit_multiple_tasks(task_service: TaskService) -> None:
     response = edit_tasks(task_service, request)
 
     assert len(response.edited) == 2
-    assert response.edited[0]["name"] == "Updated Task 1"
-    assert response.edited[1]["status"] == TaskStatus.COMPLETED.value
+    result1 = response.edited[0]
+    assert isinstance(result1, TaskModel)
+    assert result1.name == "Updated Task 1"
+    assert response.edited[1].status == TaskStatus.COMPLETED
 
 
 # ========== search_tasks Tests ==========
@@ -337,11 +345,11 @@ def test_get_single_task(task_service: TaskService) -> None:
     response = get_tasks(task_service, request)
 
     assert len(response.tasks) == 1
-    assert response.tasks[0]["task_id"] == task_id
-    assert response.tasks[0]["name"] == "Test Task"
-    assert response.tasks[0]["details"] == "Test Details"
-    assert "created_at" in response.tasks[0]
-    assert "updated_at" in response.tasks[0]
+    assert str(response.tasks[0].task_id) == task_id
+    assert response.tasks[0].name == "Test Task"
+    assert response.tasks[0].details == "Test Details"
+    assert response.tasks[0].created_at is not None
+    assert response.tasks[0].updated_at is not None
 
 
 def test_get_multiple_tasks(task_service: TaskService) -> None:
@@ -354,7 +362,7 @@ def test_get_multiple_tasks(task_service: TaskService) -> None:
     response = get_tasks(task_service, request)
 
     assert len(response.tasks) == 2
-    names = [t["name"] for t in response.tasks]
+    names = [t.name for t in response.tasks]
     assert set(names) == {"Task 1", "Task 2"}
 
 
@@ -376,7 +384,7 @@ def test_workflow_create_edit_search(task_service: TaskService) -> None:
         tasks=[TaskCreateSpec(name="Workflow Task", details="Initial details")],
     )
     create_resp = create_tasks(task_service, create_req)
-    task_id = create_resp.created[0]["task_id"]
+    task_id = str(create_resp.created[0].task_id)
 
     # Edit
     edit_req = EditTasksRequest(
