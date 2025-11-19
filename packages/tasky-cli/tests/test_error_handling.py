@@ -28,7 +28,7 @@ decorator_app = typer.Typer(no_args_is_help=False)
 
 
 @decorator_app.callback()
-def _decorator_app_callback(
+def _decorator_app_callback(  # pyright: ignore[reportUnusedFunction]
     ctx: typer.Context,
     verbose: bool = typer.Option(  # noqa: FBT001
         False,  # noqa: FBT003
@@ -42,14 +42,14 @@ def _decorator_app_callback(
 
 @decorator_app.command("decorator-error")
 @tasks_module.with_task_error_handling
-def _decorator_error_command() -> None:
+def _decorator_error_command() -> None:  # pyright: ignore[reportUnusedFunction]
     task_id = "decorator-id"
     raise TaskNotFoundError(task_id)
 
 
 @decorator_app.command("decorator-exit")
 @tasks_module.with_task_error_handling
-def _decorator_exit_command() -> None:
+def _decorator_exit_command() -> None:  # pyright: ignore[reportUnusedFunction]
     raise typer.Exit(code=5)
 
 

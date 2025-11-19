@@ -71,8 +71,7 @@ class ErrorDispatcher:
             raise exc
 
         handler = self._resolve_handler(exc)
-        result = handler(exc, verbose=verbose)
-        return result
+        return handler(exc, verbose=verbose)
 
     # ========== Registry Helpers ==========
 

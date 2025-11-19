@@ -84,6 +84,7 @@ class TestErrorDispatcher:
 
         assert result.exit_code == 1
         assert "Cannot transition from completed to cancelled" in result.message
+        assert result.suggestion is not None
         assert "tasky task reopen" in result.suggestion
 
     def test_invalid_state_transition_error_with_unknown_statuses(
@@ -101,6 +102,7 @@ class TestErrorDispatcher:
 
         assert result.exit_code == 1
         assert "Cannot transition from UNKNOWN_STATUS to OTHER_STATUS" in result.message
+        assert result.suggestion is not None
         assert "tasky task list" in result.suggestion
 
     def test_invalid_export_format_error(self, dispatcher: ErrorDispatcher) -> None:
@@ -110,6 +112,7 @@ class TestErrorDispatcher:
 
         assert result.exit_code == 1
         assert "Invalid file format: Not a valid JSON file" in result.message
+        assert result.suggestion is not None
         assert "valid JSON export" in result.suggestion
 
     def test_incompatible_version_error(self, dispatcher: ErrorDispatcher) -> None:
@@ -143,6 +146,7 @@ class TestErrorDispatcher:
 
         assert result.exit_code == 3
         assert "Storage operation failed: Database corruption detected" in result.message
+        assert result.suggestion is not None
         assert "tasky project init" in result.suggestion
 
     def test_project_not_found_error(self, dispatcher: ErrorDispatcher) -> None:
@@ -152,6 +156,7 @@ class TestErrorDispatcher:
 
         assert result.exit_code == 1
         assert "No project found in current directory" in result.message
+        assert result.suggestion is not None
         assert "tasky project init" in result.suggestion
 
     def test_backend_not_registered_error(self, dispatcher: ErrorDispatcher) -> None:
@@ -161,6 +166,7 @@ class TestErrorDispatcher:
 
         assert result.exit_code == 1
         assert "Backend 'sqlite' not found in registry" in result.message
+        assert result.suggestion is not None
         assert "config.toml" in result.suggestion
 
     def test_pydantic_validation_error(self, dispatcher: ErrorDispatcher) -> None:
@@ -175,6 +181,7 @@ class TestErrorDispatcher:
 
         assert result.exit_code == 1
         assert "for field 'age'" in result.message
+        assert result.suggestion is not None
         assert "Check your input values" in result.suggestion
 
     def test_pydantic_validation_error_with_empty_errors(self, dispatcher: ErrorDispatcher) -> None:
@@ -211,6 +218,7 @@ class TestErrorDispatcher:
 
         assert result.exit_code == 2
         assert "An unexpected error occurred" in result.message
+        assert result.suggestion is not None
         assert "Run with --verbose" in result.suggestion
 
     def test_verbose_mode_includes_traceback(self, dispatcher: ErrorDispatcher) -> None:

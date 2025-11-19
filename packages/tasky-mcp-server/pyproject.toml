@@ -1,0 +1,27 @@
+[project]
+name = "tasky-mcp-server"
+version = "0.1.0"
+description = "MCP (Model Context Protocol) server for Tasky task management"
+readme = "README.md"
+authors = [{ name = "Alexis Beaulieu", email = "alexisbeaulieu97@gmail.com" }]
+requires-python = ">=3.13"
+dependencies = [
+    "mcp>=1.1.2",
+    "tasky-logging",
+    "tasky-projects",
+    "tasky-settings",
+    "tasky-storage",
+    "tasky-tasks",
+    "typing-extensions>=4.12.0",
+]
+
+[build-system]
+requires = ["uv_build>=0.9.7,<0.10.0"]
+build-backend = "uv_build"
+
+[tool.uv.sources]
+tasky-logging = { workspace = true }
+tasky-projects = { workspace = true }
+tasky-settings = { workspace = true }
+tasky-storage = { workspace = true }
+tasky-tasks = { workspace = true }

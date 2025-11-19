@@ -10,6 +10,6 @@ from tasky_hooks.errors import (
 __all__ = [
     "ErrorResult",
     "format_error_for_cli",
-    "serialize_error_for_mcp",
     "log_fields_for_error",
+    "serialize_error_for_mcp",
 ]
