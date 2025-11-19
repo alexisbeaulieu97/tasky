@@ -7,7 +7,7 @@ import sys
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from tasky_hooks.events import BaseEvent, TaskUpdatedEvent
+    from tasky_hooks.events import BaseEvent
 
 logger = logging.getLogger("tasky.hooks.handlers")
 
@@ -33,11 +33,11 @@ def echo_handler(event: BaseEvent) -> None:
     # Print event-specific details if available
     if hasattr(event, "task_snapshot"):
         # We know it has task_snapshot, but mypy doesn't know the type
-        snapshot = getattr(event, "task_snapshot")
+        snapshot = event.task_snapshot
         print(f"  Task: {snapshot.name}", file=sys.stdout)
         print(f"  Status: {snapshot.status}", file=sys.stdout)
 
     if event.event_type == "task_updated" and hasattr(event, "updated_fields"):
         # Cast to TaskUpdatedEvent for type safety if needed, or just use getattr
-        updated_fields = getattr(event, "updated_fields")
+        updated_fields = event.updated_fields
         print(f"  Updated fields: {updated_fields}", file=sys.stdout)

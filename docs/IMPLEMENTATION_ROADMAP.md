@@ -8,7 +8,7 @@ This roadmap organizes all 18 OpenSpec changes across Phases 1-8 in optimal impl
 ## Overview
 
 **Total Effort (Phases 1-6)**: ~56-62 hours (COMPLETE ✅)
-**Total Effort (Phases 7-7b)**: ~105.5 hours of code quality + CLI improvements (Phase 7: ~98h, Phase 7b: ~7.5h)
+**Total Effort (Phases 7-7b)**: ~109.5 hours of code quality + CLI improvements (Phase 7: ~102h, Phase 7b: ~7.5h)
 **Total Effort (Phases 8+)**: TBD (MCP servers, hooks, advanced features)
 **Phases**: 6 completed (1, 1.5, 2, 3, 4, 4.4, 5, 6) + 2 in progress (7-7b) + future phases
 **Test Gate**: After each phase, run `uv run pytest` to ensure all tests still pass
@@ -34,7 +34,7 @@ Tick off each change as you complete it (mirrors the execution order below).
 - [x] 5.1 `add-project-registry`
 - [x] 6.1 `remove-json-config-support`
 
-### 🚀 Phase 7: Code Quality & Testing (279 tasks, ~98 hours)
+### 🚀 Phase 7: Code Quality & Testing (289 tasks, ~102 hours)
 - [x] 7.1 `improve-storage-backend-testing` (35 tasks, ~26h)
 - [x] 7.2 `improve-cli-test-coverage` (47 tasks, ~22h)
 - [x] 7.3 `refactor-storage-duplication` (30 tasks, ~7h)
@@ -43,6 +43,7 @@ Tick off each change as you complete it (mirrors the execution order below).
 - [x] 7.6 `consolidate-repository-fakes` (24 tasks, ~2h)
 - [x] 7.7 `improve-performance-and-safety` (42 tasks, ~21h)
 - [x] 7.8 `improve-architecture-and-documentation` (44 tasks, ~15h)
+- [ ] 7.9 `refactor-shared-dtos` (10 tasks, ~4h)
 
 ### 🎯 Phase 7b: CLI Improvements (78 tasks, ~7.5 hours)
 - [x] 7b.1 `add-cli-input-validators` (25 tasks, ~3h)
@@ -52,8 +53,9 @@ Tick off each change as you complete it (mirrors the execution order below).
 ### 🚀 Phase 8: AI Integration (45 tasks, ~40-50 hours)
 - [x] 8.1 `add-mcp-server` (MCP protocol integration for Claude)
 
-### 🎯 Phase 9: Event-Driven Automation (35 tasks, ~30-40 hours)
-- [ ] 9.1 `implement-task-hooks` (Lifecycle events and automation)
+### 🎯 Phase 9: Event-Driven Automation (41 tasks, ~33-43 hours)
+- [x] 9.1 `implement-task-hooks` (Lifecycle events and automation)
+- [ ] 9.2 `harden-hook-system` (Validation and documentation)
 
 ### 💾 Phase 10: Enterprise Features (55 tasks, ~50-60 hours)
 - [ ] 10.1 `add-advanced-backends` (PostgreSQL, multi-user, audit trails)
@@ -881,6 +883,17 @@ After completing all core features (Phases 1-6), comprehensive audit identified 
 /openspec:apply improve-architecture-and-documentation
 ```
 
+### 7.9 `refactor-shared-dtos`
+**Why Ninth in Phase 7**: Extract shared models to prevent circular dependencies
+**What**: Create `tasky-contracts` package for shared DTOs (TaskStatus, TaskSnapshot)
+**Tasks**: 10 | Hours: ~4 | Impact: Eliminates circular imports, cleaner architecture
+**Depends on**: 7.8 complete (architecture improvements)
+**Enables**: Cleaner hook implementation, better type safety
+
+```bash
+/openspec:apply refactor-shared-dtos
+```
+
 ### Phase 7 Validation Checkpoint ✓
 After Phase 7 completion:
 - Test coverage: 82.79% → 85%+ ✅
@@ -1061,6 +1074,17 @@ Week 4: CLI Improvements (Recommended before Phase 8)
 
 ```bash
 /openspec:apply implement-task-hooks
+```
+
+### 9.2 `harden-hook-system`
+**Why Second in Phase 9**: Ensure hook system is robust before widespread use
+**What**: Strict validation, concurrency safety, comprehensive documentation
+**Tasks**: 6 | Hours: ~3 | Impact: Prevents runtime errors, ensures thread safety
+**Depends on**: 9.1 complete (basic hook system)
+**Enables**: Reliable production usage of hooks
+
+```bash
+/openspec:apply harden-hook-system
 ```
 
 ---

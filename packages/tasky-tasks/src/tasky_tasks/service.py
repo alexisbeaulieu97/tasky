@@ -72,7 +72,7 @@ class TaskService:
                 task_id=task.task_id,
                 task_snapshot=self._create_snapshot(task),
                 project_root=self._project_root,
-            )
+            ),
         )
         return task
 
@@ -351,7 +351,7 @@ class TaskService:
                     old_snapshot=old_snapshot,
                     new_snapshot=new_snapshot,
                     updated_fields=updated_fields,
-                )
+                ),
             )
 
     def delete_task(self, task_id: UUID) -> bool:
@@ -380,7 +380,7 @@ class TaskService:
                 task_snapshot = self._create_snapshot(task)
         except Exception:
             logger.exception(
-                "Failed to retrieve task snapshot before deletion for task %s", task_id
+                "Failed to retrieve task snapshot before deletion for task %s", task_id,
             )
 
         try:
@@ -402,7 +402,7 @@ class TaskService:
                 TaskDeletedEvent(
                     task_id=task_id,
                     task_snapshot=task_snapshot,
-                )
+                ),
             )
 
         return True
@@ -448,7 +448,7 @@ class TaskService:
                 task_id=task.task_id,
                 task_snapshot=self._create_snapshot(task),
                 completion_timestamp=task.updated_at,
-            )
+            ),
         )
         return task
 
@@ -489,7 +489,7 @@ class TaskService:
                 task_id=task.task_id,
                 task_snapshot=self._create_snapshot(task),
                 previous_status=previous_status,
-            )
+            ),
         )
         return task
 
@@ -531,6 +531,6 @@ class TaskService:
                 task_snapshot=self._create_snapshot(task),
                 previous_status=previous_status,
                 new_status=task.status.value,
-            )
+            ),
         )
         return task

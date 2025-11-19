@@ -38,7 +38,6 @@ def load_user_hooks() -> None:
         spec.loader.exec_module(module)
 
         # Validate exported hooks
-        from tasky_hooks.dispatcher import get_dispatcher
 
         for name in dir(module):
             if name.startswith("_"):
@@ -49,7 +48,6 @@ def load_user_hooks() -> None:
             # But the spec suggests validating exports.
             # Since the current pattern relies on side-effects (register calls in the file),
             # we'll just log success.
-            pass
 
         logger.info("User hooks loaded successfully")
     except Exception:

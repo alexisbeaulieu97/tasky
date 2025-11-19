@@ -254,7 +254,7 @@ class TaskImportExportService:
                     failed_count=len(result.errors),
                     import_strategy=strategy,
                     imported_task_ids=[],  # TODO: Capture IDs in ImportResult
-                )
+                ),
             )
 
         return result

@@ -668,7 +668,7 @@ def _get_service() -> TaskService:
 
     # Register echo handler if --verbose-hooks is set
     if _get_context_value(typer_ctx, _VERBOSE_HOOKS_KEY) and not _get_context_value(
-        typer_ctx, _QUIET_KEY
+        typer_ctx, _QUIET_KEY,
     ):
         dispatcher.register("*", echo_handler)
 
