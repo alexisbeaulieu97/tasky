@@ -24,20 +24,22 @@ def echo_handler(event: BaseEvent) -> None:
 
     This handler is intended for use with the --verbose-hooks CLI flag.
     """
-    print(f"Hook: {event.event_type} fired", file=sys.stdout)
-    print(f"  Timestamp: {event.timestamp}", file=sys.stdout)
+    print(f"Hook: {event.event_type} fired", file=sys.stdout)  # noqa: T201
+    print(f"  Timestamp: {event.timestamp}", file=sys.stdout)  # noqa: T201
 
     if hasattr(event, "task_id"):
-        print(f"  Task ID: {event.task_id}", file=sys.stdout)
+        # We use getattr to avoid type checking errors on BaseEvent
+        task_id = getattr(event, "task_id")  # noqa: B009
+        print(f"  Task ID: {task_id}", file=sys.stdout)  # noqa: T201
 
     # Print event-specific details if available
     if hasattr(event, "task_snapshot"):
         # We know it has task_snapshot, but mypy doesn't know the type
-        snapshot = event.task_snapshot
-        print(f"  Task: {snapshot.name}", file=sys.stdout)
-        print(f"  Status: {snapshot.status}", file=sys.stdout)
+        snapshot = getattr(event, "task_snapshot")  # noqa: B009
+        print(f"  Task: {snapshot.name}", file=sys.stdout)  # noqa: T201
+        print(f"  Status: {snapshot.status}", file=sys.stdout)  # noqa: T201
 
     if event.event_type == "task_updated" and hasattr(event, "updated_fields"):
         # Cast to TaskUpdatedEvent for type safety if needed, or just use getattr
-        updated_fields = event.updated_fields
-        print(f"  Updated fields: {updated_fields}", file=sys.stdout)
+        updated_fields = getattr(event, "updated_fields")  # noqa: B009
+        print(f"  Updated fields: {updated_fields}", file=sys.stdout)  # noqa: T201

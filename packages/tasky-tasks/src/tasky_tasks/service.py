@@ -320,16 +320,18 @@ class TaskService:
         )
         return self.find_tasks(task_filter)
 
-    def update_task(self, task: TaskModel) -> None:
+    def update_task(self, task: TaskModel) -> None:  # noqa: C901
         """Update an existing task."""
         # Try to get the old state for the event
         old_snapshot = None
         try:
             old_task = self.repository.get_task(task.task_id)
             if old_task:
-                old_snapshot = self._create_snapshot(old_task)
+                # Create snapshot from a copy to avoid mutable reference issues
+                # if the repository returns a live object
+                old_snapshot = self._create_snapshot(old_task.model_copy(deep=True))
         except Exception:
-            logger.warning("Failed to retrieve old task state for update event")
+            logger.exception("Failed to retrieve old task state for update event")
 
         task.mark_updated()
         self.repository.save_task(task)
@@ -338,7 +340,7 @@ class TaskService:
         if old_snapshot:
             new_snapshot = self._create_snapshot(task)
             # Calculate updated fields
-            updated_fields = []
+            updated_fields: list[str] = []
             old_data = old_snapshot.model_dump()
             new_data = new_snapshot.model_dump()
             for key, value in new_data.items():
@@ -354,7 +356,7 @@ class TaskService:
                 ),
             )
 
-    def delete_task(self, task_id: UUID) -> bool:
+    def delete_task(self, task_id: UUID) -> bool:  # noqa: C901
         """Delete a task by ID.
 
         Raises
@@ -380,7 +382,8 @@ class TaskService:
                 task_snapshot = self._create_snapshot(task)
         except Exception:
             logger.exception(
-                "Failed to retrieve task snapshot before deletion for task %s", task_id,
+                "Failed to retrieve task snapshot before deletion for task %s",
+                task_id,
             )
 
         try:

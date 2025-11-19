@@ -564,20 +564,6 @@ def update_command(
     _update_project_last_accessed()
 
 
-def _get_service() -> TaskService:
-    """Get or create a task service for the current project.
-
-    Returns:
-        Configured TaskService instance
-
-    Raises:
-        ProjectNotFoundError: If no project found
-        KeyError: If configured backend is not registered
-
-    """
-    return create_task_service()
-
-
 def _update_project_last_accessed() -> None:
     """Update the last accessed timestamp for the current project in the registry.
 
@@ -609,17 +595,6 @@ def _is_verbose(ctx: typer.Context | None) -> bool:
         obj: object = current.obj
         if isinstance(obj, dict):
             value: bool = bool(obj.get(_VERBOSE_KEY, False))
-            return value
-        current = current.parent
-    return False
-
-
-def _is_verbose_hooks(ctx: typer.Context | None) -> bool:
-    current = ctx
-    while current is not None:
-        obj: object = current.obj
-        if isinstance(obj, dict):
-            value: bool = bool(obj.get(_VERBOSE_HOOKS_KEY, False))
             return value
         current = current.parent
     return False
@@ -668,7 +643,8 @@ def _get_service() -> TaskService:
 
     # Register echo handler if --verbose-hooks is set
     if _get_context_value(typer_ctx, _VERBOSE_HOOKS_KEY) and not _get_context_value(
-        typer_ctx, _QUIET_KEY,
+        typer_ctx,
+        _QUIET_KEY,
     ):
         dispatcher.register("*", echo_handler)
 

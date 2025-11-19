@@ -84,6 +84,10 @@ class ImportResult(BaseModel):
     updated: int = Field(0, description="Number of tasks updated")
     skipped: int = Field(0, description="Number of tasks skipped")
     errors: list[str] = Field(default_factory=list, description="Import errors")
+    imported_task_ids: list[UUID] = Field(  # pyright: ignore[reportUnknownVariableType]
+        default_factory=list,
+        description="IDs of imported tasks",
+    )
 
 
 class TaskImportExportService:
@@ -243,17 +247,13 @@ class TaskImportExportService:
 
         if not dry_run:
             # Emit import event
-            # Note: We don't have the list of imported IDs in ImportResult yet,
-            # but we can emit the counts.
-            # Ideally ImportResult should contain the list of affected IDs.
-            # For now, we emit the event with empty ID list if not available.
-            self.task_service._emit(
+            self.task_service._emit(  # pyright: ignore[reportPrivateUsage] # noqa: SLF001
                 TasksImportedEvent(
                     import_count=result.created + result.updated,
                     skipped_count=result.skipped,
                     failed_count=len(result.errors),
                     import_strategy=strategy,
-                    imported_task_ids=[],  # TODO: Capture IDs in ImportResult
+                    imported_task_ids=result.imported_task_ids,
                 ),
             )
 
@@ -403,6 +403,7 @@ class TaskImportExportService:
         """
         created_count = 0
         errors: list[str] = []
+        imported_ids: list[UUID] = []
 
         # Get existing task IDs
         existing_tasks = self.task_service.get_all_tasks()
@@ -415,6 +416,7 @@ class TaskImportExportService:
 
                 if not dry_run:
                     self.task_service.repository.save_task(task)
+                    imported_ids.append(task.task_id)
 
                 created_count += 1
                 existing_ids.add(task.task_id)  # Track for subsequent imports in same batch
@@ -432,6 +434,7 @@ class TaskImportExportService:
             updated=0,
             skipped=len(errors),
             errors=errors,
+            imported_task_ids=imported_ids,
         )
 
     def _rekey_if_duplicate(self, task: TaskModel, existing_ids: set[UUID]) -> TaskModel:
@@ -503,6 +506,7 @@ class TaskImportExportService:
         created_count = 0
         updated_count = 0
         errors: list[str] = []
+        imported_ids: list[UUID] = []
 
         # Get existing task IDs and map for preserving created_at
         existing_tasks = self.task_service.get_all_tasks()
@@ -523,6 +527,7 @@ class TaskImportExportService:
 
                 if not dry_run:
                     self.task_service.repository.save_task(task)
+                    imported_ids.append(task.task_id)
 
                 if is_update:
                     updated_count += 1
@@ -544,6 +549,7 @@ class TaskImportExportService:
             updated=updated_count,
             skipped=len(errors),
             errors=errors,
+            imported_task_ids=imported_ids,
         )
 
     def _preserve_created_at_if_update(
@@ -635,12 +641,14 @@ class TaskImportExportService:
         """
         created_count = 0
         errors: list[str] = []
+        imported_ids: list[UUID] = []
 
         for snapshot in export_doc.tasks:
             try:
                 task = self._snapshot_to_task(snapshot)
                 if not dry_run:
                     self.task_service.repository.save_task(task)
+                    imported_ids.append(task.task_id)
                 created_count += 1
             except (TaskImportError, ValueError, ValidationError) as exc:
                 # Expected import errors: validation failures, data issues
@@ -655,6 +663,7 @@ class TaskImportExportService:
             updated=0,
             skipped=len(errors),
             errors=errors,
+            imported_task_ids=imported_ids,
         )
 
     def _snapshot_to_task(self, snapshot: TaskSnapshot) -> TaskModel:
