@@ -53,9 +53,9 @@ Tick off each change as you complete it (mirrors the execution order below).
 ### 🚀 Phase 8: AI Integration (45 tasks, ~40-50 hours)
 - [x] 8.1 `add-mcp-server` (MCP protocol integration for Claude) ✅ ARCHIVED 2025-11-19
 
-### 🎯 Phase 9: Event-Driven Automation (86 tasks, ~33-43 hours)
-- [~] 9.1 `implement-task-hooks` (Lifecycle events and automation) - 69/86 tasks complete (80%)
-- [ ] 9.2 `harden-hook-system` (Validation and documentation) - 1/6 tasks complete (17%)
+### 🎯 Phase 9: Event-Driven Automation (92 tasks, ~33-43 hours)
+- [~] 9.1 `implement-task-hooks` (Lifecycle events and automation) - 62/86 tasks complete (72%)
+- [ ] 9.2 `harden-hook-system` (Validation and documentation) - 0/6 tasks complete (0%)
 
 ### 💾 Phase 10: Enterprise Features (72 tasks, ~50-60 hours)
 - [ ] 10.1 `add-advanced-backends` (PostgreSQL, multi-user, audit trails) - 0/72 tasks complete (0%) - NOT STARTED

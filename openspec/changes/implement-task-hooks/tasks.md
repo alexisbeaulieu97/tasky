@@ -51,7 +51,7 @@ Each event MUST be implemented as a Pydantic `BaseModel` in `packages/tasky-hook
 
 ### 1.8 Event Serialization & Round-trip Tests
 - [x] 1.8a Write unit tests for each event's `.model_dump()` and `.model_dump_json()` methods
-- [x] 1.8b Write round-trip test for each event: event → `.model_dump_json()` → `.model_validate_json()` → identical event
+- [ ] 1.8b Write round-trip test for each event: event → `.model_dump_json()` → `.model_validate_json()` → identical event
 - [x] 1.8c Test datetime serialization (ISO 8601 with timezone preserved, Pydantic standard)
 - [x] 1.8d Test nested structures (task snapshots with subtasks, tags, blockers via nested model serialization)
 - [x] 1.8e Test null value handling (optional fields serialized as JSON null, not omitted)
@@ -72,7 +72,7 @@ Each event MUST be implemented as a Pydantic `BaseModel` in `packages/tasky-hook
 - [x] 3.2 Implement logging handler (logs all events)
 - [x] 3.3 Implement optional CLI echo handler (prints events to stdout)
 - [x] 3.4 Add configuration flag for verbose hook output
-- [x] 3.5 Write tests for default handlers
+- [ ] 3.5 Write tests for default handlers
 
 ## 4. Task Service Integration
 
@@ -83,7 +83,7 @@ Each event MUST be implemented as a Pydantic `BaseModel` in `packages/tasky-hook
 - [x] 4.5 Update `TaskService.reopen_task()` to emit `TaskReopenedEvent`
 - [x] 4.6 Update `TaskService.delete_task()` to emit `TaskDeletedEvent`
 - [x] 4.7 Update task import logic to emit `TasksImportedEvent`
-- [x] 4.8 Write integration tests (service methods emit correct events)
+- [x] 4.8 Write integration tests (service methods emit correct events) <!-- NOTE: missing test for import event emission (9.2a.7) -->
 
 ## 5. CLI Integration
 
