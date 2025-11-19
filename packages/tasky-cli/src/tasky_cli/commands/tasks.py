@@ -12,7 +12,10 @@ from uuid import UUID
 
 import click
 import typer
+from tasky_hooks.dispatcher import get_dispatcher
 from tasky_hooks.errors import format_error_for_cli
+from tasky_hooks.handlers import echo_handler, logging_handler
+from tasky_hooks.loader import load_user_hooks
 from tasky_settings import create_task_service, get_project_registry_service
 from tasky_settings.factory import find_project_root
 from tasky_tasks import (
@@ -34,6 +37,7 @@ F = TypeVar("F", bound=Callable[..., object])
 logger = logging.getLogger(__name__)
 
 _VERBOSE_KEY = "verbose"
+_VERBOSE_HOOKS_KEY = "verbose_hooks"
 
 
 @task_app.callback()
@@ -45,10 +49,16 @@ def task_app_callback(
         "-v",
         help="Show detailed error information, including stack traces.",
     ),
+    verbose_hooks: bool = typer.Option(  # noqa: FBT001
+        False,  # noqa: FBT003
+        "--verbose-hooks",
+        help="Show detailed hook execution information.",
+    ),
 ) -> None:
     """Configure task command context."""
     ctx.ensure_object(dict)
     ctx.obj[_VERBOSE_KEY] = verbose
+    ctx.obj[_VERBOSE_HOOKS_KEY] = verbose_hooks
 
 
 def with_task_error_handling(func: F) -> F:  # noqa: UP047
@@ -587,6 +597,48 @@ def _is_verbose(ctx: typer.Context | None) -> bool:
             return value
         current = current.parent
     return False
+
+
+def _is_verbose_hooks(ctx: typer.Context | None) -> bool:
+    current = ctx
+    while current is not None:
+        obj: object = current.obj
+        if isinstance(obj, dict):
+            value: bool = bool(obj.get(_VERBOSE_HOOKS_KEY, False))
+            return value
+        current = current.parent
+    return False
+
+
+def _get_service() -> TaskService:
+    """Get or create a task service for the current project.
+
+    Returns:
+        Configured TaskService instance
+
+    Raises:
+        ProjectNotFoundError: If no project found
+        KeyError: If configured backend is not registered
+
+    """
+    # Initialize hooks
+    dispatcher = get_dispatcher()
+
+    # Load user hooks
+    load_user_hooks()
+
+    # Register default logging handler (always)
+    # Note: In a long-running process, we'd need to be careful about duplicates,
+    # but CLI commands run once.
+    dispatcher.register("*", logging_handler)
+
+    # Register echo handler if --verbose-hooks is set
+    ctx = click.get_current_context(silent=True)
+    typer_ctx = _convert_context(ctx)
+    if _is_verbose_hooks(typer_ctx):
+        dispatcher.register("*", echo_handler)
+
+    return create_task_service(dispatcher=dispatcher)
 
 
 @task_app.command(name="complete")

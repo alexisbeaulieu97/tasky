@@ -797,6 +797,7 @@ version = "0.1.0"
 source = { editable = "packages/tasky-cli" }
 dependencies = [
     { name = "rich" },
+    { name = "tasky-hooks" },
     { name = "tasky-logging" },
     { name = "tasky-projects" },
     { name = "tasky-settings" },
@@ -808,6 +809,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "rich", specifier = ">=13.8.0" },
+    { name = "tasky-hooks", editable = "packages/tasky-hooks" },
     { name = "tasky-logging", editable = "packages/tasky-logging" },
     { name = "tasky-projects", editable = "packages/tasky-projects" },
     { name = "tasky-settings", editable = "packages/tasky-settings" },
@@ -874,13 +876,17 @@ version = "0.1.0"
 source = { editable = "packages/tasky-settings" }
 dependencies = [
     { name = "pydantic-settings" },
+    { name = "tasky-hooks" },
     { name = "tasky-projects" },
+    { name = "tasky-tasks" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "pydantic-settings", specifier = ">=2.11.0" },
+    { name = "tasky-hooks", editable = "packages/tasky-hooks" },
     { name = "tasky-projects", editable = "packages/tasky-projects" },
+    { name = "tasky-tasks", editable = "packages/tasky-tasks" },
 ]
 
 [[package]]
@@ -906,12 +912,14 @@ version = "0.1.0"
 source = { editable = "packages/tasky-tasks" }
 dependencies = [
     { name = "pydantic" },
+    { name = "tasky-hooks" },
     { name = "tasky-logging" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "pydantic", specifier = ">=2.12.3" },
+    { name = "tasky-hooks", editable = "packages/tasky-hooks" },
     { name = "tasky-logging", editable = "packages/tasky-logging" },
 ]
 
