@@ -50,7 +50,7 @@ Tick off each change as you complete it (mirrors the execution order below).
 - [x] 7b.3 `refactor-structured-error-results` (27 tasks, ~2.5h)
 
 ### 🚀 Phase 8: AI Integration (45 tasks, ~40-50 hours)
-- [ ] 8.1 `add-mcp-server` (MCP protocol integration for Claude)
+- [x] 8.1 `add-mcp-server` (MCP protocol integration for Claude)
 
 ### 🎯 Phase 9: Event-Driven Automation (35 tasks, ~30-40 hours)
 - [ ] 9.1 `implement-task-hooks` (Lifecycle events and automation)
