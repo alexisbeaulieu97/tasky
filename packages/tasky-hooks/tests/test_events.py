@@ -28,10 +28,11 @@ def test_task_snapshot_creation() -> None:
 
 def test_event_immutability() -> None:
     """Test that events are immutable."""
+    task_id = uuid4()
     event = TaskCreatedEvent(
-        task_id=uuid4(),
+        task_id=task_id,
         task_snapshot=TaskSnapshot(
-            task_id=uuid4(),
+            task_id=task_id,
             name="Test",
             details="Details",
             status="pending",

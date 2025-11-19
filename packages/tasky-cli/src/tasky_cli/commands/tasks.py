@@ -38,6 +38,8 @@ logger = logging.getLogger(__name__)
 
 _VERBOSE_KEY = "verbose"
 _VERBOSE_HOOKS_KEY = "verbose_hooks"
+_NO_HOOKS_KEY = "no_hooks"
+_QUIET_KEY = "quiet"
 
 
 @task_app.callback()
@@ -54,11 +56,24 @@ def task_app_callback(
         "--verbose-hooks",
         help="Show detailed hook execution information.",
     ),
+    no_hooks: bool = typer.Option(  # noqa: FBT001
+        False,  # noqa: FBT003
+        "--no-hooks",
+        help="Disable all hook execution.",
+    ),
+    quiet: bool = typer.Option(  # noqa: FBT001
+        False,  # noqa: FBT003
+        "--quiet",
+        "-q",
+        help="Suppress hook console output.",
+    ),
 ) -> None:
     """Configure task command context."""
     ctx.ensure_object(dict)
     ctx.obj[_VERBOSE_KEY] = verbose
     ctx.obj[_VERBOSE_HOOKS_KEY] = verbose_hooks
+    ctx.obj[_NO_HOOKS_KEY] = no_hooks
+    ctx.obj[_QUIET_KEY] = quiet
 
 
 def with_task_error_handling(func: F) -> F:  # noqa: UP047
@@ -610,6 +625,18 @@ def _is_verbose_hooks(ctx: typer.Context | None) -> bool:
     return False
 
 
+def _get_context_value(ctx: typer.Context | None, key: str) -> bool:
+    current = ctx
+    while current is not None:
+        obj: object = current.obj
+        if isinstance(obj, dict):
+            value = obj.get(key)
+            if value is not None:
+                return bool(value)
+        current = current.parent
+    return False
+
+
 def _get_service() -> TaskService:
     """Get or create a task service for the current project.
 
@@ -621,6 +648,13 @@ def _get_service() -> TaskService:
         KeyError: If configured backend is not registered
 
     """
+    ctx = click.get_current_context(silent=True)
+    typer_ctx = _convert_context(ctx) if ctx else None
+
+    # Check for --no-hooks
+    if _get_context_value(typer_ctx, _NO_HOOKS_KEY):
+        return create_task_service(dispatcher=None)
+
     # Initialize hooks
     dispatcher = get_dispatcher()
 
@@ -633,9 +667,9 @@ def _get_service() -> TaskService:
     dispatcher.register("*", logging_handler)
 
     # Register echo handler if --verbose-hooks is set
-    ctx = click.get_current_context(silent=True)
-    typer_ctx = _convert_context(ctx)
-    if _is_verbose_hooks(typer_ctx):
+    if _get_context_value(typer_ctx, _VERBOSE_HOOKS_KEY) and not _get_context_value(
+        typer_ctx, _QUIET_KEY
+    ):
         dispatcher.register("*", echo_handler)
 
     return create_task_service(dispatcher=dispatcher)

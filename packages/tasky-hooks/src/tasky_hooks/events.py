@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
 
@@ -36,7 +36,7 @@ class BaseEvent(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     event_type: str
-    timestamp: datetime = Field(default_factory=datetime.now)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
     schema_version: str = "1.0"
 
 

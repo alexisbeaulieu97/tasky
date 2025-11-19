@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING, Any
 from uuid import UUID, uuid4
 
 from pydantic import BaseModel, Field, ValidationError
+from tasky_hooks.events import TasksImportedEvent
 from tasky_logging import get_logger  # type: ignore[import-untyped]
 
 from tasky_tasks.exceptions import (
@@ -239,6 +240,22 @@ class TaskImportExportService:
             result.updated,
             result.skipped,
         )
+
+        if not dry_run:
+            # Emit import event
+            # Note: We don't have the list of imported IDs in ImportResult yet,
+            # but we can emit the counts.
+            # Ideally ImportResult should contain the list of affected IDs.
+            # For now, we emit the event with empty ID list if not available.
+            self.task_service._emit(
+                TasksImportedEvent(
+                    import_count=result.created + result.updated,
+                    skipped_count=result.skipped,
+                    failed_count=len(result.errors),
+                    import_strategy=strategy,
+                    imported_task_ids=[],  # TODO: Capture IDs in ImportResult
+                )
+            )
 
         return result
 

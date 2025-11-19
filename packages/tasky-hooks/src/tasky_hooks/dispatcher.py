@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import threading
 from collections import defaultdict
 from collections.abc import Callable
 from typing import TYPE_CHECKING
@@ -20,6 +21,8 @@ class HookDispatcher:
 
     def __init__(self) -> None:
         self._handlers: dict[str, list[Handler]] = defaultdict(list)
+        self._lock = threading.Lock()
+        self._dispatching = threading.local()
 
     def register(self, event_type: str, handler: Handler) -> None:
         """Register a handler for a specific event type.
@@ -32,8 +35,10 @@ class HookDispatcher:
             The callable to execute when the event occurs.
 
         """
-        self._handlers[event_type].append(handler)
-        logger.debug("Registered handler for event: %s", event_type)
+        with self._lock:
+            if handler not in self._handlers[event_type]:
+                self._handlers[event_type].append(handler)
+                logger.debug("Registered handler for event: %s", event_type)
 
     def dispatch(self, event: BaseEvent) -> None:
         """Dispatch an event to all registered handlers.
@@ -48,31 +53,49 @@ class HookDispatcher:
             The event to dispatch.
 
         """
-        event_type = event.event_type
-        # Get handlers for specific event type and global handlers ("*")
-        handlers = self._handlers.get(event_type, []) + self._handlers.get("*", [])
-
-        if not handlers:
-            logger.debug("No handlers registered for event: %s", event_type)
+        # Reentrancy guard
+        if getattr(self._dispatching, "active", False):
+            logger.warning(
+                "Reentrancy detected; suppressing nested event %s",
+                event.event_type,
+            )
             return
 
-        logger.debug("Dispatching event %s to %d handlers", event_type, len(handlers))
-
-        for handler in handlers:
-            try:
-                handler(event)
-            except Exception:
-                logger.exception(
-                    "Error executing hook handler for event %s",
-                    event_type,
+        self._dispatching.active = True
+        try:
+            event_type = event.event_type
+            # Get handlers for specific event type and global handlers ("*")
+            with self._lock:
+                handlers = list(self._handlers.get(event_type, [])) + list(
+                    self._handlers.get("*", []),
                 )
+
+            if not handlers:
+                logger.debug("No handlers registered for event: %s", event_type)
+                return
+
+            logger.debug("Dispatching event %s to %d handlers", event_type, len(handlers))
+
+            for handler in handlers:
+                try:
+                    handler(event)
+                except Exception:
+                    handler_name = getattr(handler, "__name__", repr(handler))
+                    logger.exception(
+                        "Error executing hook handler %s for event %s",
+                        handler_name,
+                        event_type,
+                    )
+        finally:
+            self._dispatching.active = False
 
     def reset(self) -> None:
         """Reset the dispatcher by clearing all registered handlers.
 
         This is primarily used for testing to ensure a clean state between tests.
         """
-        self._handlers.clear()
+        with self._lock:
+            self._handlers.clear()
 
 
 # Global dispatcher instance

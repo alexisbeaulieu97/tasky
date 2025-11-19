@@ -165,4 +165,8 @@ def create_task_service(
     repository.initialize()
 
     # Return configured service
-    return TaskService(repository=repository, dispatcher=dispatcher)
+    return TaskService(
+        repository=repository,
+        dispatcher=dispatcher,
+        project_root=str(project_root),
+    )

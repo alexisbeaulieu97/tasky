@@ -23,7 +23,8 @@ def test_verbose_hooks_flag() -> None:
         ),
     ):
         # Initialize project first to ensure storage is ready
-        runner.invoke(app, ["project", "init"])
+        init_result = runner.invoke(app, ["project", "init"])
+        assert init_result.exit_code == 0
 
         result = runner.invoke(
             app,
@@ -48,7 +49,8 @@ def test_no_verbose_hooks_flag() -> None:
         ),
     ):
         # Initialize project first to ensure storage is ready
-        runner.invoke(app, ["project", "init"])
+        init_result = runner.invoke(app, ["project", "init"])
+        assert init_result.exit_code == 0
 
         result = runner.invoke(
             app,
@@ -72,7 +74,8 @@ def test_update_hook_output() -> None:
         ),
     ):
         # Initialize project first to ensure storage is ready
-        runner.invoke(app, ["project", "init"])
+        init_result = runner.invoke(app, ["project", "init"])
+        assert init_result.exit_code == 0
 
         create_result = runner.invoke(
             app,

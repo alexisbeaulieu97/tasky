@@ -44,9 +44,11 @@ class TaskService:
         self,
         repository: TaskRepository,
         dispatcher: HookDispatcher | None = None,
+        project_root: str = "",
     ) -> None:
         self.repository = repository
         self.dispatcher = dispatcher
+        self._project_root = project_root
 
     def _create_snapshot(self, task: TaskModel) -> TaskSnapshot:
         """Create a snapshot of the task for events."""
@@ -69,7 +71,7 @@ class TaskService:
             TaskCreatedEvent(
                 task_id=task.task_id,
                 task_snapshot=self._create_snapshot(task),
-                project_root="",  # TODO: Inject project root
+                project_root=self._project_root,
             )
         )
         return task
@@ -377,7 +379,9 @@ class TaskService:
             if task:
                 task_snapshot = self._create_snapshot(task)
         except Exception:
-            pass
+            logger.exception(
+                "Failed to retrieve task snapshot before deletion for task %s", task_id
+            )
 
         try:
             removed = self.repository.delete_task(task_id)
