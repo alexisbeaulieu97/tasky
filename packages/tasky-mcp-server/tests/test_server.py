@@ -176,7 +176,11 @@ async def test_run_tool_enforces_concurrency_limit() -> None:
     results = await asyncio.gather(invoke("a"), invoke("b"))
 
     assert results == ["a", "b"]
-    assert order == ["start-a", "end-a", "start-b", "end-b"]
+
+    # Verify serialization (no overlap) regardless of which task acquired the lock first
+    a_first = order == ["start-a", "end-a", "start-b", "end-b"]
+    b_first = order == ["start-b", "end-b", "start-a", "end-a"]
+    assert a_first or b_first, f"Execution overlapped or was invalid: {order}"
 
 
 @pytest.mark.asyncio
