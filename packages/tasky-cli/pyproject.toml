@@ -13,6 +13,7 @@ dependencies = [
     "tasky-storage",
     "tomli_w>=1.0.0",
     "typer>=0.20.0",
+    "tasky-hooks",
 ]
 
 [build-system]
@@ -24,3 +25,4 @@ tasky-logging = { workspace = true }
 tasky-projects = { workspace = true }
 tasky-settings = { workspace = true }
 tasky-storage = { workspace = true }
+tasky-hooks = { workspace = true }

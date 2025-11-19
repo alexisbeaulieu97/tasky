@@ -9,6 +9,16 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
+from tasky_hooks.events import (
+    BaseEvent,
+    TaskCancelledEvent,
+    TaskCompletedEvent,
+    TaskCreatedEvent,
+    TaskDeletedEvent,
+    TaskReopenedEvent,
+    TaskSnapshot,
+    TaskUpdatedEvent,
+)
 from tasky_logging import get_logger  # type: ignore[import-untyped]
 
 from tasky_tasks.exceptions import TaskNotFoundError, TaskValidationError
@@ -19,6 +29,8 @@ if TYPE_CHECKING:
     from datetime import datetime
     from uuid import UUID
 
+    from tasky_hooks.dispatcher import HookDispatcher
+
     from tasky_tasks.ports import TaskRepository
 
 
@@ -28,14 +40,40 @@ logger: logging.Logger = get_logger("tasks.service")  # type: ignore[no-untyped-
 class TaskService:
     """Service for managing tasks."""
 
-    def __init__(self, repository: TaskRepository) -> None:
+    def __init__(
+        self,
+        repository: TaskRepository,
+        dispatcher: HookDispatcher | None = None,
+        project_root: str = "",
+    ) -> None:
         self.repository = repository
+        self.dispatcher = dispatcher
+        self._project_root = project_root
+
+    def _create_snapshot(self, task: TaskModel) -> TaskSnapshot:
+        """Create a snapshot of the task for events."""
+        # Convert enum to string value for serialization
+        data = task.model_dump(mode="json")
+        return TaskSnapshot(**data)
+
+    def _emit(self, event: BaseEvent) -> None:
+        """Emit an event if a dispatcher is configured."""
+        if self.dispatcher:
+            self.dispatcher.dispatch(event)
 
     def create_task(self, name: str, details: str) -> TaskModel:
         """Create a new task."""
         task = TaskModel(name=name, details=details)
         self.repository.save_task(task)
         logger.info("Task created: id=%s, name=%s", task.task_id, task.name)
+
+        self._emit(
+            TaskCreatedEvent(
+                task_id=task.task_id,
+                task_snapshot=self._create_snapshot(task),
+                project_root=self._project_root,
+            ),
+        )
         return task
 
     def get_task(self, task_id: UUID) -> TaskModel:
@@ -282,13 +320,43 @@ class TaskService:
         )
         return self.find_tasks(task_filter)
 
-    def update_task(self, task: TaskModel) -> None:
+    def update_task(self, task: TaskModel) -> None:  # noqa: C901
         """Update an existing task."""
+        # Try to get the old state for the event
+        old_snapshot = None
+        try:
+            old_task = self.repository.get_task(task.task_id)
+            if old_task:
+                # Create snapshot from a copy to avoid mutable reference issues
+                # if the repository returns a live object
+                old_snapshot = self._create_snapshot(old_task.model_copy(deep=True))
+        except Exception:
+            logger.exception("Failed to retrieve old task state for update event")
+
         task.mark_updated()
         self.repository.save_task(task)
         logger.info("Task updated: id=%s", task.task_id)
 
-    def delete_task(self, task_id: UUID) -> bool:
+        if old_snapshot:
+            new_snapshot = self._create_snapshot(task)
+            # Calculate updated fields
+            updated_fields: list[str] = []
+            old_data = old_snapshot.model_dump()
+            new_data = new_snapshot.model_dump()
+            for key, value in new_data.items():
+                if key in old_data and old_data[key] != value:
+                    updated_fields.append(key)
+
+            self._emit(
+                TaskUpdatedEvent(
+                    task_id=task.task_id,
+                    old_snapshot=old_snapshot,
+                    new_snapshot=new_snapshot,
+                    updated_fields=updated_fields,
+                ),
+            )
+
+    def delete_task(self, task_id: UUID) -> bool:  # noqa: C901
         """Delete a task by ID.
 
         Raises
@@ -306,6 +374,18 @@ class TaskService:
             ``True`` when the task was removed successfully.
 
         """
+        # Get task before deletion for snapshot
+        task_snapshot = None
+        try:
+            task = self.repository.get_task(task_id)
+            if task:
+                task_snapshot = self._create_snapshot(task)
+        except Exception:
+            logger.exception(
+                "Failed to retrieve task snapshot before deletion for task %s",
+                task_id,
+            )
+
         try:
             removed = self.repository.delete_task(task_id)
         except Exception as exc:
@@ -319,6 +399,15 @@ class TaskService:
             raise TaskNotFoundError(task_id)
 
         logger.info("Deleted task: id=%s", task_id)
+
+        if task_snapshot:
+            self._emit(
+                TaskDeletedEvent(
+                    task_id=task_id,
+                    task_snapshot=task_snapshot,
+                ),
+            )
+
         return True
 
     def task_exists(self, task_id: UUID) -> bool:
@@ -356,6 +445,14 @@ class TaskService:
         task.complete()
         self.repository.save_task(task)
         logger.info("Task completed: id=%s, name=%s", task.task_id, task.name)
+
+        self._emit(
+            TaskCompletedEvent(
+                task_id=task.task_id,
+                task_snapshot=self._create_snapshot(task),
+                completion_timestamp=task.updated_at,
+            ),
+        )
         return task
 
     def cancel_task(self, task_id: UUID) -> TaskModel:
@@ -385,9 +482,18 @@ class TaskService:
 
         """
         task = self.get_task(task_id)
+        previous_status = task.status.value
         task.cancel()
         self.repository.save_task(task)
         logger.info("Task cancelled: id=%s, name=%s", task.task_id, task.name)
+
+        self._emit(
+            TaskCancelledEvent(
+                task_id=task.task_id,
+                task_snapshot=self._create_snapshot(task),
+                previous_status=previous_status,
+            ),
+        )
         return task
 
     def reopen_task(self, task_id: UUID) -> TaskModel:
@@ -417,7 +523,17 @@ class TaskService:
 
         """
         task = self.get_task(task_id)
+        previous_status = task.status.value
         task.reopen()
         self.repository.save_task(task)
         logger.info("Task reopened: id=%s, name=%s", task.task_id, task.name)
+
+        self._emit(
+            TaskReopenedEvent(
+                task_id=task.task_id,
+                task_snapshot=self._create_snapshot(task),
+                previous_status=previous_status,
+                new_status=task.status.value,
+            ),
+        )
         return task

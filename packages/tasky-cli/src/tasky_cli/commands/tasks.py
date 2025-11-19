@@ -12,7 +12,10 @@ from uuid import UUID
 
 import click
 import typer
+from tasky_hooks.dispatcher import get_dispatcher
 from tasky_hooks.errors import format_error_for_cli
+from tasky_hooks.handlers import echo_handler, logging_handler
+from tasky_hooks.loader import load_user_hooks
 from tasky_settings import create_task_service, get_project_registry_service
 from tasky_settings.factory import find_project_root
 from tasky_tasks import (
@@ -34,6 +37,9 @@ F = TypeVar("F", bound=Callable[..., object])
 logger = logging.getLogger(__name__)
 
 _VERBOSE_KEY = "verbose"
+_VERBOSE_HOOKS_KEY = "verbose_hooks"
+_NO_HOOKS_KEY = "no_hooks"
+_QUIET_KEY = "quiet"
 
 
 @task_app.callback()
@@ -45,10 +51,29 @@ def task_app_callback(
         "-v",
         help="Show detailed error information, including stack traces.",
     ),
+    verbose_hooks: bool = typer.Option(  # noqa: FBT001
+        False,  # noqa: FBT003
+        "--verbose-hooks",
+        help="Show detailed hook execution information.",
+    ),
+    no_hooks: bool = typer.Option(  # noqa: FBT001
+        False,  # noqa: FBT003
+        "--no-hooks",
+        help="Disable all hook execution.",
+    ),
+    quiet: bool = typer.Option(  # noqa: FBT001
+        False,  # noqa: FBT003
+        "--quiet",
+        "-q",
+        help="Suppress hook console output.",
+    ),
 ) -> None:
     """Configure task command context."""
     ctx.ensure_object(dict)
     ctx.obj[_VERBOSE_KEY] = verbose
+    ctx.obj[_VERBOSE_HOOKS_KEY] = verbose_hooks
+    ctx.obj[_NO_HOOKS_KEY] = no_hooks
+    ctx.obj[_QUIET_KEY] = quiet
 
 
 def with_task_error_handling(func: F) -> F:  # noqa: UP047
@@ -539,20 +564,6 @@ def update_command(
     _update_project_last_accessed()
 
 
-def _get_service() -> TaskService:
-    """Get or create a task service for the current project.
-
-    Returns:
-        Configured TaskService instance
-
-    Raises:
-        ProjectNotFoundError: If no project found
-        KeyError: If configured backend is not registered
-
-    """
-    return create_task_service()
-
-
 def _update_project_last_accessed() -> None:
     """Update the last accessed timestamp for the current project in the registry.
 
@@ -587,6 +598,57 @@ def _is_verbose(ctx: typer.Context | None) -> bool:
             return value
         current = current.parent
     return False
+
+
+def _get_context_value(ctx: typer.Context | None, key: str) -> bool:
+    current = ctx
+    while current is not None:
+        obj: object = current.obj
+        if isinstance(obj, dict):
+            value = obj.get(key)
+            if value is not None:
+                return bool(value)
+        current = current.parent
+    return False
+
+
+def _get_service() -> TaskService:
+    """Get or create a task service for the current project.
+
+    Returns:
+        Configured TaskService instance
+
+    Raises:
+        ProjectNotFoundError: If no project found
+        KeyError: If configured backend is not registered
+
+    """
+    ctx = click.get_current_context(silent=True)
+    typer_ctx = _convert_context(ctx) if ctx else None
+
+    # Check for --no-hooks
+    if _get_context_value(typer_ctx, _NO_HOOKS_KEY):
+        return create_task_service(dispatcher=None)
+
+    # Initialize hooks
+    dispatcher = get_dispatcher()
+
+    # Load user hooks
+    load_user_hooks()
+
+    # Register default logging handler (always)
+    # Note: In a long-running process, we'd need to be careful about duplicates,
+    # but CLI commands run once.
+    dispatcher.register("*", logging_handler)
+
+    # Register echo handler if --verbose-hooks is set
+    if _get_context_value(typer_ctx, _VERBOSE_HOOKS_KEY) and not _get_context_value(
+        typer_ctx,
+        _QUIET_KEY,
+    ):
+        dispatcher.register("*", echo_handler)
+
+    return create_task_service(dispatcher=dispatcher)
 
 
 @task_app.command(name="complete")

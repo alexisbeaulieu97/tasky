@@ -5,11 +5,15 @@ from __future__ import annotations
 import threading
 from importlib import import_module
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from tasky_tasks.service import TaskService
 
 from tasky_settings.backend_registry import registry
 from tasky_settings.configuration import get_settings
+
+if TYPE_CHECKING:
+    from tasky_hooks.dispatcher import HookDispatcher
 
 # Backend initialization state (thread-safe)
 # Using a list to avoid global statement - mutable container can be modified
@@ -107,7 +111,10 @@ def find_project_root(start_path: Path | None = None) -> Path:
     raise ProjectNotFoundError(current)
 
 
-def create_task_service(project_root: Path | None = None) -> TaskService:
+def create_task_service(
+    project_root: Path | None = None,
+    dispatcher: HookDispatcher | None = None,
+) -> TaskService:
     """Create a TaskService instance from project configuration.
 
     This factory function:
@@ -120,6 +127,7 @@ def create_task_service(project_root: Path | None = None) -> TaskService:
 
     Args:
         project_root: Path to project root. If None, searches from current directory.
+        dispatcher: Optional hook dispatcher for event handling.
 
     Returns:
         Configured TaskService instance
@@ -157,4 +165,8 @@ def create_task_service(project_root: Path | None = None) -> TaskService:
     repository.initialize()
 
     # Return configured service
-    return TaskService(repository=repository)
+    return TaskService(
+        repository=repository,
+        dispatcher=dispatcher,
+        project_root=str(project_root),
+    )

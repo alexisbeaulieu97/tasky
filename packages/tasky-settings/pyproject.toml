@@ -5,10 +5,17 @@ description = "Add your description here"
 readme = "README.md"
 authors = [{ name = "Alexis Beaulieu", email = "alexisbeaulieu97@gmail.com" }]
 requires-python = ">=3.13"
-dependencies = ["pydantic-settings>=2.11.0", "tasky-projects"]
+dependencies = [
+    "pydantic-settings>=2.11.0",
+    "tasky-projects",
+    "tasky-tasks",
+    "tasky-hooks",
+]
 
 [tool.uv.sources]
 tasky-projects = { workspace = true }
+tasky-tasks = { workspace = true }
+tasky-hooks = { workspace = true }
 
 [build-system]
 requires = ["uv_build>=0.9.7,<0.10.0"]
