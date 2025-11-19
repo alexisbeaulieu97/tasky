@@ -43,22 +43,22 @@ Tick off each change as you complete it (mirrors the execution order below).
 - [x] 7.6 `consolidate-repository-fakes` (24 tasks, ~2h)
 - [x] 7.7 `improve-performance-and-safety` (42 tasks, ~21h)
 - [x] 7.8 `improve-architecture-and-documentation` (44 tasks, ~15h)
-- [ ] 7.9 `refactor-shared-dtos` (10 tasks, ~4h)
+- [ ] 7.9 `refactor-shared-dtos` (10 tasks, ~4h) - 0/10 tasks complete (0%) - NOT STARTED
 
-### 🎯 Phase 7b: CLI Improvements (78 tasks, ~7.5 hours)
+### 🎯 Phase 7b: CLI Improvements (78 tasks, ~7.5 hours) ✅ COMPLETE
 - [x] 7b.1 `add-cli-input-validators` (25 tasks, ~3h)
 - [x] 7b.2 `refactor-cli-error-handling` (26 tasks, ~2h)
-- [x] 7b.3 `refactor-structured-error-results` (27 tasks, ~2.5h)
+- [x] 7b.3 `refactor-structured-error-results` (27 tasks, ~2.5h) ✅ ARCHIVED 2025-11-19
 
 ### 🚀 Phase 8: AI Integration (45 tasks, ~40-50 hours)
-- [x] 8.1 `add-mcp-server` (MCP protocol integration for Claude)
+- [x] 8.1 `add-mcp-server` (MCP protocol integration for Claude) ✅ ARCHIVED 2025-11-19
 
-### 🎯 Phase 9: Event-Driven Automation (41 tasks, ~33-43 hours)
-- [x] 9.1 `implement-task-hooks` (Lifecycle events and automation)
-- [ ] 9.2 `harden-hook-system` (Validation and documentation)
+### 🎯 Phase 9: Event-Driven Automation (86 tasks, ~33-43 hours)
+- [~] 9.1 `implement-task-hooks` (Lifecycle events and automation) - 69/86 tasks complete (80%)
+- [ ] 9.2 `harden-hook-system` (Validation and documentation) - 1/6 tasks complete (17%)
 
-### 💾 Phase 10: Enterprise Features (55 tasks, ~50-60 hours)
-- [ ] 10.1 `add-advanced-backends` (PostgreSQL, multi-user, audit trails)
+### 💾 Phase 10: Enterprise Features (72 tasks, ~50-60 hours)
+- [ ] 10.1 `add-advanced-backends` (PostgreSQL, multi-user, audit trails) - 0/72 tasks complete (0%) - NOT STARTED
 
 ---
 

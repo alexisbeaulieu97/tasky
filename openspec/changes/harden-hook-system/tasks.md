@@ -5,4 +5,4 @@
 3.  [ ] Add round-trip serialization tests for all event types in `test_events.py`
 4.  [ ] Create `docs/HOOKS.md` with event schemas and examples
 5.  [ ] Add concurrency safety tests for the dispatcher
-6.  [ ] Verify all tests pass
+6.  [x] Verify all tests pass
